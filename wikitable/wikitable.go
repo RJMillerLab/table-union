@@ -23,6 +23,7 @@ type Header struct {
 
 type WikiTable struct {
 	ID      int        `json:"id"`
+	RawID   int        `json:"raw_id"`
 	Headers []Header   `json:"headers"`
 	Columns [][]string `json:"columns"`
 }
@@ -48,7 +49,7 @@ func readRaw(t wikiTableRaw) *WikiTable {
 		}
 	}
 	return &WikiTable{
-		ID:      t.ID,
+		RawID:   t.ID,
 		Headers: headers,
 		Columns: cols,
 	}
@@ -58,6 +59,7 @@ func ReadWikiTable(wikiTableFile io.Reader) chan *WikiTable {
 	out := make(chan *WikiTable)
 	go func() {
 		defer close(out)
+		var count int
 		scanner := bufio.NewScanner(wikiTableFile)
 		for scanner.Scan() {
 			data := scanner.Bytes()
@@ -66,7 +68,10 @@ func ReadWikiTable(wikiTableFile io.Reader) chan *WikiTable {
 			if err != nil {
 				panic(err)
 			}
-			out <- readRaw(tableRaw)
+			t := readRaw(tableRaw)
+			t.ID = count
+			out <- t
+			count++
 		}
 		if err := scanner.Err(); err != nil {
 			panic(err)
