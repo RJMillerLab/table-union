@@ -12,7 +12,7 @@ type cellRaw struct {
 
 type wikiTableRaw struct {
 	ID      int         `json:"tableId"`
-	Headers []Header    `json:"tableHeaders"`
+	Headers [][]Header  `json:"tableHeaders"`
 	Rows    [][]cellRaw `json:"tableData"`
 }
 
@@ -28,7 +28,17 @@ type WikiTable struct {
 }
 
 func readRaw(t wikiTableRaw) *WikiTable {
-	cols := make([][]string, len(t.Headers))
+	var headers []Header
+	numCol := len(t.Rows[0])
+	for i := range t.Headers {
+		if len(t.Headers[i]) == numCol {
+			headers = t.Headers[i]
+		}
+	}
+	if headers == nil {
+		panic("Cannot find headers with the same number of fields as row")
+	}
+	cols := make([][]string, numCol)
 	for i := range cols {
 		cols[i] = make([]string, len(t.Rows))
 	}
@@ -39,7 +49,7 @@ func readRaw(t wikiTableRaw) *WikiTable {
 	}
 	return &WikiTable{
 		ID:      t.ID,
-		Headers: t.Headers,
+		Headers: headers,
 		Columns: cols,
 	}
 }
