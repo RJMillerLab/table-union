@@ -81,6 +81,7 @@ func ReadWikiTable(wikiTableFile io.Reader) chan *WikiTable {
 		defer close(out)
 		var count int
 		scanner := bufio.NewScanner(wikiTableFile)
+		scanner.Buffer(make([]byte, bufio.MaxScanTokenSize), bufio.MaxScanTokenSize*128)
 		for scanner.Scan() {
 			data := scanner.Bytes()
 			var tableRaw wikiTableRaw
