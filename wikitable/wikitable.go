@@ -2,6 +2,7 @@ package wikitable
 
 import (
 	"bufio"
+	"encoding/csv"
 	"encoding/json"
 	"io"
 )
@@ -26,6 +27,25 @@ type WikiTable struct {
 	RawID   int        `json:"raw_id"`
 	Headers []Header   `json:"headers"`
 	Columns [][]string `json:"columns"`
+}
+
+func (t *WikiTable) ToCsv(file io.Writer) error {
+	writer := csv.NewWriter(file)
+	for i := 0; i < len(t.Columns[0]); i++ {
+		row := make([]string, len(t.Headers))
+		for j := range row {
+			row[j] = t.Columns[j][i]
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return err
+	}
+	return nil
+
 }
 
 func readRaw(t wikiTableRaw) *WikiTable {
