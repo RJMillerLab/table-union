@@ -39,6 +39,9 @@ func NewSearchIndex(ft *fasttext.FastText) *SearchIndex {
 func (index *SearchIndex) Build(wikiTableFile io.Reader) error {
 	for table := range wikitable.ReadWikiTable(wikiTableFile) {
 		for i, column := range table.Columns {
+			if table.Headers[i].IsNum {
+				continue
+			}
 			vec, err := index.GetEmb(column)
 			if err == ErrNoEmbFound {
 				log.Printf("No embedding found for table %d column %d", table.ID, i)
