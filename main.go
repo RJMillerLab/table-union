@@ -66,7 +66,8 @@ func main() {
 	var wikitablesFile string
 	flag.StringVar(&wordembsFile, "wembeddingsfile", "/home/ekzhu/FB_WORD_VEC/wiki.en.vec", "word embeddings file")
 	flag.StringVar(&wtembsFile, "wtembsFile", "wikitables_embeddings", "wiki tables embedding json file")
-	flag.StringVar(&wikitablesFile, "wikitablesFile", "/home/ekzhu/go/src/github.com/RJMillerLab/fastTextHomeWork/wikitable/testdata/tables.json", "wikitablesFile")
+	//flag.StringVar(&wikitablesFile, "wikitablesFile", "/home/ekzhu/go/src/github.com/RJMillerLab/fastTextHomeWork/wikitable/testdata/tables.json", "wikitablesFile")
+	flag.StringVar(&wikitablesFile, "wikitablesFile", "/home/ekzhu/WIKI_TABLE/tables.json", "wikitablesFile")
 	//
 	wembs, embsize := readEmbeddings(wordembsFile)
 	wtf, err := os.Open(wikitablesFile)

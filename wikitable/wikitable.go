@@ -68,10 +68,12 @@ func ReadWikiTable(wikiTableFile io.Reader) chan *WikiTable {
 			if err != nil {
 				panic(err)
 			}
-			t := readRaw(tableRaw)
-			t.ID = count
-			out <- t
-			count++
+			if len(tableRaw.Rows) > 0 {
+				t := readRaw(tableRaw)
+				t.ID = count
+				out <- t
+				count++
+			}
 		}
 		if err := scanner.Err(); err != nil {
 			panic(err)
