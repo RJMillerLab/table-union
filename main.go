@@ -56,7 +56,7 @@ func mkColumnEmbedding(column []string, wembs map[string][]float64, embSize int)
 			}
 		}
 	}
-	log.Printf("embs is %v\n", colEmbs)
+	//log.Printf("embs is %v\n", colEmbs)
 	return colEmbs
 }
 

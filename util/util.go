@@ -77,3 +77,21 @@ func MkDomain(col []string) []string {
 	}
 	return dom
 }
+
+func IsNull(s string) bool {
+	if strings.ToLower(s) == "null" {
+		return true
+	}
+	if len(strings.TrimSpace(s)) == 0 {
+		return true
+
+		return true
+	}
+	if s == "\"\"" {
+		return true
+	}
+	if len(strings.TrimSpace(strings.Replace(strings.Replace(s, "\"", "", -1), "'", "", -1))) == 0 {
+		return true
+	}
+	return false
+}

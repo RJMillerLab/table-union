@@ -1,7 +1,6 @@
 package search
 
 import (
-	"log"
 	"math"
 
 	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
@@ -19,8 +18,6 @@ type SearchIndex struct {
 }
 
 func floatToInt(x float64) int {
-	//return int(math.Floor((x / math.MaxFloat64) * float64(math.MaxInt64)))
-	log.Printf("dp is %d\n", int(math.Floor((x/math.MaxFloat64)*float64(math.MaxInt64))))
 	return int(math.Floor((x / math.MaxFloat64) * float64(math.MaxInt64)))
 }
 
