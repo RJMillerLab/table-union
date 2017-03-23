@@ -41,8 +41,9 @@ func readEmbeddings(embsFile string) (map[string][]float64, int) {
 }
 
 func mkColumnEmbedding(column []string, wembs map[string][]float64, embSize int) []float64 {
+	domain := util.MkDomain(column)
 	colEmbs := make([]float64, embSize)
-	for _, w := range column {
+	for _, w := range domain {
 		w = strings.TrimSpace(strings.ToLower(w))
 		wordparts := strings.Split(w, " ")
 		for _, p := range wordparts {

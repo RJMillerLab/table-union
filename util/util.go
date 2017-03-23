@@ -5,55 +5,9 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
-
-// Tokenizes an attribute
-func tokenize(att []string, qgrams map[string]int) ([]int, map[string]int) {
-	tokens := make([]int, len(qgrams))
-	tmap := make(map[string]int)
-	for _, e := range att {
-		e = strings.ToLower(strings.TrimSpace(strings.Replace(e, "_", " ", -1)))
-		for ix, _ := range e {
-			if ix <= len(e)-3 {
-				if val, ok := qgrams[e[ix:ix+3]]; ok {
-					tokens[val] = tokens[val] + 1
-					if _, ok := tmap[e[ix:ix+3]]; ok {
-						tmap[e[ix:ix+3]] = tmap[e[ix:ix+3]] + 1
-					} else {
-						tmap[e[ix:ix+3]] = 1
-					}
-				}
-			}
-		}
-	}
-	return tokens, tmap
-}
-
-// Loads a directory
-func LoadDirectory(dirname string) (filenames []string) {
-	dir, err := os.Open(dirname)
-	defer dir.Close()
-	if err != nil {
-		panic(err.Error())
-	}
-
-	fi_list, err := dir.Readdir(-1)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	for _, fi := range fi_list {
-		if !fi.IsDir() {
-			filenames = append(filenames, filepath.Join(dirname, fi.Name()))
-		}
-	}
-
-	return filenames
-}
 
 func LoadJson(file string, v interface{}) error {
 	buffer, err := ioutil.ReadFile(file)
@@ -67,7 +21,7 @@ func LoadJson(file string, v interface{}) error {
 	return nil
 }
 
-func dumpJson(file string, v interface{}) error {
+func DumpJson(file string, v interface{}) error {
 	buffer, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -110,4 +64,16 @@ func IsNumeric(cell string) bool {
 		return false
 	}
 	return true
+}
+
+func MkDomain(col []string) []string {
+	found := make(map[string]bool)
+	var dom []string
+	for _, s := range col {
+		if !found[strings.ToLower(s)] && IsNull(strings.ToLower(s)) != true {
+			found[strings.ToLower(s)] = true
+			dom = append(dom, s)
+		}
+	}
+	return dom
 }
