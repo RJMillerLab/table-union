@@ -107,11 +107,14 @@ func main() {
 	}
 	query := entries[2].Embedding
 	log.Printf("query1: %v\n", tables[0].Columns[2])
+	log.Printf("------------------\n")
 	_, cols := searchindex.TopK(query, 5)
 	log.Printf("results columns of query 1: %v\n", cols)
+	log.Printf("------------------\n")
 	qstr := []string{"ottawa", "toronto", "montreal"}
 	query = mkColumnEmbedding(qstr, wembs, embsize)
 	log.Printf("query2: %v\n", qstr)
+	log.Printf("------------------\n")
 	_, cols = searchindex.TopK(query, 5)
 	log.Printf("results columns of query 2: %v\n", cols)
 }
