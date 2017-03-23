@@ -1,8 +1,6 @@
 package search
 
 import (
-	"math"
-
 	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
 )
 
@@ -15,10 +13,6 @@ type VecEntry struct {
 type SearchIndex struct {
 	Entries []*VecEntry
 	Tables  []*wikitable.WikiTable
-}
-
-func floatToInt(x float64) int {
-	return int(math.Floor((x / math.MaxFloat64) * float64(math.MaxInt64)))
 }
 
 func dotProduct(x, y []float64) float64 {
@@ -35,7 +29,7 @@ func dotProduct(x, y []float64) float64 {
 func (index *SearchIndex) TopK(query []float64, k int) ([]*VecEntry, [][]string) {
 	queue := NewTopKQueue(k)
 	for _, entry := range index.Entries {
-		queue.Push(entry, floatToInt(dotProduct(query, entry.Embedding)))
+		queue.Push(entry, dotProduct(query, entry.Embedding))
 	}
 	result_emvecs := make([]*VecEntry, queue.Size())
 	result_columns := make([][]string, queue.Size())

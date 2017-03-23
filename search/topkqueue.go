@@ -1,17 +1,15 @@
 package search
 
-import "github.com/oleiade/lane"
-
 // TopKQueue maintains a fixed-size queue of items
 // with k highest priorities.
 type TopKQueue struct {
-	lane.PQueue
+	PQueue
 	k int
 }
 
 func NewTopKQueue(k int) *TopKQueue {
 	return &TopKQueue{
-		*lane.NewPQueue(lane.MINPQ),
+		*NewPQueue(MINPQ),
 		k,
 	}
 }
@@ -19,7 +17,7 @@ func NewTopKQueue(k int) *TopKQueue {
 // DryPush checks whether a Push with the given priority
 // will result in an materialized insertion to the
 // TopKQueue
-func (pq *TopKQueue) DryPush(priority int) bool {
+func (pq *TopKQueue) DryPush(priority float64) bool {
 	if pq.Size() < pq.k {
 		return true
 	}
@@ -33,7 +31,7 @@ func (pq *TopKQueue) DryPush(priority int) bool {
 // Push pushes a new item to the TopKQueue, but does not
 // actually insert the item into the queue unless its
 // priority qualifies for the top-k
-func (pq *TopKQueue) Push(value interface{}, priority int) {
+func (pq *TopKQueue) Push(value interface{}, priority float64) {
 	if !pq.DryPush(priority) {
 		return
 	}
