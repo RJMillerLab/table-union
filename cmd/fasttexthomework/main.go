@@ -49,6 +49,7 @@ func main() {
 	}
 
 	// Test
+	// TODO: use a file (e.g., CSV) as input instead
 	qstr := []string{"ottawa", "toronto", "montreal"}
 	// Build the embedding vector of the test words
 	vec, err := index.GetEmb(qstr)
