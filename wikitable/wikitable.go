@@ -5,6 +5,8 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"io"
+	"strings"
+	"unicode"
 )
 
 type cellRaw struct {
@@ -65,7 +67,9 @@ func readRaw(t wikiTableRaw) *WikiTable {
 	}
 	for i := range t.Rows {
 		for j := range cols {
-			cols[j][i] = t.Rows[i][j].Text
+			v := t.Rows[i][j].Text
+			v = strings.TrimFunc(strings.TrimSpace(v), unicode.IsPunct)
+			cols[j][i] = v
 		}
 	}
 	return &WikiTable{

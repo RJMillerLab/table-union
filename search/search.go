@@ -97,7 +97,7 @@ func (index *SearchIndex) GetEmb(column []string) ([]float64, error) {
 		for _, p := range wordparts {
 			emb, err := index.ft.GetEmb(p)
 			if err == fasttext.ErrNoEmbFound {
-				log.Printf("No embedding found for %s", p)
+				// log.Printf("No embedding found for %s", p)
 				continue
 			}
 			if err != nil {

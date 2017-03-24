@@ -15,7 +15,7 @@ func main() {
 	var wikiTableFilename string
 	flag.StringVar(&fastTextFilename, "fasttext-raw", "/home/ekzhu/FB_WORD_VEC/wiki.en.vec",
 		"Facebook fastText word vec file")
-	flag.StringVar(&sqliteDbFilename, "fasttext-db", "fasttext.db",
+	flag.StringVar(&sqliteDbFilename, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs, will be created if not exist")
 	flag.StringVar(&wikiTableFilename, "wikitable-raw", "/home/ekzhu/WIKI_TABLE/tables.json",
 		"WikiTable dataset file")
