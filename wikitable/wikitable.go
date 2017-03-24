@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"io"
+	"log"
 	"strconv"
 	"strings"
 	"unicode"
@@ -31,7 +33,14 @@ type WikiTable struct {
 	Columns [][]string `json:"columns"`
 }
 
+func (t *WikiTable) IsEmpty() bool {
+	return len(t.Headers) == 0 && len(t.Columns) == 0
+}
+
 func (t *WikiTable) ToCsv(file io.Writer) error {
+	if len(t.Columns) == 0 {
+		return errors.New("Empty table")
+	}
 	writer := csv.NewWriter(file)
 	row := make([]string, len(t.Headers))
 	// Write headers
@@ -71,7 +80,7 @@ func FromCsv(file io.Reader) (*WikiTable, error) {
 		return nil, err
 	}
 	if len(rows) < 2 {
-		panic("Empty CSV File")
+		return nil, errors.New("Empty table")
 	}
 	// Make headers
 	headers := make([]Header, len(rows[0]))
@@ -101,17 +110,24 @@ func FromCsv(file io.Reader) (*WikiTable, error) {
 	}, nil
 }
 
-func readRaw(t wikiTableRaw) *WikiTable {
+func readRaw(t wikiTableRaw) (*WikiTable, error) {
+	if len(t.Rows) <= 0 {
+		return nil, errors.New("Raw table has no row")
+	}
 	var headers []Header
 	numCol := len(t.Rows[0])
+	if numCol == 0 {
+		return nil, errors.New("Raw table has no column")
+	}
 	for i := range t.Headers {
 		if len(t.Headers[i]) == numCol {
 			headers = t.Headers[i]
 		}
 	}
 	if headers == nil {
-		panic("Cannot find headers with the same number of fields as row")
+		return nil, errors.New("Cannot find headers with the same number of fields as row")
 	}
+	// Transpose
 	cols := make([][]string, numCol)
 	for i := range cols {
 		cols[i] = make([]string, len(t.Rows))
@@ -126,7 +142,7 @@ func readRaw(t wikiTableRaw) *WikiTable {
 	return &WikiTable{
 		Headers: headers,
 		Columns: cols,
-	}
+	}, nil
 }
 
 func ReadWikiTable(wikiTableFile io.Reader) chan *WikiTable {
@@ -143,12 +159,14 @@ func ReadWikiTable(wikiTableFile io.Reader) chan *WikiTable {
 			if err != nil {
 				panic(err)
 			}
-			if len(tableRaw.Rows) > 0 {
-				t := readRaw(tableRaw)
-				t.ID = count
-				out <- t
-				count++
+			t, err := readRaw(tableRaw)
+			count++
+			if err != nil {
+				log.Printf("ReadWikiTable (ID %d): %s", count, err)
+				continue
 			}
+			t.ID = count
+			out <- t
 		}
 		if err := scanner.Err(); err != nil {
 			panic(err)
