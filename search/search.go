@@ -58,6 +58,20 @@ func (index *SearchIndex) Build(wikiTableFile io.Reader) error {
 	return nil
 }
 
+// Save backs up the search index using
+// 1) a Sqlite3 database for the entries (embedding vectors), and
+// 2) a directory to save wiki tables in CSV files, each filename is the unique table ID.
+func (index *SearchIndex) Save(embDbFilename, tableBackupDir string) error {
+	// TODO
+	return nil
+}
+
+// Load recover the search index.
+func (index *SearchIndex) Load(embDbFilename, tableBackupDir string) error {
+	// TODO
+	return nil
+}
+
 func (index *SearchIndex) GetTable(id int) *wikitable.WikiTable {
 	return index.tables[id]
 }

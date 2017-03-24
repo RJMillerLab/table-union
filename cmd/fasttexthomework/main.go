@@ -39,6 +39,7 @@ func main() {
 	// Build search index
 	// TODO: make this step faster by initializing from a sqlite db
 	// similar to fastText
+	// See TODOs in search.go
 	f, err := os.Open(wikiTableFilename)
 	if err != nil {
 		panic(err)
