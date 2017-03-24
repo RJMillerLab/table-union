@@ -1,14 +1,64 @@
 package main
 
 import (
+	"encoding/csv"
 	"flag"
-	"fmt"
+	"io"
 	"log"
 	"os"
 
 	"github.com/RJMillerLab/fastTextHomeWork/search"
+	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
+	"github.com/ekzhu/counter"
+	"github.com/ekzhu/datatable"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
+
+func readCSV(file io.Reader) *datatable.DataTable {
+	reader := csv.NewReader(file)
+	var table *datatable.DataTable
+	for {
+		row, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(err)
+		}
+		if table == nil {
+			table = datatable.NewDataTable(len(row))
+		}
+		if err := table.AppendRow(row); err != nil {
+			panic(err)
+		}
+	}
+	return table
+}
+
+func query(index *search.SearchIndex, table *datatable.DataTable) {
+	for i := 0; i < table.NumCol(); i++ {
+		log.Printf("Querying column %d", i)
+		domain := counter.NewCounter()
+		table.ApplyColumn(func(j int, v string) error {
+			domain.Update(v)
+			return nil
+		}, i)
+		values := make([]string, 0, domain.Unique())
+		domain.Apply(func(v interface{}) error {
+			values = append(values, v.(string))
+			return nil
+		})
+		vec, err := index.GetEmb(values)
+		if err != nil {
+			log.Print(err)
+			continue
+		}
+		result := index.TopK(vec, 5)
+		for _, v := range result {
+			log.Printf("Table %d, Column %d", v.TableID, v.ColumnIndex)
+		}
+	}
+}
 
 func main() {
 	var fastTextFilename string
@@ -17,6 +67,7 @@ func main() {
 	var searchIndexSqliteDB string
 	var wikiTableDir string
 	var rebuildSearchIndex bool
+	var queryCSVFilename string
 	flag.StringVar(&fastTextFilename, "fasttext-raw", "/home/ekzhu/FB_WORD_VEC/wiki.en.vec",
 		"Facebook fastText word vec file")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
@@ -28,7 +79,9 @@ func main() {
 	flag.StringVar(&wikiTableDir, "wikitable-dir", "/home/ekzhu/WIKI_TABLE/tables",
 		"Directory for storing wikitable CSV files, will be created if not exist")
 	flag.BoolVar(&rebuildSearchIndex, "rebuild-searchindex", false,
-		"Set to true to rebuild search index from scratch, the original index will be removed")
+		"Set to true to rebuild search index from scratch, the existing search index sqlite database will be removed")
+	flag.StringVar(&queryCSVFilename, "query", "",
+		"Query CSV file")
 	flag.Parse()
 
 	// Create Sqlite DB for fastText if not exists
@@ -49,49 +102,44 @@ func main() {
 	ft := fasttext.NewFastText(fastTextSqliteDB)
 	defer ft.Close()
 
-	if rebuildSearchIndex {
-		if err := os.RemoveAll(wikiTableDir); err != nil {
+	// Create wikitable store, build if not exists
+	ts := wikitable.NewWikiTableStore(wikiTableDir)
+	if ts.IsNotBuilt() {
+		log.Print("Building wikitable store from scratch")
+		f, err := os.Open(wikiTableFilename)
+		if err != nil {
 			panic(err)
 		}
+		if err := ts.Build(f); err != nil {
+			panic(err)
+		}
+		f.Close()
+		log.Print("Finish building wikitable store")
+	}
+
+	if rebuildSearchIndex {
 		if err := os.Remove(searchIndexSqliteDB); err != nil {
 			panic(err)
 		}
 	}
 
-	index := search.NewSearchIndex(ft, searchIndexSqliteDB, wikiTableDir)
+	index := search.NewSearchIndex(ft, searchIndexSqliteDB)
 	defer index.Close()
 	// Build search index
 	if index.IsNotBuilt() {
 		log.Print("Building search index from scratch")
-		f, err := os.Open(wikiTableFilename)
-		if err != nil {
+		if err := index.Build(ts); err != nil {
 			panic(err)
 		}
-		if err := index.Build(f, 8); err != nil {
-			panic(err)
-		}
-		f.Close()
 		log.Print("Finish building search index")
 	}
 
 	// Test
-	// TODO: use a file (e.g., CSV) as input instead
-	qstr := []string{"ottawa", "toronto", "montreal"}
-	log.Println("Test query:", qstr)
-	// Build the embedding vector of the test words
-	vec, err := index.GetEmb(qstr)
+	f, err := os.Open(queryCSVFilename)
 	if err != nil {
-		log.Print(err)
-		return
+		panic(err)
 	}
-	// query
-	result := index.TopK(vec, 5)
-	for _, v := range result {
-		fmt.Printf("Table %d, Column %d\n", v.TableID, v.ColumnIndex)
-		table, err := index.GetTable(v.TableID)
-		if err != nil {
-			panic(err)
-		}
-		table.ToCsv(os.Stdout)
-	}
+	defer f.Close()
+	q := readCSV(f)
+	query(index, q)
 }

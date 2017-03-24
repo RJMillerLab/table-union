@@ -6,12 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
-	"sync"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -24,12 +19,8 @@ const (
 )
 
 var (
-	ErrNoEmbFound           = errors.New("No embedding found")
-	ErrIndexNotEmpty        = errors.New("The search index is not empty")
-	ErrExistingWikiTableDir = errors.New("The wikitable directory already exists")
-	ErrExistingSqliteTable  = errors.New("The Sqlite database table already exists")
-	ErrNoTableFound         = errors.New("No such table found")
-	ByteOrder               = binary.BigEndian
+	ErrNoEmbFound = errors.New("No embedding found")
+	ByteOrder     = binary.BigEndian
 )
 
 type EmbEntry struct {
@@ -39,34 +30,29 @@ type EmbEntry struct {
 }
 
 type SearchIndex struct {
-	ft           *fasttext.FastText
-	wikiTableDir string
-	db           *sql.DB     // Sqlite store for the embedding entries
-	entries      []*EmbEntry // In-memory store for the embedding entries
-	transFun     func(string) string
-	tablename    string
-	byteOrder    binary.ByteOrder
+	ft        *fasttext.FastText
+	db        *sql.DB     // Sqlite store for the embedding entries
+	entries   []*EmbEntry // In-memory store for the embedding entries
+	transFun  func(string) string
+	tablename string
+	byteOrder binary.ByteOrder
 }
 
-func NewSearchIndex(ft *fasttext.FastText, dbFilename, wikiTableDir string) *SearchIndex {
+func NewSearchIndex(ft *fasttext.FastText, dbFilename string) *SearchIndex {
 	db, err := sql.Open("sqlite3", dbFilename)
 	if err != nil {
 		panic(err)
 	}
 	index := &SearchIndex{
-		ft:           ft,
-		wikiTableDir: wikiTableDir,
-		db:           db,
-		entries:      make([]*EmbEntry, 0),
-		transFun:     func(s string) string { return strings.TrimSpace(strings.ToLower(s)) },
-		tablename:    TableName,
-		byteOrder:    ByteOrder,
+		ft:        ft,
+		db:        db,
+		entries:   make([]*EmbEntry, 0),
+		transFun:  func(s string) string { return strings.TrimSpace(strings.ToLower(s)) },
+		tablename: TableName,
+		byteOrder: ByteOrder,
 	}
 	if index.checkSqlitTableExist() {
-		err := index.load()
-		if err != nil {
-			panic(err)
-		}
+		index.load()
 	}
 	return index
 }
@@ -76,37 +62,28 @@ func (index *SearchIndex) Close() error {
 }
 
 func (index *SearchIndex) IsNotBuilt() bool {
-	if _, err := os.Stat(index.wikiTableDir); err == nil {
-		return false
-	}
-	if index.checkSqlitTableExist() {
-		return false
-	}
-	return true
+	return !index.checkSqlitTableExist()
 }
 
-func (index *SearchIndex) Build(wikiTableFile io.Reader, numThread int) error {
-	// Checks
-	if _, err := os.Stat(index.wikiTableDir); err == nil {
-		return ErrExistingWikiTableDir
-	}
+func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 	if index.checkSqlitTableExist() {
-		return ErrExistingSqliteTable
+		return errors.New("Sqlite database already exists")
+	}
+	if ts.IsNotBuilt() {
+		return errors.New("Wikitable store is not built, build it first")
 	}
 
-	// Proc embeddings
+	// Compute embedding entries from wikitables
 	entries := make(chan *EmbEntry)
-	tables := make(chan *wikitable.WikiTable)
 	go func() {
 		defer close(entries)
-		defer close(tables)
-		for table := range wikitable.ReadWikiTable(wikiTableFile) {
+		ts.Apply(func(table *wikitable.WikiTable) {
 			for i, column := range table.Columns {
 				if table.Headers[i].IsNum {
 					continue
 				}
 				vec, err := index.GetEmb(column)
-				if err == ErrNoEmbFound {
+				if err != nil {
 					continue
 				}
 				entry := &EmbEntry{
@@ -117,86 +94,57 @@ func (index *SearchIndex) Build(wikiTableFile io.Reader, numThread int) error {
 				index.entries = append(index.entries, entry)
 				entries <- entry
 			}
-			tables <- table
-		}
+		})
 	}()
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-	// Backing up wiki tables
-	go func() {
-		defer wg.Done()
-		if err := os.Mkdir(index.wikiTableDir, 0777); err != nil {
-			panic(err)
-		}
-		for table := range tables {
-			p := filepath.Join(index.wikiTableDir, strconv.Itoa(table.ID))
-			f, err := os.Create(p)
-			if err != nil {
-				panic(err)
-			}
-			table.ToCsv(f)
-			f.Close()
-		}
-	}()
-
-	// Saving embeddings to Sqlite
-	go func() {
-		defer wg.Done()
-		_, err := index.db.Exec(fmt.Sprintf(`
+	// Saving embedding entries to Sqlite
+	_, err := index.db.Exec(fmt.Sprintf(`
 		CREATE TABLE %s (
 			table_id INTEGER,
 			column_index INTEGER,
 			vec BLOB
 		);
 		`, index.tablename))
-		if err != nil {
-			panic(err)
-		}
-		stmt, err := index.db.Prepare(fmt.Sprintf(`
+	if err != nil {
+		panic(err)
+	}
+	stmt, err := index.db.Prepare(fmt.Sprintf(`
 		INSERT INTO %s(table_id, column_index, vec) VALUES(?, ?, ?);
 		`, index.tablename))
-		if err != nil {
+	if err != nil {
+		panic(err)
+	}
+	defer stmt.Close()
+	for e := range entries {
+		binVec := vecToBytes(e.Vec, index.byteOrder)
+		if _, err := stmt.Exec(e.TableID, e.ColumnIndex, binVec); err != nil {
 			panic(err)
 		}
-		defer stmt.Close()
-		for e := range entries {
-			binVec := vecToBytes(e.Vec, index.byteOrder)
-			if _, err := stmt.Exec(e.TableID, e.ColumnIndex, binVec); err != nil {
-				panic(err)
-			}
-		}
-	}()
-
-	wg.Wait()
+	}
 	return nil
 }
 
 // Load recovers the search index entries from the Sqlite database.
-func (index *SearchIndex) load() error {
+func (index *SearchIndex) load() {
 	if len(index.entries) > 0 {
-		return ErrIndexNotEmpty
+		panic("Index is not empty when calling load()")
 	}
 	rows, err := index.db.Query(fmt.Sprintf(`
 	SELECT table_id, column_index, vec FROM %s;
 	`, index.tablename))
 	if err != nil {
-		return err
+		panic(err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var tableID, columnIndex int
 		var binVec []byte
 		if err := rows.Scan(&tableID, &columnIndex, &binVec); err != nil {
-			return err
+			panic(err)
 		}
 		vec, err := bytesToVec(binVec, index.byteOrder)
 		if err != nil {
-			return err
-		}
-		p := filepath.Join(index.wikiTableDir, strconv.Itoa(tableID))
-		if _, err := os.Stat(p); err != nil {
-			return ErrNoTableFound
+			panic(err)
 		}
 		index.entries = append(index.entries, &EmbEntry{
 			TableID:     tableID,
@@ -204,25 +152,6 @@ func (index *SearchIndex) load() error {
 			Vec:         vec,
 		})
 	}
-	return nil
-}
-
-func (index *SearchIndex) GetTable(id int) (*wikitable.WikiTable, error) {
-	p := filepath.Join(index.wikiTableDir, strconv.Itoa(id))
-	f, err := os.Open(p)
-	if os.IsNotExist(err) {
-		return nil, ErrNoTableFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	t, err := wikitable.FromCsv(f)
-	if err != nil {
-		return nil, err
-	}
-	t.ID = id
-	return t, nil
 }
 
 func (index *SearchIndex) TopK(query []float64, k int) []*EmbEntry {

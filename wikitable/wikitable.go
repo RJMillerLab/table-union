@@ -7,9 +7,16 @@ import (
 	"errors"
 	"io"
 	"log"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
+)
+
+var (
+	ErrEmptyTable   = errors.New("Empty table")
+	ErrNoTableFound = errors.New("No such table found")
 )
 
 type cellRaw struct {
@@ -27,16 +34,14 @@ type Header struct {
 	Text  string `json:"text"`
 }
 
+// WikiTable is a in-memory representation of a wikitable.
 type WikiTable struct {
 	ID      int        `json:"id"`
 	Headers []Header   `json:"headers"`
 	Columns [][]string `json:"columns"`
 }
 
-func (t *WikiTable) IsEmpty() bool {
-	return len(t.Headers) == 0 && len(t.Columns) == 0
-}
-
+// Write the wikitable in CSV format.
 func (t *WikiTable) ToCsv(file io.Writer) error {
 	if len(t.Columns) == 0 {
 		return errors.New("Empty table")
@@ -73,6 +78,7 @@ func (t *WikiTable) ToCsv(file io.Writer) error {
 	return nil
 }
 
+// Converts a CSV file to wikitable.
 func FromCsv(file io.Reader) (*WikiTable, error) {
 	reader := csv.NewReader(file)
 	rows, err := reader.ReadAll()
@@ -145,6 +151,7 @@ func readRaw(t wikiTableRaw) (*WikiTable, error) {
 	}, nil
 }
 
+// ReadWikiTable provides a channel reader for the raw wikitable dataset.
 func ReadWikiTable(wikiTableFile io.Reader) chan *WikiTable {
 	out := make(chan *WikiTable)
 	go func() {
@@ -173,4 +180,99 @@ func ReadWikiTable(wikiTableFile io.Reader) chan *WikiTable {
 		}
 	}()
 	return out
+}
+
+// WikiTableStore is provides an interface for the file system
+// directory storing the wikitable CSV files.
+type WikiTableStore struct {
+	wikiTableDir string
+}
+
+func NewWikiTableStore(wikiTableDir string) *WikiTableStore {
+	return &WikiTableStore{
+		wikiTableDir: wikiTableDir,
+	}
+}
+
+// GetTable gets a wikitable given its ID.
+func (ts *WikiTableStore) GetTable(id int) (*WikiTable, error) {
+	p := filepath.Join(ts.wikiTableDir, strconv.Itoa(id))
+	f, err := os.Open(p)
+	if os.IsNotExist(err) {
+		return nil, ErrNoTableFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	t, err := FromCsv(f)
+	if err != nil {
+		return nil, err
+	}
+	t.ID = id
+	return t, nil
+}
+
+// Apply executes function fn on every wikitable.
+func (ts *WikiTableStore) Apply(fn func(*WikiTable)) {
+	ids := make(chan int)
+	go func() {
+		defer close(ids)
+		dir, err := os.Open(ts.wikiTableDir)
+		if err != nil {
+			panic(err)
+		}
+		defer dir.Close()
+		var names []string
+		for ; err == nil; names, err = dir.Readdirnames(1024) {
+			for _, n := range names {
+				id, err := strconv.Atoi(n)
+				if err != nil {
+					panic(err)
+				}
+				ids <- id
+			}
+		}
+	}()
+
+	for id := range ids {
+		t, err := ts.GetTable(id)
+		if err != nil {
+			panic(err)
+		}
+		fn(t)
+	}
+}
+
+// IsNotBuilt checks if the wikitable directory has not been
+// created.
+func (ts *WikiTableStore) IsNotBuilt() bool {
+	_, err := os.Stat(ts.wikiTableDir)
+	if os.IsNotExist(err) {
+		return true
+	}
+	if err != nil {
+		panic(err)
+	}
+	return false
+}
+
+// Build creates the wikitable directory and populate it with
+// wikitable CSV files, given the raw wikitable dataset file.
+func (ts *WikiTableStore) Build(wikiTableFile io.Reader) error {
+	if err := os.MkdirAll(ts.wikiTableDir, 0777); err != nil {
+		return err
+	}
+	for table := range ReadWikiTable(wikiTableFile) {
+		p := filepath.Join(ts.wikiTableDir, strconv.Itoa(table.ID))
+		f, err := os.Create(p)
+		if err != nil {
+			return err
+		}
+		if err := table.ToCsv(f); err != nil {
+			return err
+		}
+		f.Close()
+	}
+	return nil
 }
