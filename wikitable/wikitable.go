@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"io"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -26,15 +27,29 @@ type Header struct {
 
 type WikiTable struct {
 	ID      int        `json:"id"`
-	RawID   int        `json:"raw_id"`
 	Headers []Header   `json:"headers"`
 	Columns [][]string `json:"columns"`
 }
 
 func (t *WikiTable) ToCsv(file io.Writer) error {
 	writer := csv.NewWriter(file)
+	row := make([]string, len(t.Headers))
+	// Write headers
+	for i := range row {
+		row[i] = t.Headers[i].Text
+	}
+	if err := writer.Write(row); err != nil {
+		return err
+	}
+	// Write column types
+	for i := range row {
+		row[i] = strconv.FormatBool(t.Headers[i].IsNum)
+	}
+	if err := writer.Write(row); err != nil {
+		return err
+	}
+	// Write rows
 	for i := 0; i < len(t.Columns[0]); i++ {
-		row := make([]string, len(t.Headers))
 		for j := range row {
 			row[j] = t.Columns[j][i]
 		}
@@ -47,7 +62,43 @@ func (t *WikiTable) ToCsv(file io.Writer) error {
 		return err
 	}
 	return nil
+}
 
+func FromCsv(file io.Reader) (*WikiTable, error) {
+	reader := csv.NewReader(file)
+	rows, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) < 2 {
+		panic("Empty CSV File")
+	}
+	// Make headers
+	headers := make([]Header, len(rows[0]))
+	for i := range headers {
+		isNum, err := strconv.ParseBool(rows[1][i])
+		if err != nil {
+			return nil, err
+		}
+		headers[i] = Header{
+			IsNum: isNum,
+			Text:  rows[0][i],
+		}
+	}
+	// Make columns
+	cols := make([][]string, len(headers))
+	for i := range cols {
+		cols[i] = make([]string, len(rows))
+	}
+	for i := range rows {
+		for j := range cols {
+			cols[j][i] = rows[i][j]
+		}
+	}
+	return &WikiTable{
+		Headers: headers,
+		Columns: cols,
+	}, nil
 }
 
 func readRaw(t wikiTableRaw) *WikiTable {
@@ -73,7 +124,6 @@ func readRaw(t wikiTableRaw) *WikiTable {
 		}
 	}
 	return &WikiTable{
-		RawID:   t.ID,
 		Headers: headers,
 		Columns: cols,
 	}
