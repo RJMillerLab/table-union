@@ -243,7 +243,7 @@ func (ts *WikiTableStore) Build(wikiTableFile io.Reader) error {
 			count++
 			// Skip existing CSV files
 			p := ts.getTableFilename(count)
-			if _, err := os.Stat(p); err != nil {
+			if _, err := os.Stat(p); err == nil {
 				continue
 			}
 			data := scanner.Bytes()
