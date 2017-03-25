@@ -207,7 +207,8 @@ func (ts *WikiTableStore) Apply(fn func(*WikiTable)) {
 	for id := range ids {
 		t, err := ts.GetTable(id)
 		if err != nil {
-			log.Printf("Error in reading table %d", id)
+			log.Printf("Error in reading table %d: %s", id, err)
+			continue
 		}
 		fn(t)
 	}
