@@ -151,37 +151,6 @@ func readRaw(t wikiTableRaw) (*WikiTable, error) {
 	}, nil
 }
 
-// ReadWikiTable provides a channel reader for the raw wikitable dataset.
-func ReadWikiTable(wikiTableFile io.Reader) chan *WikiTable {
-	out := make(chan *WikiTable)
-	go func() {
-		defer close(out)
-		var count int
-		scanner := bufio.NewScanner(wikiTableFile)
-		scanner.Buffer(make([]byte, bufio.MaxScanTokenSize), bufio.MaxScanTokenSize*128)
-		for scanner.Scan() {
-			data := scanner.Bytes()
-			var tableRaw wikiTableRaw
-			err := json.Unmarshal(data, &tableRaw)
-			if err != nil {
-				panic(err)
-			}
-			t, err := readRaw(tableRaw)
-			count++
-			if err != nil {
-				log.Printf("ReadWikiTable (ID %d): %s", count, err)
-				continue
-			}
-			t.ID = count
-			out <- t
-		}
-		if err := scanner.Err(); err != nil {
-			panic(err)
-		}
-	}()
-	return out
-}
-
 // WikiTableStore is provides an interface for the file system
 // directory storing the wikitable CSV files.
 type WikiTableStore struct {
@@ -196,7 +165,7 @@ func NewWikiTableStore(wikiTableDir string) *WikiTableStore {
 
 // GetTable gets a wikitable given its ID.
 func (ts *WikiTableStore) GetTable(id int) (*WikiTable, error) {
-	p := filepath.Join(ts.wikiTableDir, strconv.Itoa(id))
+	p := ts.getTableFilename(id)
 	f, err := os.Open(p)
 	if os.IsNotExist(err) {
 		return nil, ErrNoTableFound
@@ -238,7 +207,7 @@ func (ts *WikiTableStore) Apply(fn func(*WikiTable)) {
 	for id := range ids {
 		t, err := ts.GetTable(id)
 		if err != nil {
-			panic(err)
+			log.Printf("Error in reading table %d", id)
 		}
 		fn(t)
 	}
@@ -263,8 +232,41 @@ func (ts *WikiTableStore) Build(wikiTableFile io.Reader) error {
 	if err := os.MkdirAll(ts.wikiTableDir, 0777); err != nil {
 		return err
 	}
-	for table := range ReadWikiTable(wikiTableFile) {
-		p := filepath.Join(ts.wikiTableDir, strconv.Itoa(table.ID))
+
+	tables := make(chan *WikiTable)
+	go func() {
+		defer close(tables)
+		var count int
+		scanner := bufio.NewScanner(wikiTableFile)
+		scanner.Buffer(make([]byte, bufio.MaxScanTokenSize), bufio.MaxScanTokenSize*256)
+		for scanner.Scan() {
+			count++
+			// Skip existing CSV files
+			p := ts.getTableFilename(count)
+			if _, err := os.Stat(p); err != nil {
+				continue
+			}
+			data := scanner.Bytes()
+			var tableRaw wikiTableRaw
+			err := json.Unmarshal(data, &tableRaw)
+			if err != nil {
+				panic(err)
+			}
+			t, err := readRaw(tableRaw)
+			if err != nil {
+				// log.Printf("ReadWikiTable (ID %d): %s", count, err)
+				continue
+			}
+			t.ID = count
+			tables <- t
+		}
+		if err := scanner.Err(); err != nil {
+			panic(err)
+		}
+	}()
+
+	for table := range tables {
+		p := ts.getTableFilename(table.ID)
 		f, err := os.Create(p)
 		if err != nil {
 			return err
@@ -275,4 +277,8 @@ func (ts *WikiTableStore) Build(wikiTableFile io.Reader) error {
 		f.Close()
 	}
 	return nil
+}
+
+func (ts *WikiTableStore) getTableFilename(id int) string {
+	return filepath.Join(ts.wikiTableDir, strconv.Itoa(id))
 }

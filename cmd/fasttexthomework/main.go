@@ -67,6 +67,7 @@ func main() {
 	var searchIndexSqliteDB string
 	var wikiTableDir string
 	var rebuildSearchIndex bool
+	var rebuildWikiTableStore bool
 	var queryCSVFilename string
 	flag.StringVar(&fastTextFilename, "fasttext-raw", "/home/ekzhu/FB_WORD_VEC/wiki.en.vec",
 		"Facebook fastText word vec file")
@@ -78,6 +79,8 @@ func main() {
 		"Sqlite database file for search index vecs, will be created if not exist")
 	flag.StringVar(&wikiTableDir, "wikitable-dir", "/home/ekzhu/WIKI_TABLE/tables",
 		"Directory for storing wikitable CSV files, will be created if not exist")
+	flag.BoolVar(&rebuildWikiTableStore, "rebuild-wikitable", false,
+		"Set to true to rebuild wikitable store, existing CSV files will be skipped")
 	flag.BoolVar(&rebuildSearchIndex, "rebuild-searchindex", false,
 		"Set to true to rebuild search index from scratch, the existing search index sqlite database will be removed")
 	flag.StringVar(&queryCSVFilename, "query", "",
@@ -104,8 +107,8 @@ func main() {
 
 	// Create wikitable store, build if not exists
 	ts := wikitable.NewWikiTableStore(wikiTableDir)
-	if ts.IsNotBuilt() {
-		log.Print("Building wikitable store from scratch")
+	if ts.IsNotBuilt() || rebuildWikiTableStore {
+		log.Print("Building wikitable store")
 		f, err := os.Open(wikiTableFilename)
 		if err != nil {
 			panic(err)

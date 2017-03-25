@@ -170,8 +170,12 @@ func (index *SearchIndex) TopK(query []float64, k int) []*EmbEntry {
 func (index *SearchIndex) GetEmb(column []string) ([]float64, error) {
 	domain := mkDomain(column, index.transFun)
 	var vec []float64
+	var count int
 	for w := range domain {
 		wordparts := strings.Split(w, " ")
+		if len(wordparts) > 5 {
+			continue
+		}
 		for _, p := range wordparts {
 			emb, err := index.ft.GetEmb(p)
 			if err == fasttext.ErrNoEmbFound {
@@ -187,9 +191,15 @@ func (index *SearchIndex) GetEmb(column []string) ([]float64, error) {
 				add(vec, emb.Vec)
 			}
 		}
+		if vec != nil {
+			count++
+		}
 	}
 	if vec == nil {
 		return nil, ErrNoEmbFound
+	}
+	for i, v := range vec {
+		vec[i] = v / float64(count)
 	}
 	return vec, nil
 }
