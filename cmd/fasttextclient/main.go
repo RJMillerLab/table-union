@@ -92,7 +92,7 @@ func main() {
 			panic(err)
 		}
 		for _, v := range result {
-			log.Printf("Table %d, Column %d", v.TableID, v.ColumnIndex)
+			log.Printf("Table %s, Column %d", v.TableID, v.ColumnIndex)
 			t, err := ts.GetTable(v.TableID)
 			outputFilename := filepath.Join(colResultDir, fmt.Sprintf("%d_c%d", v.TableID, v.ColumnIndex))
 			f, err := os.Create(outputFilename)
