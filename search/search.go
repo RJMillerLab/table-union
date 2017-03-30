@@ -6,12 +6,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
+	"github.com/RJMillerLab/lsh"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
@@ -32,8 +34,8 @@ type EmbEntry struct {
 
 type SearchIndex struct {
 	ft        *fasttext.FastText
-	db        *sql.DB     // Sqlite store for the embedding entries
-	entries   []*EmbEntry // In-memory store for the embedding entries
+	db        *sql.DB // Sqlite store for the embedding entries
+	lsh       *lsh.CosineLsh
 	transFun  func(string) string
 	tablename string
 	byteOrder binary.ByteOrder
@@ -47,7 +49,7 @@ func NewSearchIndex(ft *fasttext.FastText, dbFilename string) *SearchIndex {
 	index := &SearchIndex{
 		ft:        ft,
 		db:        db,
-		entries:   make([]*EmbEntry, 0),
+		lsh:       lsh.NewCosineLsh(300, 16, 10),
 		transFun:  func(s string) string { return strings.TrimSpace(strings.ToLower(s)) },
 		tablename: TableName,
 		byteOrder: ByteOrder,
@@ -87,12 +89,13 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 				if err != nil {
 					continue
 				}
+				id := toColumnID(table.ID, i)
+				index.lsh.Insert(vec, id)
 				entry := &EmbEntry{
 					TableID:     table.ID,
 					ColumnIndex: i,
 					Vec:         vec,
 				}
-				index.entries = append(index.entries, entry)
 				entries <- entry
 			}
 		})
@@ -122,14 +125,17 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 			panic(err)
 		}
 	}
+	_, err = index.db.Exec(fmt.Sprintf(`
+		CREATE INDEX ind_column_id ON %s(table_id, column_index);
+		`, index.tablename))
+	if err != nil {
+		panic(err)
+	}
 	return nil
 }
 
 // Load recovers the search index entries from the Sqlite database.
 func (index *SearchIndex) load() {
-	if len(index.entries) > 0 {
-		panic("Index is not empty when calling load()")
-	}
 	rows, err := index.db.Query(fmt.Sprintf(`
 	SELECT table_id, column_index, vec FROM %s;
 	`, index.tablename))
@@ -137,6 +143,7 @@ func (index *SearchIndex) load() {
 		panic(err)
 	}
 	defer rows.Close()
+	var count int
 	for rows.Next() {
 		var tableID string
 		var columnIndex int
@@ -148,17 +155,50 @@ func (index *SearchIndex) load() {
 		if err != nil {
 			panic(err)
 		}
-		index.entries = append(index.entries, &EmbEntry{
-			TableID:     tableID,
-			ColumnIndex: columnIndex,
-			Vec:         vec,
-		})
+		id := toColumnID(tableID, columnIndex)
+		index.lsh.Insert(vec, id)
+		count++
+		fmt.Printf("\rLoaded %d embeddings into index", count)
+		if count == 100000 {
+			break
+		}
 	}
+	fmt.Println()
+}
+
+func (index *SearchIndex) Get(tableID string, columnIndex int) (*EmbEntry, error) {
+	var binVec []byte
+	err := index.db.QueryRow(fmt.Sprintf(`
+	SELECT vec FROM %s
+	WHERE table_id=? AND column_index=?;
+	`, index.tablename), tableID, columnIndex).Scan(&binVec)
+	if err == sql.ErrNoRows {
+		return nil, errors.New("The column does not exist in the index")
+	}
+	if err != nil {
+		return nil, err
+	}
+	vec, err := bytesToVec(binVec, index.byteOrder)
+	if err != nil {
+		panic(err)
+	}
+	return &EmbEntry{
+		TableID:     tableID,
+		ColumnIndex: columnIndex,
+		Vec:         vec,
+	}, nil
 }
 
 func (index *SearchIndex) TopK(query []float64, k int) []*EmbEntry {
+	lshResults := index.lsh.Query(query)
+	log.Printf("LSH Returns %d candidates", len(lshResults))
 	queue := NewTopKQueue(k)
-	for _, entry := range index.entries {
+	for _, id := range lshResults {
+		tableID, columnIndex := fromColumnID(id)
+		entry, err := index.Get(tableID, columnIndex)
+		if err != nil {
+			panic(err)
+		}
 		queue.Push(entry, dotProduct(query, entry.Vec))
 	}
 	result := make([]*EmbEntry, queue.Size())
@@ -271,17 +311,14 @@ func bytesToVec(data []byte, order binary.ByteOrder) ([]float64, error) {
 	return vec, nil
 }
 
-func fromColumnID(columnID string) (tableID int, columnIndex int) {
+func fromColumnID(columnID string) (tableID string, columnIndex int) {
 	items := strings.Split(columnID, ":")
 	if len(items) != 2 {
 		msg := fmt.Sprintf("Malformed Column ID: %s", columnID)
 		panic(msg)
 	}
-	tableID, err := strconv.Atoi(items[0])
-	if err != nil {
-		msg := fmt.Sprintf("Malformed Column ID: %s", columnID)
-		panic(msg)
-	}
+	tableID = items[0]
+	var err error
 	columnIndex, err = strconv.Atoi(items[1])
 	if err != nil {
 		msg := fmt.Sprintf("Malformed Column ID: %s", columnID)
@@ -290,7 +327,7 @@ func fromColumnID(columnID string) (tableID int, columnIndex int) {
 	return
 }
 
-func toColumnID(tableID int, columnIndex int) (columnID string) {
-	columnID = fmt.Sprintf("%d:%d", tableID, columnIndex)
+func toColumnID(tableID string, columnIndex int) (columnID string) {
+	columnID = fmt.Sprintf("%s:%d", tableID, columnIndex)
 	return
 }

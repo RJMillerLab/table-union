@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -45,7 +46,12 @@ func main() {
 		panic(err)
 	}
 	defer f.Close()
-	queryTable, err := datatable.FromCSV(csv.NewReader(f))
+	reader := csv.NewReader(f)
+	headers, err := reader.Read()
+	if err != nil {
+		panic(err)
+	}
+	queryTable, err := datatable.FromCSV(reader)
 	if err != nil {
 		panic(err)
 	}
@@ -81,20 +87,25 @@ func main() {
 	if err := os.MkdirAll(resultDir, 0777); err != nil {
 		panic(err)
 	}
-	log.Print(queryResponse)
 	for i, result := range queryResponse.Results {
 		if result == nil || len(result) == 0 {
-			log.Printf("No result for column %d", i)
+			log.Printf("No result for column %d (%s)", i, headers[i])
 			continue
 		}
-		colResultDir := filepath.Join(resultDir, fmt.Sprintf("c%d_result", i))
+		log.Printf("Result for column %d (%s)", i, headers[i])
+		colResultDir := filepath.Join(resultDir, fmt.Sprintf("c%d_(%s)", i, headers[i]))
 		if err := os.MkdirAll(colResultDir, 0777); err != nil {
 			panic(err)
 		}
-		for _, v := range result {
-			log.Printf("Table %s, Column %d", v.TableID, v.ColumnIndex)
+		for i, v := range result {
+			log.Printf("(Rank %d) Table %s, Column %d", i, v.TableID, v.ColumnIndex)
 			t, err := ts.GetTable(v.TableID)
-			outputFilename := filepath.Join(colResultDir, fmt.Sprintf("%d_c%d", v.TableID, v.ColumnIndex))
+			outputFilename := filepath.Join(colResultDir,
+				fmt.Sprintf("(Rank %d)_%s_c%d_(%s).csv",
+					i,
+					v.TableID,
+					v.ColumnIndex,
+					url.PathEscape(t.Headers[v.ColumnIndex].Text)))
 			f, err := os.Create(outputFilename)
 			if err != nil {
 				panic(err)

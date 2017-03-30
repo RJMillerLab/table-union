@@ -86,6 +86,7 @@ func (s *Server) queryHandler(c *gin.Context) {
 	for i := range vecs {
 		result := make([]QueryResult, 0)
 		if vecs[i] != nil {
+			log.Printf("Querying with column %d", i)
 			embs := s.si.TopK(vecs[i], queryRequest.K)
 			for _, emb := range embs {
 				result = append(result, QueryResult{

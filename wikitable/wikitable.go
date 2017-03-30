@@ -103,11 +103,11 @@ func FromCSV(file io.Reader) (*WikiTable, error) {
 	// Make columns
 	cols := make([][]string, len(headers))
 	for i := range cols {
-		cols[i] = make([]string, len(rows))
+		cols[i] = make([]string, len(rows)-2)
 	}
-	for i := range rows[2:] {
+	for i, row := range rows[2:] {
 		for j := range cols {
-			cols[j][i] = rows[i][j]
+			cols[j][i] = row[j]
 		}
 	}
 	return &WikiTable{
