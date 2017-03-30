@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -24,7 +25,7 @@ var (
 )
 
 type EmbEntry struct {
-	TableID     int       `json:"table_id"`
+	TableID     string    `json:"table_id"`
 	ColumnIndex int       `json:"column_index"`
 	Vec         []float64 `json:"vec"`
 }
@@ -100,7 +101,7 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 	// Saving embedding entries to Sqlite
 	_, err := index.db.Exec(fmt.Sprintf(`
 		CREATE TABLE %s (
-			table_id INTEGER,
+			table_id TEXT,
 			column_index INTEGER,
 			vec BLOB
 		);
@@ -137,7 +138,8 @@ func (index *SearchIndex) load() {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var tableID, columnIndex int
+		var tableID string
+		var columnIndex int
 		var binVec []byte
 		if err := rows.Scan(&tableID, &columnIndex, &binVec); err != nil {
 			panic(err)
@@ -267,4 +269,28 @@ func bytesToVec(data []byte, order binary.ByteOrder) ([]float64, error) {
 		vec[i] = v
 	}
 	return vec, nil
+}
+
+func fromColumnID(columnID string) (tableID int, columnIndex int) {
+	items := strings.Split(columnID, ":")
+	if len(items) != 2 {
+		msg := fmt.Sprintf("Malformed Column ID: %s", columnID)
+		panic(msg)
+	}
+	tableID, err := strconv.Atoi(items[0])
+	if err != nil {
+		msg := fmt.Sprintf("Malformed Column ID: %s", columnID)
+		panic(msg)
+	}
+	columnIndex, err = strconv.Atoi(items[1])
+	if err != nil {
+		msg := fmt.Sprintf("Malformed Column ID: %s", columnID)
+		panic(msg)
+	}
+	return
+}
+
+func toColumnID(tableID int, columnIndex int) (columnID string) {
+	columnID = fmt.Sprintf("%d:%d", tableID, columnIndex)
+	return
 }

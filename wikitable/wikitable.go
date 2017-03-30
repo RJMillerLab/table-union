@@ -36,13 +36,13 @@ type Header struct {
 
 // WikiTable is a in-memory representation of a wikitable.
 type WikiTable struct {
-	ID      int        `json:"id"`
+	ID      string     `json:"id"`
 	Headers []Header   `json:"headers"`
 	Columns [][]string `json:"columns"`
 }
 
 // Write the wikitable in CSV format.
-func (t *WikiTable) ToCsv(file io.Writer) error {
+func (t *WikiTable) ToCSV(file io.Writer) error {
 	if len(t.Columns) == 0 {
 		return errors.New("Empty table")
 	}
@@ -79,7 +79,7 @@ func (t *WikiTable) ToCsv(file io.Writer) error {
 }
 
 // Converts a CSV file to wikitable.
-func FromCsv(file io.Reader) (*WikiTable, error) {
+func FromCSV(file io.Reader) (*WikiTable, error) {
 	reader := csv.NewReader(file)
 	rows, err := reader.ReadAll()
 	if err != nil {
@@ -105,7 +105,7 @@ func FromCsv(file io.Reader) (*WikiTable, error) {
 	for i := range cols {
 		cols[i] = make([]string, len(rows))
 	}
-	for i := range rows {
+	for i := range rows[2:] {
 		for j := range cols {
 			cols[j][i] = rows[i][j]
 		}
@@ -164,7 +164,7 @@ func NewWikiTableStore(wikiTableDir string) *WikiTableStore {
 }
 
 // GetTable gets a wikitable given its ID.
-func (ts *WikiTableStore) GetTable(id int) (*WikiTable, error) {
+func (ts *WikiTableStore) GetTable(id string) (*WikiTable, error) {
 	p := ts.getTableFilename(id)
 	f, err := os.Open(p)
 	if os.IsNotExist(err) {
@@ -174,7 +174,7 @@ func (ts *WikiTableStore) GetTable(id int) (*WikiTable, error) {
 		return nil, err
 	}
 	defer f.Close()
-	t, err := FromCsv(f)
+	t, err := FromCSV(f)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +184,7 @@ func (ts *WikiTableStore) GetTable(id int) (*WikiTable, error) {
 
 // Apply executes function fn on every wikitable.
 func (ts *WikiTableStore) Apply(fn func(*WikiTable)) {
-	ids := make(chan int)
+	ids := make(chan string)
 	go func() {
 		defer close(ids)
 		dir, err := os.Open(ts.wikiTableDir)
@@ -194,11 +194,7 @@ func (ts *WikiTableStore) Apply(fn func(*WikiTable)) {
 		defer dir.Close()
 		var names []string
 		for ; err == nil; names, err = dir.Readdirnames(1024) {
-			for _, n := range names {
-				id, err := strconv.Atoi(n)
-				if err != nil {
-					panic(err)
-				}
+			for _, id := range names {
 				ids <- id
 			}
 		}
@@ -207,7 +203,7 @@ func (ts *WikiTableStore) Apply(fn func(*WikiTable)) {
 	for id := range ids {
 		t, err := ts.GetTable(id)
 		if err != nil {
-			log.Printf("Error in reading table %d: %s", id, err)
+			log.Printf("Error in reading table %s: %s", id, err)
 			continue
 		}
 		fn(t)
@@ -242,8 +238,10 @@ func (ts *WikiTableStore) Build(wikiTableFile io.Reader) error {
 		scanner.Buffer(make([]byte, bufio.MaxScanTokenSize), bufio.MaxScanTokenSize*256)
 		for scanner.Scan() {
 			count++
+			// Use the order as the table id
+			id := strconv.Itoa(count)
 			// Skip existing CSV files
-			p := ts.getTableFilename(count)
+			p := ts.getTableFilename(id)
 			if _, err := os.Stat(p); err == nil {
 				continue
 			}
@@ -258,7 +256,7 @@ func (ts *WikiTableStore) Build(wikiTableFile io.Reader) error {
 				// log.Printf("ReadWikiTable (ID %d): %s", count, err)
 				continue
 			}
-			t.ID = count
+			t.ID = id
 			tables <- t
 		}
 		if err := scanner.Err(); err != nil {
@@ -272,7 +270,7 @@ func (ts *WikiTableStore) Build(wikiTableFile io.Reader) error {
 		if err != nil {
 			return err
 		}
-		if err := table.ToCsv(f); err != nil {
+		if err := table.ToCSV(f); err != nil {
 			return err
 		}
 		f.Close()
@@ -280,6 +278,6 @@ func (ts *WikiTableStore) Build(wikiTableFile io.Reader) error {
 	return nil
 }
 
-func (ts *WikiTableStore) getTableFilename(id int) string {
-	return filepath.Join(ts.wikiTableDir, strconv.Itoa(id))
+func (ts *WikiTableStore) getTableFilename(id string) string {
+	return filepath.Join(ts.wikiTableDir, id)
 }

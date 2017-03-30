@@ -1,64 +1,15 @@
 package main
 
 import (
-	"encoding/csv"
 	"flag"
-	"io"
 	"log"
 	"os"
 
 	"github.com/RJMillerLab/fastTextHomeWork/search"
+	"github.com/RJMillerLab/fastTextHomeWork/server"
 	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
-	"github.com/ekzhu/counter"
-	"github.com/ekzhu/datatable"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
-
-func readCSV(file io.Reader) *datatable.DataTable {
-	reader := csv.NewReader(file)
-	var table *datatable.DataTable
-	for {
-		row, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		if table == nil {
-			table = datatable.NewDataTable(len(row))
-		}
-		if err := table.AppendRow(row); err != nil {
-			panic(err)
-		}
-	}
-	return table
-}
-
-func query(index *search.SearchIndex, table *datatable.DataTable) {
-	for i := 0; i < table.NumCol(); i++ {
-		log.Printf("Querying column %d", i)
-		domain := counter.NewCounter()
-		table.ApplyColumn(func(j int, v string) error {
-			domain.Update(v)
-			return nil
-		}, i)
-		values := make([]string, 0, domain.Unique())
-		domain.Apply(func(v interface{}) error {
-			values = append(values, v.(string))
-			return nil
-		})
-		vec, err := index.GetEmb(values)
-		if err != nil {
-			log.Print(err)
-			continue
-		}
-		result := index.TopK(vec, 5)
-		for _, v := range result {
-			log.Printf("Table %d, Column %d", v.TableID, v.ColumnIndex)
-		}
-	}
-}
 
 func main() {
 	var fastTextFilename string
@@ -68,7 +19,7 @@ func main() {
 	var wikiTableDir string
 	var rebuildSearchIndex bool
 	var rebuildWikiTableStore bool
-	var queryCSVFilename string
+	var port string
 	flag.StringVar(&fastTextFilename, "fasttext-raw", "/home/ekzhu/FB_WORD_VEC/wiki.en.vec",
 		"Facebook fastText word vec file")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
@@ -83,8 +34,7 @@ func main() {
 		"Set to true to rebuild wikitable store, existing CSV files will be skipped")
 	flag.BoolVar(&rebuildSearchIndex, "rebuild-searchindex", false,
 		"Set to true to rebuild search index from scratch, the existing search index sqlite database will be removed")
-	flag.StringVar(&queryCSVFilename, "query", "",
-		"Query CSV file")
+	flag.StringVar(&port, "port", "4003", "Server port")
 	flag.Parse()
 
 	// Create Sqlite DB for fastText if not exists
@@ -103,7 +53,6 @@ func main() {
 		log.Print("Finished building FastText Sqlite database")
 	}
 	ft := fasttext.NewFastText(fastTextSqliteDB)
-	defer ft.Close()
 
 	// Create wikitable store, build if not exists
 	ts := wikitable.NewWikiTableStore(wikiTableDir)
@@ -126,23 +75,18 @@ func main() {
 		}
 	}
 
-	index := search.NewSearchIndex(ft, searchIndexSqliteDB)
-	defer index.Close()
-	// Build search index
-	if index.IsNotBuilt() {
+	si := search.NewSearchIndex(ft, searchIndexSqliteDB)
+	// Build search index if it is not built
+	if si.IsNotBuilt() {
 		log.Print("Building search index from scratch")
-		if err := index.Build(ts); err != nil {
+		if err := si.Build(ts); err != nil {
 			panic(err)
 		}
 		log.Print("Finish building search index")
 	}
 
-	// Test
-	f, err := os.Open(queryCSVFilename)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-	q := readCSV(f)
-	query(index, q)
+	// Start server
+	s := server.NewServer(ft, ts, si)
+	defer s.Close()
+	s.Run(port)
 }
