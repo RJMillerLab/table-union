@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
 	"github.com/ekzhu/datatable"
@@ -67,15 +68,22 @@ func (c *Client) mkReq(queryRequest QueryRequest) QueryResponse {
 
 func (c *Client) findTopKWords(words []string, vec []float64, k int) []string {
 	queue := NewTopKQueue(k)
-	for _, v := range words {
-		wordVec, err := c.ft.GetEmb(v)
-		if err == fasttext.ErrNoEmbFound {
+	domain := mkDomain(words, c.transFun)
+	for w := range domain {
+		wordparts := strings.Split(w, " ")
+		if len(wordparts) > 5 {
 			continue
 		}
-		if err != nil {
-			panic(err)
+		for _, p := range wordparts {
+			wordVec, err := c.ft.GetEmb(p)
+			if err == fasttext.ErrNoEmbFound {
+				continue
+			}
+			if err != nil {
+				panic(err)
+			}
+			queue.Push(p, dotProduct(wordVec.Vec, vec))
 		}
-		queue.Push(v, dotProduct(wordVec.Vec, vec))
 	}
 	relevantWords := make([]string, queue.Size())
 	for x := len(relevantWords) - 1; x >= 0; x-- {
@@ -139,6 +147,7 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 			t, err := c.ts.GetTable(entry.TableID)
 			// Find the top-k values in this column
 			topkWords := c.findTopKWords(t.Columns[entry.ColumnIndex], vecs[i], k)
+			log.Print(topkWords)
 			// Create output directory for this column
 			outputDir := filepath.Join(colResultDir,
 				fmt.Sprintf("(Rank %d)_%s_c%d_(%s)",
