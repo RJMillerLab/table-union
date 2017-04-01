@@ -1,4 +1,4 @@
-package server
+package embserver
 
 import (
 	"encoding/json"
@@ -7,9 +7,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/RJMillerLab/fastTextHomeWork/search"
 	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
-	"github.com/ekzhu/datatable"
 	fasttext "github.com/ekzhu/go-fasttext"
 	"github.com/gin-gonic/gin"
 )
@@ -17,26 +15,27 @@ import (
 type Server struct {
 	ft     *fasttext.FastText
 	ts     *wikitable.WikiTableStore
-	si     *search.SearchIndex
+	si     *SearchIndex
 	router *gin.Engine
 }
 
 type QueryRequest struct {
-	Table *datatable.DataTable `json:"query_table"`
-	K     int                  `json:"k"`
+	Vec []float64 `json:"vec"`
+	K   int       `json:"k"`
 }
 
 type QueryResponse struct {
-	Results [][]QueryResult `json:"query_results"`
+	Result []QueryResult `json:"result"`
 }
 
 type QueryResult struct {
-	TableID     string `json:"table_id"`
-	ColumnIndex int    `json:"column_index"`
+	TableID     string    `json:"table_id"`
+	ColumnIndex int       `json:"column_index"`
+	Vec         []float64 `json:"vec"`
 }
 
 func NewServer(ft *fasttext.FastText, ts *wikitable.WikiTableStore,
-	si *search.SearchIndex) *Server {
+	si *SearchIndex) *Server {
 	s := &Server{
 		ft:     ft,
 		ts:     ts,
@@ -71,34 +70,18 @@ func (s *Server) queryHandler(c *gin.Context) {
 		c.AbortWithStatus(http.StatusUnprocessableEntity)
 		return
 	}
-	// Create embeddings
-	vecs := make([][]float64, queryRequest.Table.NumCol())
-	for i := range vecs {
-		vec, err := s.si.GetEmb(queryRequest.Table.GetColumn(i))
-		if err != nil {
-			log.Printf("Embedding not found for column %d", i)
-			continue
-		}
-		vecs[i] = vec
-	}
 	// Query index
-	results := make([][]QueryResult, len(vecs))
-	for i := range vecs {
-		result := make([]QueryResult, 0)
-		if vecs[i] != nil {
-			log.Printf("Querying with column %d", i)
-			embs := s.si.TopK(vecs[i], queryRequest.K)
-			for _, emb := range embs {
-				result = append(result, QueryResult{
-					TableID:     emb.TableID,
-					ColumnIndex: emb.ColumnIndex,
-				})
-			}
-		}
-		results[i] = result
+	result := make([]QueryResult, 0)
+	embs := s.si.TopK(queryRequest.Vec, queryRequest.K)
+	for _, emb := range embs {
+		result = append(result, QueryResult{
+			TableID:     emb.TableID,
+			ColumnIndex: emb.ColumnIndex,
+			Vec:         emb.Vec,
+		})
 	}
 	response := QueryResponse{
-		Results: results,
+		Result: result,
 	}
 	c.JSON(http.StatusOK, response)
 }

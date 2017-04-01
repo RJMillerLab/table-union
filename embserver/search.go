@@ -1,4 +1,4 @@
-package search
+package embserver
 
 import (
 	"bytes"
@@ -24,6 +24,7 @@ const (
 var (
 	ErrNoEmbFound = errors.New("No embedding found")
 	ByteOrder     = binary.BigEndian
+	TransFunc     = func(s string) string { return strings.TrimSpace(strings.ToLower(s)) }
 )
 
 type EmbEntry struct {
@@ -50,7 +51,7 @@ func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *lsh.CosineLsh
 		ft:        ft,
 		db:        db,
 		lsh:       lsh,
-		transFun:  func(s string) string { return strings.TrimSpace(strings.ToLower(s)) },
+		transFun:  TransFunc,
 		tablename: TableName,
 		byteOrder: ByteOrder,
 	}
@@ -85,7 +86,7 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 				if table.Headers[i].IsNum {
 					continue
 				}
-				vec, err := index.GetEmb(column)
+				vec, err := getColEmb(index.ft, index.transFun, column)
 				if err != nil {
 					continue
 				}
@@ -206,8 +207,22 @@ func (index *SearchIndex) TopK(query []float64, k int) []*EmbEntry {
 	return result
 }
 
-func (index *SearchIndex) GetEmb(column []string) ([]float64, error) {
-	domain := mkDomain(column, index.transFun)
+func (index *SearchIndex) checkSqlitTableExist() bool {
+	var name string
+	err := index.db.QueryRow(`
+	SELECT name FROM sqlite_master WHERE type='table' AND name=?;
+	`, index.tablename).Scan(&name)
+	if err == sql.ErrNoRows {
+		return false
+	}
+	if err != nil {
+		panic(err)
+	}
+	return true
+}
+
+func getColEmb(ft *fasttext.FastText, transFun func(string) string, column []string) ([]float64, error) {
+	domain := mkDomain(column, transFun)
 	var vec []float64
 	var count int
 	for w := range domain {
@@ -216,7 +231,7 @@ func (index *SearchIndex) GetEmb(column []string) ([]float64, error) {
 			continue
 		}
 		for _, p := range wordparts {
-			emb, err := index.ft.GetEmb(p)
+			emb, err := ft.GetEmb(p)
 			if err == fasttext.ErrNoEmbFound {
 				// log.Printf("No embedding found for %s", p)
 				continue
@@ -241,20 +256,6 @@ func (index *SearchIndex) GetEmb(column []string) ([]float64, error) {
 		vec[i] = v / float64(count)
 	}
 	return vec, nil
-}
-
-func (index *SearchIndex) checkSqlitTableExist() bool {
-	var name string
-	err := index.db.QueryRow(`
-	SELECT name FROM sqlite_master WHERE type='table' AND name=?;
-	`, index.tablename).Scan(&name)
-	if err == sql.ErrNoRows {
-		return false
-	}
-	if err != nil {
-		panic(err)
-	}
-	return true
 }
 
 func mkDomain(values []string, transFun func(string) string) map[string]bool {

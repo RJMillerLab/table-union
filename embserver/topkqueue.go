@@ -1,4 +1,4 @@
-package search
+package embserver
 
 // TopKQueue maintains a fixed-size queue of items
 // with k highest priorities.

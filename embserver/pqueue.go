@@ -1,4 +1,4 @@
-package search
+package embserver
 
 import (
 	"fmt"
