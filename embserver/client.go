@@ -65,6 +65,26 @@ func (c *Client) mkReq(queryRequest QueryRequest) QueryResponse {
 	return queryResponse
 }
 
+func (c *Client) findTopKWords(words []string, vec []float64, k int) []string {
+	queue := NewTopKQueue(k)
+	for _, v := range words {
+		wordVec, err := c.ft.GetEmb(v)
+		if err == fasttext.ErrNoEmbFound {
+			continue
+		}
+		if err != nil {
+			panic(err)
+		}
+		queue.Push(v, dotProduct(wordVec.Vec, vec))
+	}
+	relevantWords := make([]string, queue.Size())
+	for x := len(relevantWords) - 1; x >= 0; x-- {
+		v, _ := queue.Pop()
+		relevantWords[x] = v.(string)
+	}
+	return relevantWords
+}
+
 func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 	f, err := os.Open(queryCSVFilename)
 	if err != nil {
@@ -72,7 +92,7 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 	}
 	defer f.Close()
 	reader := csv.NewReader(f)
-	headers, err := reader.Read()
+	headers, err := reader.Read() // Assume first row is header
 	if err != nil {
 		panic(err)
 	}
@@ -114,16 +134,41 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 		if err := os.MkdirAll(colResultDir, 0777); err != nil {
 			panic(err)
 		}
-		for i, v := range result {
-			log.Printf("(Rank %d) Table %s, Column %d", i, v.TableID, v.ColumnIndex)
-			t, err := c.ts.GetTable(v.TableID)
-			outputFilename := filepath.Join(colResultDir,
-				fmt.Sprintf("(Rank %d)_%s_c%d_(%s).csv",
-					i,
-					v.TableID,
-					v.ColumnIndex,
-					url.PathEscape(t.Headers[v.ColumnIndex].Text)))
-			f, err := os.Create(outputFilename)
+		for rank, entry := range result {
+			log.Printf("(Rank %d) Table %s, Column %d", rank, entry.TableID, entry.ColumnIndex)
+			t, err := c.ts.GetTable(entry.TableID)
+			// Find the top-k values in this column
+			topkWords := c.findTopKWords(t.Columns[entry.ColumnIndex], vecs[i], k)
+			// Create output directory for this column
+			outputDir := filepath.Join(colResultDir,
+				fmt.Sprintf("(Rank %d)_%s_c%d_(%s)",
+					rank,
+					entry.TableID,
+					entry.ColumnIndex,
+					url.PathEscape(t.Headers[entry.ColumnIndex].Text)))
+			if err := os.MkdirAll(outputDir, 0777); err != nil {
+				panic(err)
+			}
+			// Output the top-k values
+			topkWordFilename := filepath.Join(outputDir, fmt.Sprintf("top-%d.csv", k))
+			f, err := os.Create(topkWordFilename)
+			if err != nil {
+				panic(err)
+			}
+			w := csv.NewWriter(f)
+			for _, word := range topkWords {
+				if err := w.Write([]string{word}); err != nil {
+					panic(err)
+				}
+			}
+			w.Flush()
+			if err := w.Error(); err != nil {
+				panic(err)
+			}
+			f.Close()
+			// Output original table
+			filename := filepath.Join(outputDir, "table.csv")
+			f, err = os.Create(filename)
 			if err != nil {
 				panic(err)
 			}
