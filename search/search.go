@@ -159,9 +159,6 @@ func (index *SearchIndex) load() {
 		index.lsh.Insert(vec, id)
 		count++
 		fmt.Printf("\rLoaded %d embeddings into index", count)
-		if count == 100000 {
-			break
-		}
 	}
 	fmt.Println()
 }
