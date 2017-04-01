@@ -8,7 +8,12 @@ import (
 	"github.com/RJMillerLab/fastTextHomeWork/search"
 	"github.com/RJMillerLab/fastTextHomeWork/server"
 	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
+	"github.com/RJMillerLab/lsh"
 	fasttext "github.com/ekzhu/go-fasttext"
+)
+
+var (
+	FastTextDim = 300
 )
 
 func main() {
@@ -20,6 +25,7 @@ func main() {
 	var rebuildSearchIndex bool
 	var rebuildWikiTableStore bool
 	var port string
+	var l, m int
 	flag.StringVar(&fastTextFilename, "fasttext-raw", "/home/ekzhu/FB_WORD_VEC/wiki.en.vec",
 		"Facebook fastText word vec file")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
@@ -35,6 +41,8 @@ func main() {
 	flag.BoolVar(&rebuildSearchIndex, "rebuild-searchindex", false,
 		"Set to true to rebuild search index from scratch, the existing search index sqlite database will be removed")
 	flag.StringVar(&port, "port", "4003", "Server port")
+	flag.IntVar(&l, "l", 5, "LSH Parameter: number of bands or hash tables")
+	flag.IntVar(&m, "m", 20, "LSH Parameter: size of each band or hash key")
 	flag.Parse()
 
 	// Create Sqlite DB for fastText if not exists
@@ -75,7 +83,7 @@ func main() {
 		}
 	}
 
-	si := search.NewSearchIndex(ft, searchIndexSqliteDB)
+	si := search.NewSearchIndex(ft, searchIndexSqliteDB, lsh.NewCosineLsh(FastTextDim, l, m))
 	// Build search index if it is not built
 	if si.IsNotBuilt() {
 		log.Print("Building search index from scratch")

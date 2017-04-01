@@ -41,7 +41,7 @@ type SearchIndex struct {
 	byteOrder binary.ByteOrder
 }
 
-func NewSearchIndex(ft *fasttext.FastText, dbFilename string) *SearchIndex {
+func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *lsh.CosineLsh) *SearchIndex {
 	db, err := sql.Open("sqlite3", dbFilename)
 	if err != nil {
 		panic(err)
@@ -49,7 +49,7 @@ func NewSearchIndex(ft *fasttext.FastText, dbFilename string) *SearchIndex {
 	index := &SearchIndex{
 		ft:        ft,
 		db:        db,
-		lsh:       lsh.NewCosineLsh(300, 16, 10),
+		lsh:       lsh,
 		transFun:  func(s string) string { return strings.TrimSpace(strings.ToLower(s)) },
 		tablename: TableName,
 		byteOrder: ByteOrder,
