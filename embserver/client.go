@@ -146,6 +146,7 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 			log.Printf("(Rank %d) Table %s, Column %d", rank, entry.TableID, entry.ColumnIndex)
 			t, err := c.ts.GetTable(entry.TableID)
 			// Find the top-k values in this column
+			log.Printf("t: %v", t)
 			topkWords := c.findTopKWords(t.Columns[entry.ColumnIndex], vecs[i], k)
 			log.Print(topkWords)
 			// Create output directory for this column
