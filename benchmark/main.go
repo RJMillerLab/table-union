@@ -15,9 +15,57 @@ import (
 func main() {
 	var groundtruthFile string
 	var annotationDir string
+	var testDir string
+	var rawtestDir string
 	flag.StringVar(&groundtruthFile, "groundtruthfile", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/groundtruth.json", "groundtruthFile")
 	flag.StringVar(&annotationDir, "annotationdir", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/annotations", "annotationDir")
+	flag.StringVar(&testDir, "testdir", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/testdata", "test data directory")
+	flag.StringVar(&rawtestDir, "rawtestdir", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/rawcolumns", "raw test data directory")
 	//
+	//generate_groundtruth(groundtruthFile, annotationDir)
+	//
+	generate_testdata(rawtestDir, testDir)
+}
+
+func generate_testdata(rawtestDir, testDir string) {
+	colFiles := loadDirectory(rawtestDir)
+	for icf, cf := range colFiles {
+		if icf%100 == 0 {
+			log.Printf("processed %d files.", icf)
+		}
+		f, err := os.Open(cf)
+		if err != nil {
+			fmt.Printf("column file panic")
+			panic(err.Error())
+		}
+		of, err := os.Create(strings.Replace(cf, rawtestDir, testDir, -1))
+		if err != nil {
+			fmt.Printf("error in creating a file")
+			panic(err.Error())
+		}
+		scanner := bufio.NewScanner(f)
+		w := bufio.NewWriter(of)
+		fname := strings.Replace(cf, rawtestDir+"/", "", -1)
+		_, err = w.WriteString(fname + "\n")
+		if err != nil {
+			fmt.Printf("error in writing")
+			panic(err.Error())
+		}
+		for scanner.Scan() {
+			a := strings.Replace(strings.Replace(strings.Replace(strings.ToLower(scanner.Text()), "_", " ", -1), "(", "", -1), ")", "", -1)
+			if a != "" {
+				_, err := w.WriteString(a + "\n")
+				if err != nil {
+					fmt.Printf("error in writing")
+					panic(err.Error())
+				}
+			}
+		}
+		w.Flush()
+	}
+}
+
+func generate_groundtruth(groundtruthFile, annotationDir string) {
 	classcolumn := make(map[string][]string)
 	columnclass := make(map[string][]string)
 	aFiles := loadDirectory(annotationDir)
