@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -22,12 +23,12 @@ func main() {
 	flag.StringVar(&testDir, "testdir", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/testdata", "test data directory")
 	flag.StringVar(&rawtestDir, "rawtestdir", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/rawcolumns", "raw test data directory")
 	//
-	//generate_groundtruth(groundtruthFile, annotationDir)
+	columnMap := generate_groundtruth(groundtruthFile, annotationDir)
 	//
-	generate_testdata(rawtestDir, testDir)
+	generate_testdata(rawtestDir, testDir, columnMap)
 }
 
-func generate_testdata(rawtestDir, testDir string) {
+func generate_testdata(rawtestDir, testDir string, columnMap map[string]string) {
 	colFiles := loadDirectory(rawtestDir)
 	for icf, cf := range colFiles {
 		if icf%100 == 0 {
@@ -38,26 +39,30 @@ func generate_testdata(rawtestDir, testDir string) {
 			fmt.Printf("column file panic")
 			panic(err.Error())
 		}
-		of, err := os.Create(strings.Replace(cf, rawtestDir, testDir, -1))
+		of, err := os.Create(testDir + "/" + columnMap[strings.ToLower(strings.Replace(cf, rawtestDir+"/", "", -1))])
 		if err != nil {
 			fmt.Printf("error in creating a file")
 			panic(err.Error())
 		}
 		scanner := bufio.NewScanner(f)
 		w := bufio.NewWriter(of)
-		fname := strings.Replace(cf, rawtestDir+"/", "", -1)
-		_, err = w.WriteString(fname + "\n")
+		_, err = w.WriteString("0\n")
+		_, err = w.WriteString("false\n")
 		if err != nil {
 			fmt.Printf("error in writing")
 			panic(err.Error())
 		}
+		values := make(map[string]bool)
 		for scanner.Scan() {
-			a := strings.Replace(strings.Replace(strings.Replace(strings.ToLower(scanner.Text()), "_", " ", -1), "(", "", -1), ")", "", -1)
+			a := strings.Replace(strings.Replace(strings.Replace(strings.Replace(strings.ToLower(scanner.Text()), "_", " ", -1), "(", "", -1), ")", "", -1), ",", "", -1)
 			if a != "" {
-				_, err := w.WriteString(a + "\n")
-				if err != nil {
-					fmt.Printf("error in writing")
-					panic(err.Error())
+				if _, ok := values[a]; !ok {
+					_, err := w.WriteString(a + "\n")
+					if err != nil {
+						fmt.Printf("error in writing")
+						panic(err.Error())
+					}
+					values[a] = true
 				}
 			}
 		}
@@ -65,9 +70,11 @@ func generate_testdata(rawtestDir, testDir string) {
 	}
 }
 
-func generate_groundtruth(groundtruthFile, annotationDir string) {
+func generate_groundtruth(groundtruthFile, annotationDir string) map[string]string {
 	classcolumn := make(map[string][]string)
 	columnclass := make(map[string][]string)
+	columns := make(map[string]string)
+	fcounter := 0
 	aFiles := loadDirectory(annotationDir)
 	for _, af := range aFiles {
 		f, err := os.Open(af)
@@ -76,23 +83,30 @@ func generate_groundtruth(groundtruthFile, annotationDir string) {
 			panic(err.Error())
 		}
 		colname := strings.ToLower(strings.Replace(af, annotationDir+"/", "", -1))
+		if _, ok := columns[colname]; !ok {
+			columns[colname] = strconv.Itoa(fcounter)
+			fcounter += 1
+		}
 		scanner := bufio.NewScanner(f)
 		var anns []string
 		for scanner.Scan() {
 			a := strings.ToLower(scanner.Text())
-			anns = append(anns, a)
-			_, ok := classcolumn[a]
-			if ok {
-				classcolumn[a] = append(classcolumn[a], colname)
-			} else {
-				var cs []string
-				cs = append(cs, colname)
-				classcolumn[a] = cs
+			if a != "wordnet_entity_100001740" {
+				anns = append(anns, a)
+				_, ok := classcolumn[a]
+				if ok {
+					//classcolumn[a] = append(classcolumn[a], colname)
+					classcolumn[a] = append(classcolumn[a], columns[colname])
+				} else {
+					var cs []string
+					cs = append(cs, columns[colname])
+					classcolumn[a] = cs
+				}
 			}
 		}
 		f.Close()
 		if len(anns) > 0 {
-			columnclass[colname] = anns
+			columnclass[columns[colname]] = anns
 		}
 	}
 	sum := 0
@@ -102,11 +116,11 @@ func generate_groundtruth(groundtruthFile, annotationDir string) {
 	for col, cs := range columnclass {
 		var cands []string
 		for _, c := range cs {
-			if c != "wordnet_entity_100001740" {
-				for _, d := range classcolumn[c] {
-					cands = append(cands, d)
-				}
+			//if c != "wordnet_entity_100001740" {
+			for _, d := range classcolumn[c] {
+				cands = append(cands, d)
 			}
+			//}
 		}
 		if len(cands) > 0 {
 			sum += len(cands)
@@ -124,8 +138,10 @@ func generate_groundtruth(groundtruthFile, annotationDir string) {
 	log.Printf("max number of matches: %d", cmax)
 	log.Printf("min number of matches: %d", cmin)
 	log.Printf("avg number of matches: %f", float64(sum)/float64(len(groundtruth)))
+	log.Printf("len column maps: %d", len(columns))
 	//
 	dumpJson(groundtruthFile, groundtruth)
+	return columns
 }
 
 func loadDirectory(dirname string) (filenames []string) {
