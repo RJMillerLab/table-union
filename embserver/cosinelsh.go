@@ -2,20 +2,19 @@ package embserver
 
 import (
 	"math/rand"
+	"strconv"
 	"sync"
 )
 
-type signature []uint64
+type signature []uint8
 
 // Key is a way to index into a table.
-type hashTableKey []int
+type hashTableKey []uint8
 
 // Value is an index into the input dataset.
 type hashTableBucket []string
 
-type basicHashTableKey string
-
-type hashTable map[basicHashTableKey]hashTableBucket
+type hashTable map[uint64]hashTableBucket
 
 // Represents a SinHash signature - an array of hash values
 type simhash struct {
@@ -33,16 +32,16 @@ func newSimhash(hs hyperplanes, e []float64) *simhash {
 }
 
 func newSignature(hyperplanes hyperplanes, e []float64) signature {
-	sigarr := make([]uint64, len(hyperplanes))
+	sigarr := make([]uint8, len(hyperplanes))
 	for hix, h := range hyperplanes {
 		var dp float64
 		for k, v := range e {
 			dp += h[k] * float64(v)
 		}
 		if dp >= 0 {
-			sigarr[hix] = uint64(1)
+			sigarr[hix] = uint8(1)
 		} else {
-			sigarr[hix] = uint64(0)
+			sigarr[hix] = uint8(0)
 		}
 	}
 	return sigarr
@@ -108,7 +107,7 @@ func (clsh *cosineLshParam) hash(point []float64) []hashTableKey {
 	for i := range hvs {
 		s := make(hashTableKey, clsh.m)
 		for j := 0; j < clsh.m; j++ {
-			s[j] = int(simhash.sig[i*clsh.m+j])
+			s[j] = uint8(simhash.sig[i*clsh.m+j])
 		}
 		hvs[i] = s
 	}
@@ -141,7 +140,7 @@ func NewCosineLsh(dim, l, m int) *CosineLsh {
 // Insert adds a new data point to the Cosine LSH.
 // point is a data point being inserted into the index and
 // id is the unique identifier for the data point.
-func (index *CosineLsh) Insert(point []float64, id string) []basicHashTableKey {
+func (index *CosineLsh) Insert(point []float64, id string) []uint64 {
 	// Apply hash functions
 	hvs := index.toBasicHashTableKeys(index.hash(point))
 	// Insert key into all hash tables
@@ -150,7 +149,7 @@ func (index *CosineLsh) Insert(point []float64, id string) []basicHashTableKey {
 	for i := range index.tables {
 		hv := hvs[i]
 		table := index.tables[i]
-		go func(table hashTable, hv basicHashTableKey) {
+		go func(table hashTable, hv uint64) {
 			if _, exist := table[hv]; !exist {
 				table[hv] = make(hashTableBucket, 0)
 			}
@@ -187,21 +186,25 @@ func (index *CosineLsh) Query(q []float64) []string {
 	return ids
 }
 
-func (index *CosineLsh) toBasicHashTableKeys(keys []hashTableKey) []basicHashTableKey {
-	basicKeys := make([]basicHashTableKey, index.cosineLshParam.l)
+func (index *CosineLsh) toBasicHashTableKeys(keys []hashTableKey) []uint64 {
+	basicKeys := make([]uint64, index.cosineLshParam.l)
 	for i, key := range keys {
 		s := ""
 		for _, hashVal := range key {
 			switch hashVal {
-			case 0:
+			case uint8(0):
 				s += "0"
-			case 1:
+			case uint8(1):
 				s += "1"
 			default:
 				panic("Hash value is not 0 or 1")
 			}
 		}
-		basicKeys[i] = basicHashTableKey(s)
+		v, err := strconv.ParseUint(s, 2, 64)
+		if err != nil {
+			panic(err)
+		}
+		basicKeys[i] = v
 	}
 	return basicKeys
 }

@@ -19,6 +19,7 @@ func main() {
 	var fastTextSqliteDB string
 	var wikiTableFilename string
 	var searchIndexSqliteDB string
+	var lshIndexSqliteDB string
 	var wikiTableDir string
 	var rebuildSearchIndex bool
 	var rebuildWikiTableStore bool
@@ -31,7 +32,9 @@ func main() {
 	flag.StringVar(&wikiTableFilename, "wikitable-raw", "/home/ekzhu/WIKI_TABLE/tables.json",
 		"WikiTable dataset file")
 	flag.StringVar(&searchIndexSqliteDB, "searchindex-db", "/home/ekzhu/WIKI_TABLE/search-index.db",
-		"Sqlite database file for search index vecs, will be created if not exist")
+		"sqlite database file for search index vecs, will be created if not exist")
+	flag.StringVar(&lshIndexSqliteDB, "lshindex-db", "/home/ekzhu/WIKI_TABLE/lsh-index.db",
+		"sqlite database file for search index vecs, will be created if not exist")
 	flag.StringVar(&wikiTableDir, "wikitable-dir", "/home/ekzhu/WIKI_TABLE/tables",
 		"Directory for storing wikitable CSV files, will be created if not exist")
 	flag.BoolVar(&rebuildWikiTableStore, "rebuild-wikitable", false,
@@ -79,9 +82,12 @@ func main() {
 		if err := os.Remove(searchIndexSqliteDB); err != nil {
 			panic(err)
 		}
+		if err := os.Remove(lshIndexSqliteDB); err != nil {
+			panic(err)
+		}
 	}
 
-	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, embserver.NewCosineLsh(FastTextDim, l, m))
+	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, embserver.NewCosineLsh(FastTextDim, l, m), lshIndexSqliteDB)
 	// Build search index if it is not built
 	if si.IsNotBuilt() {
 		log.Print("Building search index from scratch")
