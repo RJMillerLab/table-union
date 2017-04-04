@@ -1,7 +1,6 @@
 package embserver
 
 import (
-	"fmt"
 	"math/rand"
 	"sync"
 )
@@ -142,7 +141,7 @@ func NewCosineLsh(dim, l, m int) *CosineLsh {
 // Insert adds a new data point to the Cosine LSH.
 // point is a data point being inserted into the index and
 // id is the unique identifier for the data point.
-func (index *CosineLsh) Insert(point []float64, id string) {
+func (index *CosineLsh) Insert(point []float64, id string) []basicHashTableKey {
 	// Apply hash functions
 	hvs := index.toBasicHashTableKeys(index.hash(point))
 	// Insert key into all hash tables
@@ -160,6 +159,7 @@ func (index *CosineLsh) Insert(point []float64, id string) {
 		}(table, hv)
 	}
 	wg.Wait()
+	return hvs
 }
 
 // Query finds the ids of approximate nearest neighbour candidates,
@@ -192,7 +192,14 @@ func (index *CosineLsh) toBasicHashTableKeys(keys []hashTableKey) []basicHashTab
 	for i, key := range keys {
 		s := ""
 		for _, hashVal := range key {
-			s += fmt.Sprintf("%.16x", hashVal)
+			switch hashVal {
+			case 0:
+				s += "0"
+			case 1:
+				s += "1"
+			default:
+				panic("Hash value is not 0 or 1")
+			}
 		}
 		basicKeys[i] = basicHashTableKey(s)
 	}
