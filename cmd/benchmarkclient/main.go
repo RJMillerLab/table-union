@@ -2,8 +2,11 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,14 +24,18 @@ func main() {
 	var benchmarkDir string
 	var fastTextSqliteDB string
 	var batchQueryFilename string
-	flag.StringVar(&benchmarkDir, "benchmark-dir", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/testdata", "Directory when benchmark CSV files are stored.")
+	var groundtruthFile string
+	flag.StringVar(&benchmarkDir, "benchmark-dir", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/testdata",
+		"Directory where benchmark CSV files are stored.")
+	flag.StringVar(&groundtruthFile, "groundtruth", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/groundtruth.json",
+		"Ground truth file - based on WWT benchmark.")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs")
 	flag.StringVar(&queryCSVFilename, "query", "",
 		"Query CSV file")
 	flag.StringVar(&resultDir, "result-dir", "",
 		"Query result directory")
-	flag.StringVar(&batchQueryFilename, "batch-query", "", "The file containing a list of queries.")
+	flag.StringVar(&batchQueryFilename, "batch-query", "", "The file containing a list of queries")
 	flag.StringVar(&host, "host", "http://localhost:4004", "Server host")
 	flag.IntVar(&k, "k", 5, "Top-K")
 	flag.Parse()
@@ -44,6 +51,11 @@ func main() {
 		panic(err)
 	}
 	if batchQueryFilename != "" {
+		var tp int
+		var total_result int
+		// load ground truth
+		gt := make(map[string][]string)
+		loadJson(groundtruthFile, &gt)
 		f, err := os.Open(batchQueryFilename)
 		if err != nil {
 			fmt.Printf("Query file panic")
@@ -54,13 +66,43 @@ func main() {
 			queryCSVFilename := scanner.Text()
 			qname := queryCSVFilename[strings.LastIndex(queryCSVFilename, "/")+1:]
 			client.Query(queryCSVFilename, k, filepath.Join(resultDir, qname))
+			rf, err := os.Open(filepath.Join(filepath.Join(resultDir, qname), "results"))
+			if err != nil {
+				fmt.Printf("result file panic")
+				continue
+			}
+			res_scanner := bufio.NewScanner(rf)
+			for res_scanner.Scan() {
+				parts := strings.Split(res_scanner.Text(), " ")
+				total_result += 1
+				if contains(gt[qname], parts[0]) {
+					tp += 1
+				}
+			}
 		}
+		log.Printf("Precision: %f", float64(tp)/float64(total_result))
 	}
 	if queryCSVFilename != "" {
 		client.Query(queryCSVFilename, k, resultDir)
 	}
 }
 
-func evaluate() {
+func loadJson(file string, v interface{}) {
+	buffer, err := ioutil.ReadFile(file)
+	if err != nil {
+		panic(err.Error())
+	}
+	err = json.Unmarshal(buffer, v)
+	if err != nil {
+		panic(err.Error())
+	}
+}
 
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
