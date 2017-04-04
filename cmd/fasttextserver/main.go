@@ -7,7 +7,6 @@ import (
 
 	"github.com/RJMillerLab/fastTextHomeWork/embserver"
 	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
-	"github.com/RJMillerLab/lsh"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
@@ -82,7 +81,7 @@ func main() {
 		}
 	}
 
-	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, lsh.NewCosineLsh(FastTextDim, l, m))
+	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, embserver.NewCosineLsh(FastTextDim, l, m))
 	// Build search index if it is not built
 	if si.IsNotBuilt() {
 		log.Print("Building search index from scratch")

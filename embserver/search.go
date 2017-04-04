@@ -12,7 +12,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
-	"github.com/RJMillerLab/lsh"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
@@ -37,13 +36,13 @@ type EmbEntry struct {
 type SearchIndex struct {
 	ft        *fasttext.FastText
 	db        *sql.DB // Sqlite store for the embedding entries
-	lsh       *lsh.CosineLsh
+	lsh       *CosineLsh
 	transFun  func(string) string
 	tablename string
 	byteOrder binary.ByteOrder
 }
 
-func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *lsh.CosineLsh) *SearchIndex {
+func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *CosineLsh) *SearchIndex {
 	db, err := sql.Open("sqlite3", dbFilename)
 	if err != nil {
 		panic(err)
