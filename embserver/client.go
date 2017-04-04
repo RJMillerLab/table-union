@@ -1,6 +1,7 @@
 package embserver
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
@@ -12,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
@@ -133,10 +135,16 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 		if err := os.MkdirAll(colResultDir, 0777); err != nil {
 			panic(err)
 		}
+		rf, err := os.Create(filepath.Join(resultDir, "results"))
+		if err != nil {
+			panic(err)
+		}
+		wr := bufio.NewWriter(rf)
 		for rank, entry := range result {
 			log.Printf("(Rank %d) Table %s, Column %d", rank, entry.TableID, entry.ColumnIndex)
 			t, err := c.ts.GetTable(entry.TableID)
 			// Find the top-k values in this column
+			log.Printf("t: %v", t)
 			topkWords := c.findTopKWords(t.Columns[entry.ColumnIndex], vecs[i], k)
 			// Create output directory for this column
 			outputDir := filepath.Join(colResultDir,
@@ -175,7 +183,13 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 				panic(err)
 			}
 			f.Close()
+			// Output result table and column
+			if _, err := wr.WriteString(entry.TableID + " " + strconv.Itoa(entry.ColumnIndex) + "\n"); err != nil {
+				panic(err)
+			}
+
 		}
+		wr.Flush()
 	}
 	log.Printf("Query results written to %s", resultDir)
 }
