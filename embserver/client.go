@@ -66,29 +66,20 @@ func (c *Client) mkReq(queryRequest QueryRequest) QueryResponse {
 	return queryResponse
 }
 
-func (c *Client) findTopKWords(words []string, vec []float64, k int) []string {
+func (c *Client) findTopKWords(column []string, vec []float64, k int) [][]string {
 	queue := NewTopKQueue(k)
-	domain := mkDomain(words, c.transFun)
-	for w := range domain {
-		wordparts := strings.Split(w, " ")
-		if len(wordparts) > 5 {
+	words := mkTokenizedValues(column, c.transFun)
+	for w := range words {
+		wordVec, err := getValueEmb(c.ft, w)
+		if err != nil {
 			continue
 		}
-		for _, p := range wordparts {
-			wordVec, err := c.ft.GetEmb(p)
-			if err == fasttext.ErrNoEmbFound {
-				continue
-			}
-			if err != nil {
-				panic(err)
-			}
-			queue.Push(p, dotProduct(wordVec.Vec, vec))
-		}
+		queue.Push(w, dotProduct(wordVec, vec))
 	}
-	relevantWords := make([]string, queue.Size())
+	relevantWords := make([][]string, queue.Size())
 	for x := len(relevantWords) - 1; x >= 0; x-- {
 		v, _ := queue.Pop()
-		relevantWords[x] = v.(string)
+		relevantWords[x] = v.([]string)
 	}
 	return relevantWords
 }
@@ -147,7 +138,6 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 			t, err := c.ts.GetTable(entry.TableID)
 			// Find the top-k values in this column
 			topkWords := c.findTopKWords(t.Columns[entry.ColumnIndex], vecs[i], k)
-			log.Print(topkWords)
 			// Create output directory for this column
 			outputDir := filepath.Join(colResultDir,
 				fmt.Sprintf("(Rank %d)_%s_c%d_(%s)",
@@ -166,7 +156,7 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 			}
 			w := csv.NewWriter(f)
 			for _, word := range topkWords {
-				if err := w.Write([]string{word}); err != nil {
+				if err := w.Write([]string{strings.Join(word, " ")}); err != nil {
 					panic(err)
 				}
 			}
@@ -187,4 +177,5 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 			f.Close()
 		}
 	}
+	log.Printf("Query results written to %s", resultDir)
 }

@@ -10,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
-	"unicode"
 )
 
 var (
@@ -141,7 +139,6 @@ func readRaw(t wikiTableRaw) (*WikiTable, error) {
 	for i := range t.Rows {
 		for j := range cols {
 			v := t.Rows[i][j].Text
-			v = strings.TrimFunc(strings.TrimSpace(v), unicode.IsPunct)
 			cols[j][i] = v
 		}
 	}

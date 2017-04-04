@@ -1,14 +1,13 @@
 package embserver
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
+	"unicode"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -24,7 +23,9 @@ const (
 var (
 	ErrNoEmbFound = errors.New("No embedding found")
 	ByteOrder     = binary.BigEndian
-	TransFunc     = func(s string) string { return strings.TrimSpace(strings.ToLower(s)) }
+	TransFunc     = func(s string) string {
+		return strings.ToLower(strings.TrimFunc(strings.TrimSpace(s), unicode.IsPunct))
+	}
 )
 
 type EmbEntry struct {
@@ -219,113 +220,4 @@ func (index *SearchIndex) checkSqlitTableExist() bool {
 		panic(err)
 	}
 	return true
-}
-
-func getColEmb(ft *fasttext.FastText, transFun func(string) string, column []string) ([]float64, error) {
-	domain := mkDomain(column, transFun)
-	var vec []float64
-	var count int
-	for w := range domain {
-		wordparts := strings.Split(w, " ")
-		if len(wordparts) > 5 {
-			continue
-		}
-		for _, p := range wordparts {
-			emb, err := ft.GetEmb(p)
-			if err == fasttext.ErrNoEmbFound {
-				// log.Printf("No embedding found for %s", p)
-				continue
-			}
-			if err != nil {
-				panic(err)
-			}
-			if vec == nil {
-				vec = emb.Vec
-			} else {
-				add(vec, emb.Vec)
-			}
-		}
-		if vec != nil {
-			count++
-		}
-	}
-	if vec == nil {
-		return nil, ErrNoEmbFound
-	}
-	for i, v := range vec {
-		vec[i] = v / float64(count)
-	}
-	return vec, nil
-}
-
-func mkDomain(values []string, transFun func(string) string) map[string]bool {
-	domain := make(map[string]bool)
-	for _, v := range values {
-		v = transFun(v)
-		domain[v] = true
-	}
-	return domain
-}
-
-func dotProduct(x, y []float64) float64 {
-	if len(x) != len(y) {
-		panic("Length of vectors not equal")
-	}
-	p := 0.0
-	for i := range x {
-		p += x[i] * y[i]
-	}
-	return p
-}
-
-func add(dst, src []float64) {
-	if len(dst) != len(src) {
-		panic("Length of vectors not equal")
-	}
-	for i := range src {
-		dst[i] = dst[i] + src[i]
-	}
-}
-
-func vecToBytes(vec []float64, order binary.ByteOrder) []byte {
-	buf := new(bytes.Buffer)
-	for _, v := range vec {
-		binary.Write(buf, order, v)
-	}
-	return buf.Bytes()
-}
-
-func bytesToVec(data []byte, order binary.ByteOrder) ([]float64, error) {
-	size := len(data) / 8
-	vec := make([]float64, size)
-	buf := bytes.NewReader(data)
-	var v float64
-	for i := range vec {
-		if err := binary.Read(buf, order, &v); err != nil {
-			return nil, err
-		}
-		vec[i] = v
-	}
-	return vec, nil
-}
-
-func fromColumnID(columnID string) (tableID string, columnIndex int) {
-	items := strings.Split(columnID, ":")
-	if len(items) != 2 {
-		msg := fmt.Sprintf("Malformed Column ID: %s", columnID)
-		panic(msg)
-	}
-	tableID = items[0]
-	var err error
-	columnIndex, err = strconv.Atoi(items[1])
-	if err != nil {
-		msg := fmt.Sprintf("Malformed Column ID: %s", columnID)
-		panic(msg)
-	}
-	return
-}
-
-func toColumnID(tableID string, columnIndex int) (columnID string) {
-	columnID = fmt.Sprintf("%s:%d", tableID, columnIndex)
-	return
 }
