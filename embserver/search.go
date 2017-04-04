@@ -94,6 +94,7 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 	go func() {
 		defer close(entries)
 		defer close(lshEntries)
+		var count int
 		ts.Apply(func(table *wikitable.WikiTable) {
 			for i, column := range table.Columns {
 				if table.Headers[i].IsNum {
@@ -118,6 +119,10 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 						BandIndex:   bandIndex,
 						HashKey:     hashKey,
 					}
+				}
+				count++
+				if count%1000 == 0 {
+					log.Printf("At least %d domains indexed so far", count)
 				}
 			}
 		})
