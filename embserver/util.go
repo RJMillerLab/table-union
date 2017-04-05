@@ -3,12 +3,19 @@ package embserver
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/ekzhu/counter"
 	fasttext "github.com/ekzhu/go-fasttext"
+	"github.com/gonum/matrix/mat64"
+	"github.com/gonum/stat"
+)
+
+var (
+	ErrPCAFailure = errors.New("PCA Failed")
 )
 
 // Get the embedding vector of a column by taking the average of the distinct values (tokenized) vectors.
@@ -34,6 +41,36 @@ func getColEmb(ft *fasttext.FastText, transFun func(string) string, column []str
 	for i, v := range vec {
 		vec[i] = v / float64(count)
 	}
+	return vec, nil
+}
+
+func getColEmbPCA(ft *fasttext.FastText, transFun func(string) string, column []string) ([]float64, error) {
+	values := mkTokenizedValues(column, transFun)
+	var data []float64
+	var count int
+	for tokens := range values {
+		valueVec, err := getValueEmb(ft, tokens)
+		if err != nil {
+			continue
+		}
+		if data == nil {
+			data = valueVec
+		} else {
+			data = append(data, valueVec...)
+		}
+		count++
+	}
+	if count == 0 {
+		return nil, ErrNoEmbFound
+	}
+	matrix := mat64.NewDense(count, fasttext.Dim, data)
+	var pc stat.PC
+	if ok := pc.PrincipalComponents(matrix, nil); !ok {
+		return nil, ErrPCAFailure
+	}
+	pcs := pc.Vectors(nil)
+	vec := make([]float64, fasttext.Dim)
+	mat64.Col(vec, 0, pcs)
 	return vec, nil
 }
 

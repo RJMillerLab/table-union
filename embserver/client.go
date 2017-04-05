@@ -104,7 +104,7 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 	// Create embeddings
 	vecs := make([][]float64, queryTable.NumCol())
 	for i := range vecs {
-		vec, err := getColEmb(c.ft, c.transFun, queryTable.GetColumn(i))
+		vec, err := getColEmbPCA(c.ft, c.transFun, queryTable.GetColumn(i))
 		if err != nil {
 			log.Printf("Embedding not found for column %d", i)
 			continue

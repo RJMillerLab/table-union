@@ -83,16 +83,15 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 	}
 
 	// Compute embedding entries from wikitables
-	entries := make(chan *EmbEntry, 1000)
+	entries := make(chan *EmbEntry)
 	go func() {
 		defer close(entries)
-		var count int
 		ts.Apply(func(table *wikitable.WikiTable) {
 			for i, column := range table.Columns {
 				if table.Headers[i].IsNum {
 					continue
 				}
-				vec, err := getColEmb(index.ft, index.transFun, column)
+				vec, err := getColEmbPCA(index.ft, index.transFun, column)
 				if err != nil {
 					continue
 				}
@@ -104,10 +103,6 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 					Vec:         vec,
 				}
 				entries <- entry
-				count++
-				if count%1000 == 0 {
-					log.Printf("At least %d domains indexed so far", count)
-				}
 			}
 		})
 	}()

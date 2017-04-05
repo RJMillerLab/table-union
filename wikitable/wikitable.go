@@ -183,6 +183,9 @@ func (ts *WikiTableStore) GetTable(id string) (*WikiTable, error) {
 func (ts *WikiTableStore) Apply(fn func(*WikiTable)) {
 	ids := make(chan string)
 	go func() {
+		//
+		var count int
+		//
 		defer close(ids)
 		dir, err := os.Open(ts.wikiTableDir)
 		if err != nil {
@@ -193,6 +196,12 @@ func (ts *WikiTableStore) Apply(fn func(*WikiTable)) {
 		for ; err == nil; names, err = dir.Readdirnames(1024) {
 			for _, id := range names {
 				ids <- id
+				//
+				count++
+				if count == 10000 {
+					return
+				}
+				//
 			}
 		}
 	}()
