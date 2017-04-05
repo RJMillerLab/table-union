@@ -140,7 +140,7 @@ func NewCosineLsh(dim, l, m int) *CosineLsh {
 // Insert adds a new data point to the Cosine LSH.
 // point is a data point being inserted into the index and
 // id is the unique identifier for the data point.
-func (index *CosineLsh) Insert(point []float64, id string) []uint64 {
+func (index *CosineLsh) Insert(point []float64, id string) {
 	// Apply hash functions
 	hvs := index.toBasicHashTableKeys(index.hash(point))
 	// Insert key into all hash tables
@@ -158,7 +158,6 @@ func (index *CosineLsh) Insert(point []float64, id string) []uint64 {
 		}(table, hv)
 	}
 	wg.Wait()
-	return hvs
 }
 
 // Query finds the ids of approximate nearest neighbour candidates,

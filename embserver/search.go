@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
 	"unicode"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -43,31 +42,26 @@ type LSHEntry struct {
 }
 
 type SearchIndex struct {
-	ft            *fasttext.FastText
-	db            *sql.DB // Sqlite store for the embedding entries
-	lsh           *CosineLsh
-	lshdbFilename string // sqlite database file for the lsh index backup
-	transFun      func(string) string
-	tablename     string
-	byteOrder     binary.ByteOrder
+	ft        *fasttext.FastText
+	db        *sql.DB // Sqlite store for the embedding entries
+	lsh       *CosineLsh
+	transFun  func(string) string
+	tablename string
+	byteOrder binary.ByteOrder
 }
 
-func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *CosineLsh, lshdbFilename string) *SearchIndex {
+func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *CosineLsh) *SearchIndex {
 	db, err := sql.Open("sqlite3", dbFilename)
 	if err != nil {
 		panic(err)
 	}
 	index := &SearchIndex{
-		ft:            ft,
-		db:            db,
-		lsh:           lsh,
-		lshdbFilename: lshdbFilename,
-		transFun:      TransFunc,
-		tablename:     TableName,
-		byteOrder:     ByteOrder,
-	}
-	if index.checkSqlitTableExist() {
-		index.load()
+		ft:        ft,
+		db:        db,
+		lsh:       lsh,
+		transFun:  TransFunc,
+		tablename: TableName,
+		byteOrder: ByteOrder,
 	}
 	return index
 }
@@ -90,10 +84,8 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 
 	// Compute embedding entries from wikitables
 	entries := make(chan *EmbEntry, 1000)
-	lshEntries := make(chan *LSHEntry, 1000)
 	go func() {
 		defer close(entries)
-		defer close(lshEntries)
 		var count int
 		ts.Apply(func(table *wikitable.WikiTable) {
 			for i, column := range table.Columns {
@@ -105,70 +97,19 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 					continue
 				}
 				id := toColumnID(table.ID, i)
-				hashKeys := index.lsh.Insert(vec, id)
+				index.lsh.Insert(vec, id)
 				entry := &EmbEntry{
 					TableID:     table.ID,
 					ColumnIndex: i,
 					Vec:         vec,
 				}
 				entries <- entry
-				for bandIndex, hashKey := range hashKeys {
-					lshEntries <- &LSHEntry{
-						TableID:     table.ID,
-						ColumnIndex: i,
-						BandIndex:   bandIndex,
-						HashKey:     hashKey,
-					}
-				}
 				count++
 				if count%1000 == 0 {
 					log.Printf("At least %d domains indexed so far", count)
 				}
 			}
 		})
-	}()
-
-	// Save LSH entries to Sqlite
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		// Open connection
-		db, err := sql.Open("sqlite3", index.lshdbFilename)
-		if err != nil {
-			panic(err)
-		}
-		// Saving embedding entries to Sqlite
-		_, err = db.Exec(fmt.Sprintf(`
-		CREATE TABLE %s (
-			table_id TEXT,
-			column_index INTEGER,
-			band_index INTEGER,
-			hash_key INTEGER
-		);
-		`, LSHTableName))
-		if err != nil {
-			panic(err)
-		}
-		stmt, err := db.Prepare(fmt.Sprintf(`
-		INSERT INTO %s(table_id, column_index, band_index, hash_key) VALUES(?, ?, ?, ?);
-		`, LSHTableName))
-		if err != nil {
-			panic(err)
-		}
-		defer stmt.Close()
-		for e := range lshEntries {
-			if _, err := stmt.Exec(e.TableID, e.ColumnIndex, e.BandIndex, e.HashKey); err != nil {
-				panic(err)
-			}
-		}
-		_, err = db.Exec(fmt.Sprintf(`
-		CREATE INDEX ind_band ON %s(band_index, hash_key);
-		`, LSHTableName))
-		if err != nil {
-			panic(err)
-		}
-		db.Close()
 	}()
 
 	// Saving embedding entries to Sqlite
@@ -202,12 +143,11 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 		panic(err)
 	}
 
-	wg.Wait()
 	return nil
 }
 
 // Load recovers the search index entries from the Sqlite database.
-func (index *SearchIndex) load() {
+func (index *SearchIndex) Load() {
 	rows, err := index.db.Query(fmt.Sprintf(`
 	SELECT table_id, column_index, vec FROM %s;
 	`, index.tablename))
@@ -233,6 +173,81 @@ func (index *SearchIndex) load() {
 		fmt.Printf("\rLoaded %d embeddings into index", count)
 	}
 	fmt.Println()
+}
+
+func (index *SearchIndex) GetLSHIndexEntries() chan *LSHEntry {
+	out := make(chan *LSHEntry)
+	go func() {
+		defer close(out)
+		rows, err := index.db.Query(fmt.Sprintf(`
+		SELECT table_id, column_index, vec FROM %s;
+		`, index.tablename))
+		if err != nil {
+			panic(err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var tableID string
+			var columnIndex int
+			var binVec []byte
+			if err := rows.Scan(&tableID, &columnIndex, &binVec); err != nil {
+				panic(err)
+			}
+			vec, err := bytesToVec(binVec, index.byteOrder)
+			if err != nil {
+				panic(err)
+			}
+			hashKeys := index.lsh.toBasicHashTableKeys(index.lsh.hash(vec))
+			for bandIndex, hashKey := range hashKeys {
+				out <- &LSHEntry{
+					TableID:     tableID,
+					ColumnIndex: columnIndex,
+					BandIndex:   bandIndex,
+					HashKey:     hashKey,
+				}
+			}
+		}
+	}()
+	return out
+}
+
+func (index *SearchIndex) SaveLSHIndex(lshEntries <-chan *LSHEntry, lshdbFilename string) {
+	// Open connection
+	db, err := sql.Open("sqlite3", lshdbFilename)
+	if err != nil {
+		panic(err)
+	}
+	// Saving embedding entries to Sqlite
+	_, err = db.Exec(fmt.Sprintf(`
+		CREATE TABLE %s (
+			table_id TEXT,
+			column_index INTEGER,
+			band_index INTEGER,
+			hash_key INTEGER
+		);
+		`, LSHTableName))
+	if err != nil {
+		panic(err)
+	}
+	stmt, err := db.Prepare(fmt.Sprintf(`
+		INSERT INTO %s(table_id, column_index, band_index, hash_key) VALUES(?, ?, ?, ?);
+		`, LSHTableName))
+	if err != nil {
+		panic(err)
+	}
+	defer stmt.Close()
+	for e := range lshEntries {
+		if _, err := stmt.Exec(e.TableID, e.ColumnIndex, e.BandIndex, e.HashKey); err != nil {
+			panic(err)
+		}
+	}
+	_, err = db.Exec(fmt.Sprintf(`
+		CREATE INDEX ind_band ON %s(band_index, hash_key);
+		`, LSHTableName))
+	if err != nil {
+		panic(err)
+	}
+	db.Close()
 }
 
 func (index *SearchIndex) Get(tableID string, columnIndex int) (*EmbEntry, error) {
