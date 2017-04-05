@@ -90,6 +90,8 @@ func main() {
 			panic(err)
 		}
 		log.Print("Finish building search index")
+	} else {
+		si.Load()
 	}
 
 	// Start server
