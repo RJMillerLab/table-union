@@ -11,7 +11,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
+	"github.com/RJMillerLab/table-union/wikitable"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 

@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
+	"github.com/RJMillerLab/table-union/wikitable"
 	fasttext "github.com/ekzhu/go-fasttext"
 	"github.com/gin-gonic/gin"
 )

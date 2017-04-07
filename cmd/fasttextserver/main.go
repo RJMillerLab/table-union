@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/RJMillerLab/fastTextHomeWork/embserver"
-	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
+	"github.com/RJMillerLab/table-union/embserver"
+	"github.com/RJMillerLab/table-union/wikitable"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 

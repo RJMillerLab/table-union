@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
+	"github.com/RJMillerLab/table-union/wikitable"
 	"github.com/ekzhu/datatable"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
