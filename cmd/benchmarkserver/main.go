@@ -1,13 +1,12 @@
-ackage main
+package main
 
 import (
 	"flag"
 	"log"
 	"os"
 
-	"github.com/RJMillerLab/fastTextHomeWork/embserver"
-	"github.com/RJMillerLab/fastTextHomeWork/wikitable"
-	"github.com/RJMillerLab/lsh"
+	"github.com/RJMillerLab/table-union/embserver"
+	"github.com/RJMillerLab/table-union/wikitable"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
@@ -16,6 +15,7 @@ var (
 )
 
 func main() {
+	var rebuildWikiTableStore bool
 	var fastTextFilename string
 	var fastTextSqliteDB string
 	var searchIndexSqliteDB string
@@ -23,6 +23,8 @@ func main() {
 	var rebuildSearchIndex bool
 	var port string
 	var l, m int
+	flag.BoolVar(&rebuildWikiTableStore, "rebuild-wikitable", false,
+		"Set to true to rebuild wikitable store, existing CSV files will be skipped")
 	flag.StringVar(&fastTextFilename, "fasttext-raw", "/home/ekzhu/FB_WORD_VEC/wiki.en.vec",
 		"Facebook fastText word vec file")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
@@ -57,13 +59,13 @@ func main() {
 	// Create wikitable store, build if not exists
 	ts := wikitable.NewWikiTableStore(benchmarkDir)
 	// No need to build CSV files
-	if rebuildSearchIndex {
+	if ts.IsNotBuilt() || rebuildWikiTableStore {
 		if err := os.Remove(searchIndexSqliteDB); err != nil {
 			panic(err)
 		}
 	}
 
-	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, lsh.NewCosineLsh(FastTextDim, l, m))
+	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, embserver.NewCosineLsh(FastTextDim, l, m))
 	// Build search index if it is not built
 	if si.IsNotBuilt() {
 		log.Print("Building search index from scratch")
