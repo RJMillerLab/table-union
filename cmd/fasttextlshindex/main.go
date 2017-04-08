@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	"github.com/RJMillerLab/fastTextHomeWork/embserver"
+	"github.com/RJMillerLab/table-union/embserver"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 

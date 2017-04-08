@@ -3,7 +3,6 @@ package wwt
 import (
 	"bufio"
 	"encoding/xml"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -82,7 +81,8 @@ type Row struct {
 }
 
 type WWTColumn struct {
-	ColumnName  string
+	TableID     string
+	ColumnIndex int
 	Column      []string
 	Annotations []string
 	Vec         []float64
@@ -115,7 +115,8 @@ func (w *WWT) ReadColumns() <-chan *WWTColumn {
 		for col := range readRaw(w.dir) {
 			vec, err := embedding.GetDomainEmbPCA(w.ft, w.tokenFun, w.transFun, col.Column)
 			if err != nil {
-				log.Printf("Error in column %s: %s", col.ColumnName, err)
+				log.Printf("Error in table %s column %d: %s", col.TableID, col.ColumnIndex, err)
+				continue
 			}
 			col.Vec = vec
 			out <- col
@@ -163,10 +164,11 @@ func readRaw(wwtDir string) <-chan *WWTColumn {
 					columns[j][i] = row.Entities[colIndex]
 				}
 			}
+			tableId := filepath.Base(file)
 			for i, colIndex := range colIndices {
-				colName := fmt.Sprintf("%s_%d", filepath.Base(file), colIndex)
 				out <- &WWTColumn{
-					ColumnName:  colName,
+					TableID:     tableId,
+					ColumnIndex: colIndex,
 					Column:      columns[i],
 					Annotations: annotations[i],
 				}

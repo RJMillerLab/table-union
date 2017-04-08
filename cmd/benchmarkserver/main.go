@@ -29,9 +29,9 @@ func main() {
 		"Facebook fastText word vec file")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs, will be created if not exist")
-	flag.StringVar(&searchIndexSqliteDB, "searchindex-db", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/search-index.db",
+	flag.StringVar(&searchIndexSqliteDB, "searchindex-db", "/home/fnargesian/go/src/github.com/RJMillerLab/table-union/benchmark/search-index.db",
 		"Sqlite database file for search index vecs, will be created if not exist")
-	flag.StringVar(&benchmarkDir, "benchmark-dir", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/testdata", "Directory for storing wikitable CSV files, will be created if not exist")
+	flag.StringVar(&benchmarkDir, "benchmark-dir", "/home/fnargesian/go/src/github.com/RJMillerLab/table-union/benchmark/testdata", "Directory for storing wikitable CSV files, will be created if not exist")
 	flag.BoolVar(&rebuildSearchIndex, "rebuild-searchindex", false,
 		"Set to true to rebuild search index from scratch, the existing search index sqlite database will be removed")
 	flag.StringVar(&port, "port", "4004", "Server port")

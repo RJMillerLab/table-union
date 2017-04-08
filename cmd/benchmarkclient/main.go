@@ -25,9 +25,9 @@ func main() {
 	var fastTextSqliteDB string
 	var batchQueryFilename string
 	var groundtruthFile string
-	flag.StringVar(&benchmarkDir, "benchmark-dir", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/testdata",
+	flag.StringVar(&benchmarkDir, "benchmark-dir", "/home/fnargesian/go/src/github.com/RJMillerLab/table-union/benchmark/testdata",
 		"Directory where benchmark CSV files are stored.")
-	flag.StringVar(&groundtruthFile, "groundtruth", "/home/fnargesian/go/src/github.com/RJMillerLab/fastTextHomeWork/benchmark/groundtruth.json",
+	flag.StringVar(&groundtruthFile, "groundtruth", "/home/fnargesian/go/src/github.com/RJMillerLab/table-union/benchmark/groundtruth.json",
 		"Ground truth file - based on WWT benchmark.")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs")
