@@ -6,11 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strings"
-	"unicode"
 
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/RJMillerLab/table-union/embedding"
 	"github.com/RJMillerLab/table-union/wikitable"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
@@ -21,11 +20,7 @@ const (
 )
 
 var (
-	ErrNoEmbFound = errors.New("No embedding found")
-	ByteOrder     = binary.BigEndian
-	TransFunc     = func(s string) string {
-		return strings.ToLower(strings.TrimFunc(strings.TrimSpace(s), unicode.IsPunct))
-	}
+	ByteOrder = binary.BigEndian
 )
 
 type EmbEntry struct {
@@ -46,6 +41,7 @@ type SearchIndex struct {
 	db        *sql.DB // Sqlite store for the embedding entries
 	lsh       *CosineLsh
 	transFun  func(string) string
+	tokenFun  func(string) []string
 	tablename string
 	byteOrder binary.ByteOrder
 }
@@ -59,7 +55,8 @@ func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *CosineLsh) *S
 		ft:        ft,
 		db:        db,
 		lsh:       lsh,
-		transFun:  TransFunc,
+		transFun:  DefaultTransFun,
+		tokenFun:  DefaultTokenFun,
 		tablename: TableName,
 		byteOrder: ByteOrder,
 	}
@@ -91,7 +88,7 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 				if table.Headers[i].IsNum {
 					continue
 				}
-				vec, err := getColEmbPCA(index.ft, index.transFun, column)
+				vec, err := embedding.GetDomainEmbPCA(index.ft, index.tokenFun, index.transFun, column)
 				if err != nil {
 					continue
 				}
@@ -126,7 +123,7 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 	}
 	defer stmt.Close()
 	for e := range entries {
-		binVec := vecToBytes(e.Vec, index.byteOrder)
+		binVec := embedding.VecToBytes(e.Vec, index.byteOrder)
 		if _, err := stmt.Exec(e.TableID, e.ColumnIndex, binVec); err != nil {
 			panic(err)
 		}
@@ -158,7 +155,7 @@ func (index *SearchIndex) Load() {
 		if err := rows.Scan(&tableID, &columnIndex, &binVec); err != nil {
 			panic(err)
 		}
-		vec, err := bytesToVec(binVec, index.byteOrder)
+		vec, err := embedding.BytesToVec(binVec, index.byteOrder)
 		if err != nil {
 			panic(err)
 		}
@@ -188,7 +185,7 @@ func (index *SearchIndex) GetLSHIndexEntries() chan *LSHEntry {
 			if err := rows.Scan(&tableID, &columnIndex, &binVec); err != nil {
 				panic(err)
 			}
-			vec, err := bytesToVec(binVec, index.byteOrder)
+			vec, err := embedding.BytesToVec(binVec, index.byteOrder)
 			if err != nil {
 				panic(err)
 			}
@@ -257,7 +254,7 @@ func (index *SearchIndex) Get(tableID string, columnIndex int) (*EmbEntry, error
 	if err != nil {
 		return nil, err
 	}
-	vec, err := bytesToVec(binVec, index.byteOrder)
+	vec, err := embedding.BytesToVec(binVec, index.byteOrder)
 	if err != nil {
 		panic(err)
 	}

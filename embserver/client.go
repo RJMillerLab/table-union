@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/RJMillerLab/table-union/embedding"
 	"github.com/RJMillerLab/table-union/wikitable"
 	"github.com/ekzhu/datatable"
 	fasttext "github.com/ekzhu/go-fasttext"
@@ -27,6 +28,7 @@ type Client struct {
 	host     string
 	cli      *http.Client
 	transFun func(string) string
+	tokenFun func(string) []string
 }
 
 func NewClient(ft *fasttext.FastText, ts *wikitable.WikiTableStore, host string) (*Client, error) {
@@ -38,7 +40,8 @@ func NewClient(ft *fasttext.FastText, ts *wikitable.WikiTableStore, host string)
 		ts:       ts,
 		host:     host,
 		cli:      &http.Client{},
-		transFun: TransFunc,
+		transFun: DefaultTransFun,
+		tokenFun: DefaultTokenFun,
 	}, nil
 }
 
@@ -70,9 +73,9 @@ func (c *Client) mkReq(queryRequest QueryRequest) QueryResponse {
 
 func (c *Client) findTopKWords(column []string, vec []float64, k int) [][]string {
 	queue := NewTopKQueue(k)
-	words := mkTokenizedValues(column, c.transFun)
+	words := embedding.TokenizedValues(column, c.tokenFun, c.transFun)
 	for w := range words {
-		wordVec, err := getValueEmb(c.ft, w)
+		wordVec, err := embedding.GetValueEmb(c.ft, w)
 		if err != nil {
 			continue
 		}
@@ -104,7 +107,7 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 	// Create embeddings
 	vecs := make([][]float64, queryTable.NumCol())
 	for i := range vecs {
-		vec, err := getColEmbPCA(c.ft, c.transFun, queryTable.GetColumn(i))
+		vec, err := embedding.GetDomainEmbPCA(c.ft, c.tokenFun, c.transFun, queryTable.GetColumn(i))
 		if err != nil {
 			log.Printf("Embedding not found for column %d", i)
 			continue
