@@ -9,16 +9,19 @@ import (
 )
 
 var (
-	TableName = "benchmark"
-	ByteOrder = binary.BigEndian
+	ColumnPairTableName = "column_pair"
+	VecTableName        = "domain_vec"
+	ByteOrder           = binary.BigEndian
 )
 
 type SamplePair struct {
-	ID1   string
-	ID2   string
-	Vec1  []float64
-	Vec2  []float64
-	Label int
+	TableID1     string
+	TableID2     string
+	ColumnIndex1 int
+	ColumnIndex2 int
+	Vec1         []float64
+	Vec2         []float64
+	Label        int
 }
 
 func WriteToDB(samplePairs <-chan *SamplePair, sqliteDB string) {
@@ -27,30 +30,75 @@ func WriteToDB(samplePairs <-chan *SamplePair, sqliteDB string) {
 		panic(err)
 	}
 	defer db.Close()
+
+	// Create tables
 	_, err = db.Exec(fmt.Sprintf(`
 		CREATE TABLE %s (
-			id1 TEXT,
-			id2 TEXT,
-			vec1 BLOB,
-			vec2 BLOB,
+			table_id TEXT,
+			column_index INTEGER,
+			vec BLOB
+		);
+		`, VecTableName))
+	if err != nil {
+		panic(err)
+	}
+	_, err = db.Exec(fmt.Sprintf(`
+		CREATE TABLE %s (
+			table_id1 TEXT,
+			column_index1 INTEGER,
+			table_id2 TEXT,
+			column_index2 INTEGER,
 			label INTEGER
 		);
-		`, TableName))
+		`, ColumnPairTableName))
 	if err != nil {
 		panic(err)
 	}
-	stmt, err := db.Prepare(fmt.Sprintf(`
-		INSERT INTO %s(id1, id2, vec1, vec2, label) VALUES(?, ?, ?, ?, ?);
-		`, TableName))
+	// Prepare statements
+	columnPairStmt, err := db.Prepare(fmt.Sprintf(`
+		INSERT INTO %s(table_id1, column_index1, table_id2, column_index2, label) VALUES(?, ?, ?, ?, ?);
+		`, ColumnPairTableName))
 	if err != nil {
 		panic(err)
 	}
-	defer stmt.Close()
+	defer columnPairStmt.Close()
+	domainVecStmt, err := db.Prepare(fmt.Sprintf(`
+		INSERT INTO %s(table_id, column_index, vec) VALUES(?, ?, ?);
+		`, VecTableName))
+	if err != nil {
+		panic(err)
+	}
+	defer domainVecStmt.Close()
+
+	// Insert into tables
 	for p := range samplePairs {
-		binVec1 := embedding.VecToBytes(p.Vec1, ByteOrder)
-		binVec2 := embedding.VecToBytes(p.Vec2, ByteOrder)
-		if _, err := stmt.Exec(p.ID1, p.ID2, binVec1, binVec2, p.Label); err != nil {
+		// Insert into domain vec table
+		if !checkIdExists(p.TableID1, p.ColumnIndex1, db) {
+			binVec1 := embedding.VecToBytes(p.Vec1, ByteOrder)
+			if _, err := domainVecStmt.Exec(p.TableID1, p.ColumnIndex1, binVec1); err != nil {
+				panic(err)
+			}
+		}
+		if !checkIdExists(p.TableID2, p.ColumnIndex2, db) {
+			binVec2 := embedding.VecToBytes(p.Vec2, ByteOrder)
+			if _, err := domainVecStmt.Exec(p.TableID2, p.ColumnIndex2, binVec2); err != nil {
+				panic(err)
+			}
+		}
+		// Insert into column pair table
+		if _, err := columnPairStmt.Exec(p.TableID1, p.ColumnIndex1, p.TableID2, p.ColumnIndex2, p.Label); err != nil {
 			panic(err)
 		}
 	}
+}
+
+func checkIdExists(tableId string, columnIndex int, db *sql.DB) bool {
+	var tmp string
+	err := db.QueryRow(fmt.Sprintf(`
+		SELECT table_id FROM %s WHERE table_id=? AND column_index=?;
+	`, VecTableName), tableId, columnIndex).Scan(&tmp)
+	if err == nil {
+		return true
+	}
+	return false
 }

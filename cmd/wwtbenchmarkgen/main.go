@@ -100,22 +100,26 @@ func main() {
 			col1 := columns[p.c1]
 			col2 := columns[p.c2]
 			out <- &benchmark.SamplePair{
-				ID1:   col1.ColumnName,
-				ID2:   col2.ColumnName,
-				Vec1:  col1.Vec,
-				Vec2:  col2.Vec,
-				Label: 1,
+				TableID1:     col1.TableID,
+				ColumnIndex1: col1.ColumnIndex,
+				TableID2:     col2.TableID,
+				ColumnIndex2: col2.ColumnIndex,
+				Vec1:         col1.Vec,
+				Vec2:         col2.Vec,
+				Label:        1,
 			}
 		}
 		for _, p := range negativePairs {
 			col1 := columns[p.c1]
 			col2 := columns[p.c2]
 			out <- &benchmark.SamplePair{
-				ID1:   col1.ColumnName,
-				ID2:   col2.ColumnName,
-				Vec1:  col1.Vec,
-				Vec2:  col2.Vec,
-				Label: 0,
+				TableID1:     col1.TableID,
+				ColumnIndex1: col1.ColumnIndex,
+				TableID2:     col2.TableID,
+				ColumnIndex2: col2.ColumnIndex,
+				Vec1:         col1.Vec,
+				Vec2:         col2.Vec,
+				Label:        0,
 			}
 		}
 		close(out)
