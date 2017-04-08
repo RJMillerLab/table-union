@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/RJMillerLab/table-union/embedding"
+	"github.com/ekzhu/counter"
 )
 
 var (
@@ -22,6 +23,12 @@ type SamplePair struct {
 	Vec1         []float64
 	Vec2         []float64
 	Label        int
+}
+
+func (p *SamplePair) ColumnIDs() (id1, id2 string) {
+	id1 = fmt.Sprintf("%s_%d", p.TableID1, p.ColumnIndex1)
+	id2 = fmt.Sprintf("%s_%d", p.TableID2, p.ColumnIndex2)
+	return
 }
 
 func WriteToDB(samplePairs <-chan *SamplePair, sqliteDB string) {
@@ -71,34 +78,39 @@ func WriteToDB(samplePairs <-chan *SamplePair, sqliteDB string) {
 	defer domainVecStmt.Close()
 
 	// Insert into tables
+	columnInserted := counter.NewCounter()
+	var count int
 	for p := range samplePairs {
 		// Insert into domain vec table
-		if !checkIdExists(p.TableID1, p.ColumnIndex1, db) {
+		id1, id2 := p.ColumnIDs()
+		if !columnInserted.Has(id1) {
 			binVec1 := embedding.VecToBytes(p.Vec1, ByteOrder)
 			if _, err := domainVecStmt.Exec(p.TableID1, p.ColumnIndex1, binVec1); err != nil {
 				panic(err)
 			}
+			columnInserted.Update(id1)
 		}
-		if !checkIdExists(p.TableID2, p.ColumnIndex2, db) {
+		if !columnInserted.Has(id2) {
 			binVec2 := embedding.VecToBytes(p.Vec2, ByteOrder)
 			if _, err := domainVecStmt.Exec(p.TableID2, p.ColumnIndex2, binVec2); err != nil {
 				panic(err)
 			}
+			columnInserted.Update(id2)
 		}
 		// Insert into column pair table
 		if _, err := columnPairStmt.Exec(p.TableID1, p.ColumnIndex1, p.TableID2, p.ColumnIndex2, p.Label); err != nil {
 			panic(err)
 		}
+		count++
+		fmt.Printf("\rInserted %d pairs", count)
 	}
-}
+	fmt.Println()
 
-func checkIdExists(tableId string, columnIndex int, db *sql.DB) bool {
-	var tmp string
-	err := db.QueryRow(fmt.Sprintf(`
-		SELECT table_id FROM %s WHERE table_id=? AND column_index=?;
-	`, VecTableName), tableId, columnIndex).Scan(&tmp)
-	if err == nil {
-		return true
+	// Build index on vector table
+	_, err = db.Exec(fmt.Sprintf(`
+		CREATE INDEX ind_column_id ON %s(table_id, column_index);
+		`, VecTableName))
+	if err != nil {
+		panic(err)
 	}
-	return false
 }
