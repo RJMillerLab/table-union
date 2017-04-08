@@ -116,6 +116,7 @@ func (w *WWT) ReadColumns() <-chan *WWTColumn {
 			vec, err := embedding.GetDomainEmbPCA(w.ft, w.tokenFun, w.transFun, col.Column)
 			if err != nil {
 				log.Printf("Error in column %s: %s", col.ColumnName, err)
+				continue
 			}
 			col.Vec = vec
 			out <- col
