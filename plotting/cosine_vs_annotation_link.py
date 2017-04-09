@@ -31,7 +31,7 @@ for table_id1, table_id2, column_index1, column_index2, label in \
     bin_vec2 = cursor.execute("select vec from domain_vec where table_id=? and column_index=?", (table_id2, column_index2)).fetchone()[0]
     vec1 = np.frombuffer(bin_vec1, dtype=dt)
     vec2 = np.frombuffer(bin_vec2, dtype=dt)
-    cos = cosine(vec1, vec2)
+    cos = 1.0 - cosine(vec1, vec2)
     if label == 0:
         neg_cosines.append(cos)
     else:
