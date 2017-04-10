@@ -11,9 +11,9 @@ func TestReadWikiTable(t *testing.T) {
 		t.Error(err)
 	}
 	defer f.Close()
-	for table := range ReadWikiTable(f) {
-		t.Log(table.ID)
-		t.Log(table.Headers)
-		t.Log(table.Columns)
-	}
+	//for table := range ReadWikiTable(f) {
+	//	t.Log(table.ID)
+	//	t.Log(table.Headers)
+	//	t.Log(table.Columns)
+	//}
 }
