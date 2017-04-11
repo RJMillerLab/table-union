@@ -50,30 +50,19 @@ func newSignature(hyperplanes hyperplanes, e []float64) signature {
 // the hyperplanes
 type hyperplanes [][]float64
 
-// GenerateHP generates a hyperplan using gaussian distribution (0, 1).
-// The number of dimensions in a hyperplane is the number of qgrams in the ontology.
-func generateHP(s int) []float64 {
-	h := make([]float64, s)
-	for i := 0; i < s; i++ {
-		n := rand.NormFloat64()
-		h[i] = n
-	}
-	return h
-}
-
-// Generates a set of hyperplanes.
-func generateHPs(d int, s int) hyperplanes {
+//NewHyperplanes generates and initializes a set of d hyperplanes with s dimensions.
+func newHyperplanes(d, s int) hyperplanes {
 	hs := make([][]float64, d)
 	for i := 0; i < d; i++ {
-		v := generateHP(s)
+		v := make([]float64, s)
+		for i := 0; i < s; i++ {
+			n := rand.NormFloat64()
+			v[i] = n
+		}
 		hs[i] = v
 	}
 	return hs
-}
-
-//NewHyperplanes generates and initializes a set of d hyperplanes with s dimensions.
-func newHyperplanes(d, s int) hyperplanes {
-	return generateHPs(d, s)
+	//return generateHPs(d, s)
 }
 
 type cosineLshParam struct {

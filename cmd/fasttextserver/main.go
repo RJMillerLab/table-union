@@ -83,19 +83,21 @@ func main() {
 	}
 
 	// Create ontology wikitable store, build if not exists
-	ots := wikitable.NewWikiTableStore(ontWikiTableDir)
-	if ots.IsNotBuilt() || rebuildOntWikiTableStore {
-		log.Print("Building ontology wikitable store")
-		f, err := os.Open(wikiTableFilename)
-		if err != nil {
-			panic(err)
+	/*
+		ots := wikitable.NewWikiTableStore(ontWikiTableDir)
+		if ots.IsNotBuilt() || rebuildOntWikiTableStore {
+			log.Print("Building ontology wikitable store")
+			f, err := os.Open(wikiTableFilename)
+			if err != nil {
+				panic(err)
+			}
+			if err := ots.OntBuild(f); err != nil {
+				panic(err)
+			}
+			f.Close()
+			log.Print("Finish building ontology wikitable store")
 		}
-		if err := ots.OntBuild(f); err != nil {
-			panic(err)
-		}
-		f.Close()
-		log.Print("Finish building ontology wikitable store")
-	}
+	*/
 	if rebuildSearchIndex {
 		if err := os.Remove(searchIndexSqliteDB); err != nil {
 			panic(err)
