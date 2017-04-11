@@ -37,7 +37,7 @@ cursor = db.cursor()
 dt = np.dtype(float)
 dt = dt.newbyteorder('>')
 for table_id1, column_index1, bin_vec1, table_id2, column_index2, bin_vec2 in \
-        cursor.execute("select t1.table_id as table_id1, t1.column_index as column_id1, t1.vec as bin_vec1, t2.table_id as table_id2, t2.column_index as column_index2, t2.vec as bin_vec2 from (select * from search_index limit 500) t1, (select * from search_index limit 500) t2 where t1.table_id!=t2.table_id;").fetchall():
+        cursor.execute("select t1.table_id as table_id1, t1.column_index as column_id1, t1.vec as bin_vec1, t2.table_id as table_id2, t2.column_index as column_index2, t2.vec as bin_vec2 from (select * from search_index limit 150) t1, (select * from search_index limit 150) t2 where t1.table_id!=t2.table_id;").fetchall():
     if (table_id1, column_index1, table_id2, column_index2) not in seen_pairs and \
             (table_id2, column_index2, table_id1, column_index1) not in seen_pairs:
         vec1 = np.frombuffer(bin_vec1, dtype=dt)
