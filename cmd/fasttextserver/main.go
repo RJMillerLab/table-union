@@ -20,8 +20,10 @@ func main() {
 	var wikiTableFilename string
 	var searchIndexSqliteDB string
 	var wikiTableDir string
+	var ontWikiTableDir string
 	var rebuildSearchIndex bool
 	var rebuildWikiTableStore bool
+	var rebuildOntWikiTableStore bool
 	var port string
 	var l, m int
 	flag.StringVar(&fastTextFilename, "fasttext-raw", "/home/ekzhu/FB_WORD_VEC/wiki.en.vec",
@@ -34,8 +36,12 @@ func main() {
 		"sqlite database file for search index vecs, will be created if not exist")
 	flag.StringVar(&wikiTableDir, "wikitable-dir", "/home/ekzhu/WIKI_TABLE/tables",
 		"Directory for storing wikitable CSV files, will be created if not exist")
+	flag.StringVar(&ontWikiTableDir, "ontwikitable-dir", "/home/ekzhu/WIKI_TABLE/onttables",
+		"Directory for storing wikitable CSV files using entity labels instead of raw text, will be created if not exist")
 	flag.BoolVar(&rebuildWikiTableStore, "rebuild-wikitable", false,
 		"Set to true to rebuild wikitable store, existing CSV files will be skipped")
+	flag.BoolVar(&rebuildOntWikiTableStore, "rebuild-ontwikitable", false,
+		"Set to true to rebuild ontology wikitable store, existing CSV files will be skipped")
 	flag.BoolVar(&rebuildSearchIndex, "rebuild-searchindex", false,
 		"Set to true to rebuild search index from scratch, the existing search index sqlite database will be removed")
 	flag.StringVar(&port, "port", "4003", "Server port")
@@ -76,6 +82,20 @@ func main() {
 		log.Print("Finish building wikitable store")
 	}
 
+	// Create ontology wikitable store, build if not exists
+	ots := wikitable.NewWikiTableStore(ontWikiTableDir)
+	if ots.IsNotBuilt() || rebuildOntWikiTableStore {
+		log.Print("Building ontology wikitable store")
+		f, err := os.Open(wikiTableFilename)
+		if err != nil {
+			panic(err)
+		}
+		if err := ots.OntBuild(f); err != nil {
+			panic(err)
+		}
+		f.Close()
+		log.Print("Finish building ontology wikitable store")
+	}
 	if rebuildSearchIndex {
 		if err := os.Remove(searchIndexSqliteDB); err != nil {
 			panic(err)
