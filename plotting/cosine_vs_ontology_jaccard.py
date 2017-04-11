@@ -15,16 +15,21 @@ def get_columns(table_dir, table_id, column_id):
 
 
 def jaccard_similarity(x,y):
-    intersection_cardinality = len(set.intersection(*[set(x), set(y)]))
-    union_cardinality = len(set.union(*[set(x), set(y)]))
+    set_x = set(x)
+    set_x.discard("")
+    set_y = set(y)
+    set_y.discard("")
+    intersection_cardinality = len(set.intersection(*[set_x, set_y]))
+    union_cardinality = len(set.union(*[set_x, set_y]))
     return intersection_cardinality/float(union_cardinality)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-d", "--dataset", default="/home/ekzhu/WIKI_TABLE/search-index.db")
+parser.add_argument("-d", "--dataset", default="/home/fnargesian/WIKI_TABLE/search-index.db")
 parser.add_argument("-o", "--output", default="cosine_vs_ontology_jaccard.pdf")
 parser.add_argument("-od", "--onttabledir", default="/home/fnargesian/WIKI_TABLE/onttables")
 args = parser.parse_args(sys.argv[1:])
 
+seen_pairs = []
 cosines = collections.deque([])
 jaccards = collections.deque([])
 db = sqlite3.connect(args.dataset)
@@ -32,15 +37,19 @@ cursor = db.cursor()
 dt = np.dtype(float)
 dt = dt.newbyteorder('>')
 for table_id1, column_index1, bin_vec1, table_id2, column_index2, bin_vec2 in \
-        cursor.execute("select t1.table_id as table_id1, t1.column_index as column_id1, t1.vec as bin_vec1, t2.table_id as table_id2, t2.column_index as column_index2, t2.vec as bin_vec2 from (select * from search_index limit 100) t1, (select * from search_index limit 100) t2 where t1.table_id!=t2.table_id;").fetchall():
-    vec1 = np.frombuffer(bin_vec1, dtype=dt)
-    vec2 = np.frombuffer(bin_vec2, dtype=dt)
-    cos = 1.0 - cosine(vec1, vec2)
-    cosines.append(cos)
-    raw_vec1 = get_columns(args.onttabledir, table_id1, column_index1)
-    raw_vec2 = get_columns(args.onttabledir, table_id2, column_index2)
-    jac = jaccard_similarity(raw_vec1, raw_vec2) 
-    jaccards.append(jac)
+        cursor.execute("select t1.table_id as table_id1, t1.column_index as column_id1, t1.vec as bin_vec1, t2.table_id as table_id2, t2.column_index as column_index2, t2.vec as bin_vec2 from (select * from search_index limit 500) t1, (select * from search_index limit 500) t2 where t1.table_id!=t2.table_id;").fetchall():
+    if (table_id1, column_index1, table_id2, column_index2) not in seen_pairs and \
+            (table_id2, column_index2, table_id1, column_index1) not in seen_pairs:
+        vec1 = np.frombuffer(bin_vec1, dtype=dt)
+        vec2 = np.frombuffer(bin_vec2, dtype=dt)
+        cos = 1.0 - cosine(vec1, vec2)
+        cosines.append(cos)
+        raw_vec1 = get_columns(args.onttabledir, table_id1, column_index1)
+        raw_vec2 = get_columns(args.onttabledir, table_id2, column_index2)
+        jac = jaccard_similarity(raw_vec1, raw_vec2) 
+        jaccards.append(jac)
+        seen_pairs.append((table_id1, column_index1, table_id2, column_index2))
+print("len of cosine is %d\n" % len(cosines))
 cosine_inx = np.argsort(np.array(list(cosines)))
 x_cosines = np.array(list(cosines))[cosine_inx] 
 y_jaccards = np.array(list(jaccards))[cosine_inx]
