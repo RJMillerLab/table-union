@@ -36,7 +36,7 @@ func main() {
 		"sqlite database file for search index vecs, will be created if not exist")
 	flag.StringVar(&wikiTableDir, "wikitable-dir", "/home/ekzhu/WIKI_TABLE/tables",
 		"Directory for storing wikitable CSV files, will be created if not exist")
-	flag.StringVar(&ontWikiTableDir, "ontwikitable-dir", "/home/ekzhu/WIKI_TABLE/onttables",
+	flag.StringVar(&ontWikiTableDir, "ontwikitable-dir", "/home/fnargesian/WIKI_TABLE/onttables",
 		"Directory for storing wikitable CSV files using entity labels instead of raw text, will be created if not exist")
 	flag.BoolVar(&rebuildWikiTableStore, "rebuild-wikitable", false,
 		"Set to true to rebuild wikitable store, existing CSV files will be skipped")
@@ -83,21 +83,19 @@ func main() {
 	}
 
 	// Create ontology wikitable store, build if not exists
-	/*
-		ots := wikitable.NewWikiTableStore(ontWikiTableDir)
-		if ots.IsNotBuilt() || rebuildOntWikiTableStore {
-			log.Print("Building ontology wikitable store")
-			f, err := os.Open(wikiTableFilename)
-			if err != nil {
-				panic(err)
-			}
-			if err := ots.OntBuild(f); err != nil {
-				panic(err)
-			}
-			f.Close()
-			log.Print("Finish building ontology wikitable store")
+	ots := wikitable.NewWikiTableStore(ontWikiTableDir)
+	if ots.IsNotBuilt() || rebuildOntWikiTableStore {
+		log.Print("Building ontology wikitable store")
+		f, err := os.Open(wikiTableFilename)
+		if err != nil {
+			panic(err)
 		}
-	*/
+		if err := ots.OntBuild(f); err != nil {
+			panic(err)
+		}
+		f.Close()
+		log.Print("Finish building ontology wikitable store")
+	}
 	if rebuildSearchIndex {
 		if err := os.Remove(searchIndexSqliteDB); err != nil {
 			panic(err)
