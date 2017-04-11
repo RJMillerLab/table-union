@@ -113,12 +113,12 @@ func (w *WWT) ReadColumns() <-chan *WWTColumn {
 	out := make(chan *WWTColumn)
 	go func() {
 		for col := range readRaw(w.dir) {
-			vec, err := embedding.GetDomainEmbPCA(w.ft, w.tokenFun, w.transFun, col.Column)
+			vecs, err := embedding.GetDomainEmbPCA(w.ft, w.tokenFun, w.transFun, col.Column, 1)
 			if err != nil {
 				log.Printf("Error in table %s column %d: %s", col.TableID, col.ColumnIndex, err)
 				continue
 			}
-			col.Vec = vec
+			col.Vec = vecs[0]
 			out <- col
 		}
 		close(out)

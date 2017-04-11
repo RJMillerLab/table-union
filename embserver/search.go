@@ -88,16 +88,16 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 				if table.Headers[i].IsNum {
 					continue
 				}
-				vec, err := embedding.GetDomainEmbPCA(index.ft, index.tokenFun, index.transFun, column)
+				vecs, err := embedding.GetDomainEmbPCA(index.ft, index.tokenFun, index.transFun, column, 1)
 				if err != nil {
 					continue
 				}
 				id := toColumnID(table.ID, i)
-				index.lsh.Insert(vec, id)
+				index.lsh.Insert(vecs[0], id)
 				entry := &EmbEntry{
 					TableID:     table.ID,
 					ColumnIndex: i,
-					Vec:         vec,
+					Vec:         vecs[0],
 				}
 				entries <- entry
 			}

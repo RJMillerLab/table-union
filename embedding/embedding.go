@@ -42,9 +42,9 @@ func GetDomainEmbAve(ft *fasttext.FastText, tokenFun func(string) []string, tran
 	return vec, nil
 }
 
-// Get the embedding vector of a column domain by taking the first principal
+// Get the embedding vector of a column domain by taking the first K principal
 // component of the distinct values (tokenized) vectors
-func GetDomainEmbPCA(ft *fasttext.FastText, tokenFun func(string) []string, transFun func(string) string, column []string) ([]float64, error) {
+func GetDomainEmbPCA(ft *fasttext.FastText, tokenFun func(string) []string, transFun func(string) string, column []string, kfirst int) ([][]float64, error) {
 	values := TokenizedValues(column, tokenFun, transFun)
 	var data []float64
 	var count int
@@ -68,10 +68,18 @@ func GetDomainEmbPCA(ft *fasttext.FastText, tokenFun func(string) []string, tran
 	if ok := pc.PrincipalComponents(matrix, nil); !ok {
 		return nil, ErrPCAFailure
 	}
+	//pcs := pc.Vectors(nil)
+	//vec := make([]float64, fasttext.Dim)
+	//mat64.Col(vec, 0, pcs)
+	kpcs := make([][]float64, kfirst)
 	pcs := pc.Vectors(nil)
-	vec := make([]float64, fasttext.Dim)
-	mat64.Col(vec, 0, pcs)
-	return vec, nil
+	for i := 0; i < kfirst; i++ {
+		vec := make([]float64, fasttext.Dim)
+		mat64.Col(vec, i, pcs)
+		kpcs = append(kpcs, vec)
+	}
+	//return vec, nil
+	return kpcs, nil
 }
 
 // Get the embedding vector of a tokenized value by sum all the tokens' vectors
