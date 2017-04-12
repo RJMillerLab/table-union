@@ -85,9 +85,6 @@ for p in pairs:
 
 print("Number of pairs is %d" % len(pairs))
 print("Number of pairs which non-zero jaccard is %d" % pos_count)
-cosine_inx = np.argsort(np.array(list(pcs_cosines)))
-x_cosines = np.array(list(pcs_cosines))[cosine_inx] 
-y_jaccards = np.array(list(jaccards))[cosine_inx]
 # writing points to json
 print("Saving pairs and scores...")
 with open('testdata/cosines.json', 'w') as fp:
