@@ -26,13 +26,14 @@ func main() {
 	var rebuildOntWikiTableStore bool
 	var port string
 	var l, m int
+	var pcsNum int
 	flag.StringVar(&fastTextFilename, "fasttext-raw", "/home/ekzhu/FB_WORD_VEC/wiki.en.vec",
 		"Facebook fastText word vec file")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs, will be created if not exist")
 	flag.StringVar(&wikiTableFilename, "wikitable-raw", "/home/ekzhu/WIKI_TABLE/tables.json",
 		"WikiTable dataset file")
-	flag.StringVar(&searchIndexSqliteDB, "searchindex-db", "/home/ekzhu/WIKI_TABLE/search-index.db",
+	flag.StringVar(&searchIndexSqliteDB, "searchindex-db", "/home/fnargesian/WIKI_TABLE/search-index.db",
 		"sqlite database file for search index vecs, will be created if not exist")
 	flag.StringVar(&wikiTableDir, "wikitable-dir", "/home/ekzhu/WIKI_TABLE/tables",
 		"Directory for storing wikitable CSV files, will be created if not exist")
@@ -47,6 +48,7 @@ func main() {
 	flag.StringVar(&port, "port", "4003", "Server port")
 	flag.IntVar(&l, "l", 5, "LSH Parameter: number of bands or hash tables")
 	flag.IntVar(&m, "m", 20, "LSH Parameter: size of each band or hash key")
+	flag.IntVar(&pcsNum, "pcs", 3, "Number of principal components for representing a domain")
 	flag.Parse()
 
 	// Create Sqlite DB for fastText if not exists
@@ -102,7 +104,7 @@ func main() {
 		}
 	}
 
-	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, embserver.NewCosineLsh(FastTextDim, l, m))
+	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, embserver.NewCosineLsh(FastTextDim, l, m), pcsNum)
 	// Build search index if it is not built
 	if si.IsNotBuilt() {
 		log.Print("Building search index from scratch")

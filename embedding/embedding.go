@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"math"
 
 	"github.com/ekzhu/counter"
 	fasttext "github.com/ekzhu/go-fasttext"
@@ -68,17 +69,16 @@ func GetDomainEmbPCA(ft *fasttext.FastText, tokenFun func(string) []string, tran
 	if ok := pc.PrincipalComponents(matrix, nil); !ok {
 		return nil, ErrPCAFailure
 	}
-	//pcs := pc.Vectors(nil)
-	//vec := make([]float64, fasttext.Dim)
-	//mat64.Col(vec, 0, pcs)
-	kpcs := make([][]float64, kfirst)
 	pcs := pc.Vectors(nil)
-	for i := 0; i < kfirst; i++ {
+	_, c := pcs.Dims()
+	// choose maximum kfirst PCs
+	pcsNum := int(math.Min(float64(kfirst), float64(c)))
+	kpcs := make([][]float64, pcsNum)
+	for i := 0; i < pcsNum; i++ {
 		vec := make([]float64, fasttext.Dim)
 		mat64.Col(vec, i, pcs)
-		kpcs = append(kpcs, vec)
+		kpcs[i] = vec
 	}
-	//return vec, nil
 	return kpcs, nil
 }
 

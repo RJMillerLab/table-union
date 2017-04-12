@@ -26,6 +26,7 @@ var (
 type EmbEntry struct {
 	TableID     string    `json:"table_id"`
 	ColumnIndex int       `json:"column_index"`
+	PCIndex     int       `json:"pc_index"`
 	Vec         []float64 `json:"vec"`
 }
 
@@ -44,9 +45,10 @@ type SearchIndex struct {
 	tokenFun  func(string) []string
 	tablename string
 	byteOrder binary.ByteOrder
+	kPCs      int
 }
 
-func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *CosineLsh) *SearchIndex {
+func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *CosineLsh, kPCs int) *SearchIndex {
 	db, err := sql.Open("sqlite3", dbFilename)
 	if err != nil {
 		panic(err)
@@ -59,6 +61,7 @@ func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *CosineLsh) *S
 		tokenFun:  DefaultTokenFun,
 		tablename: TableName,
 		byteOrder: ByteOrder,
+		kPCs:      kPCs,
 	}
 	return index
 }
@@ -88,18 +91,21 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 				if table.Headers[i].IsNum {
 					continue
 				}
-				vecs, err := embedding.GetDomainEmbPCA(index.ft, index.tokenFun, index.transFun, column, 1)
+				vecs, err := embedding.GetDomainEmbPCA(index.ft, index.tokenFun, index.transFun, column, index.kPCs)
 				if err != nil {
 					continue
 				}
 				id := toColumnID(table.ID, i)
-				index.lsh.Insert(vecs[0], id)
-				entry := &EmbEntry{
-					TableID:     table.ID,
-					ColumnIndex: i,
-					Vec:         vecs[0],
+				for ipc, _ := range vecs {
+					index.lsh.Insert(vecs[ipc], id)
+					entry := &EmbEntry{
+						TableID:     table.ID,
+						ColumnIndex: i,
+						PCIndex:     ipc,
+						Vec:         vecs[ipc],
+					}
+					entries <- entry
 				}
-				entries <- entry
 			}
 		})
 	}()
@@ -109,6 +115,7 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 		CREATE TABLE %s (
 			table_id TEXT,
 			column_index INTEGER,
+			pc_index INTEGER,
 			vec BLOB
 		);
 		`, index.tablename))
@@ -116,7 +123,7 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 		panic(err)
 	}
 	stmt, err := index.db.Prepare(fmt.Sprintf(`
-		INSERT INTO %s(table_id, column_index, vec) VALUES(?, ?, ?);
+		INSERT INTO %s(table_id, column_index, pc_index, vec) VALUES(?, ?, ?, ?);
 		`, index.tablename))
 	if err != nil {
 		panic(err)
@@ -124,7 +131,7 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 	defer stmt.Close()
 	for e := range entries {
 		binVec := embedding.VecToBytes(e.Vec, index.byteOrder)
-		if _, err := stmt.Exec(e.TableID, e.ColumnIndex, binVec); err != nil {
+		if _, err := stmt.Exec(e.TableID, e.ColumnIndex, e.PCIndex, binVec); err != nil {
 			panic(err)
 		}
 	}
@@ -141,7 +148,7 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 // Load recovers the search index entries from the Sqlite database.
 func (index *SearchIndex) Load() {
 	rows, err := index.db.Query(fmt.Sprintf(`
-	SELECT table_id, column_index, vec FROM %s;
+	SELECT table_id, column_index, pc_index, vec FROM %s;
 	`, index.tablename))
 	if err != nil {
 		panic(err)
@@ -152,16 +159,20 @@ func (index *SearchIndex) Load() {
 		var tableID string
 		var columnIndex int
 		var binVec []byte
-		if err := rows.Scan(&tableID, &columnIndex, &binVec); err != nil {
+		var pcIndex int
+		if err := rows.Scan(&tableID, &columnIndex, &pcIndex, &binVec); err != nil {
 			panic(err)
 		}
-		vec, err := embedding.BytesToVec(binVec, index.byteOrder)
-		if err != nil {
-			panic(err)
+		// a domain is represented with its 1st pricipal component
+		if pcIndex == 0 {
+			vec, err := embedding.BytesToVec(binVec, index.byteOrder)
+			if err != nil {
+				panic(err)
+			}
+			id := toColumnID(tableID, columnIndex)
+			index.lsh.Insert(vec, id)
+			count++
 		}
-		id := toColumnID(tableID, columnIndex)
-		index.lsh.Insert(vec, id)
-		count++
 		fmt.Printf("\rLoaded %d embeddings into index", count)
 	}
 	fmt.Println()
@@ -172,7 +183,7 @@ func (index *SearchIndex) GetLSHIndexEntries() chan *LSHEntry {
 	go func() {
 		defer close(out)
 		rows, err := index.db.Query(fmt.Sprintf(`
-		SELECT table_id, column_index, vec FROM %s;
+		SELECT table_id, column_index, pc_index, vec FROM %s;
 		`, index.tablename))
 		if err != nil {
 			panic(err)
@@ -182,20 +193,23 @@ func (index *SearchIndex) GetLSHIndexEntries() chan *LSHEntry {
 			var tableID string
 			var columnIndex int
 			var binVec []byte
-			if err := rows.Scan(&tableID, &columnIndex, &binVec); err != nil {
+			var pcIndex int
+			if err := rows.Scan(&tableID, &columnIndex, &pcIndex, &binVec); err != nil {
 				panic(err)
 			}
-			vec, err := embedding.BytesToVec(binVec, index.byteOrder)
-			if err != nil {
-				panic(err)
-			}
-			hashKeys := index.lsh.toBasicHashTableKeys(index.lsh.hash(vec))
-			for bandIndex, hashKey := range hashKeys {
-				out <- &LSHEntry{
-					TableID:     tableID,
-					ColumnIndex: columnIndex,
-					BandIndex:   bandIndex,
-					HashKey:     hashKey,
+			if pcIndex == 0 {
+				vec, err := embedding.BytesToVec(binVec, index.byteOrder)
+				if err != nil {
+					panic(err)
+				}
+				hashKeys := index.lsh.toBasicHashTableKeys(index.lsh.hash(vec))
+				for bandIndex, hashKey := range hashKeys {
+					out <- &LSHEntry{
+						TableID:     tableID,
+						ColumnIndex: columnIndex,
+						BandIndex:   bandIndex,
+						HashKey:     hashKey,
+					}
 				}
 			}
 		}
@@ -246,7 +260,7 @@ func (index *SearchIndex) Get(tableID string, columnIndex int) (*EmbEntry, error
 	var binVec []byte
 	err := index.db.QueryRow(fmt.Sprintf(`
 	SELECT vec FROM %s
-	WHERE table_id=? AND column_index=?;
+	WHERE table_id=? AND column_index=? AND pc_index=0;
 	`, index.tablename), tableID, columnIndex).Scan(&binVec)
 	if err == sql.ErrNoRows {
 		return nil, errors.New("The column does not exist in the index")
