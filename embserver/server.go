@@ -7,14 +7,14 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/RJMillerLab/table-union/wikitable"
+	"github.com/RJMillerLab/table-union/table"
 	fasttext "github.com/ekzhu/go-fasttext"
 	"github.com/gin-gonic/gin"
 )
 
 type Server struct {
 	ft     *fasttext.FastText
-	ts     *wikitable.WikiTableStore
+	ts     *table.TableStore
 	si     *SearchIndex
 	router *gin.Engine
 }
@@ -34,7 +34,7 @@ type QueryResult struct {
 	Vec         []float64 `json:"vec"`
 }
 
-func NewServer(ft *fasttext.FastText, ts *wikitable.WikiTableStore,
+func NewServer(ft *fasttext.FastText, ts *table.TableStore,
 	si *SearchIndex) *Server {
 	s := &Server{
 		ft:     ft,

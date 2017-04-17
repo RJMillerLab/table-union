@@ -14,10 +14,10 @@ func main() {
 	var queryCSVFilename string
 	var resultDir string
 	var k int
-	var wikiTableDir string
+	var openDataDir string
 	var fastTextSqliteDB string
-	flag.StringVar(&wikiTableDir, "wikitable-dir", "/home/ekzhu/WIKI_TABLE/tables",
-		"Directory for storing wikitable CSV files")
+	flag.StringVar(&openDataDir, "opendata-dir", "/home/fnargesian/OPENDATA/datasets",
+		"Directory for storing opendata CSV files")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs")
 	flag.StringVar(&queryCSVFilename, "query", "",
@@ -32,7 +32,7 @@ func main() {
 		panic("FastText Sqlite DB does not exist")
 	}
 	ft := fasttext.NewFastText(fastTextSqliteDB)
-	ts := table.NewTableStore(wikiTableDir)
+	ts := table.NewTableStore(openDataDir)
 
 	client, err := embserver.NewClient(ft, ts, host)
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/RJMillerLab/table-union/embserver"
-	"github.com/RJMillerLab/table-union/wikitable"
+	"github.com/RJMillerLab/table-union/table"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
@@ -15,28 +15,35 @@ var (
 )
 
 func main() {
-	var rebuildWikiTableStore bool
 	var fastTextFilename string
 	var fastTextSqliteDB string
+	var openDataFilename string
 	var searchIndexSqliteDB string
-	var benchmarkDir string
+	var openDataDir string
 	var rebuildSearchIndex bool
+	var rebuildOpenDataStore bool
 	var port string
 	var l, m int
-	flag.BoolVar(&rebuildWikiTableStore, "rebuild-wikitable", false,
-		"Set to true to rebuild wikitable store, existing CSV files will be skipped")
+	var pcsNum int
 	flag.StringVar(&fastTextFilename, "fasttext-raw", "/home/ekzhu/FB_WORD_VEC/wiki.en.vec",
 		"Facebook fastText word vec file")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs, will be created if not exist")
-	flag.StringVar(&searchIndexSqliteDB, "searchindex-db", "/home/fnargesian/go/src/github.com/RJMillerLab/table-union/benchmark/search-index.db",
-		"Sqlite database file for search index vecs, will be created if not exist")
-	flag.StringVar(&benchmarkDir, "benchmark-dir", "/home/fnargesian/go/src/github.com/RJMillerLab/table-union/benchmark/testdata", "Directory for storing wikitable CSV files, will be created if not exist")
+	flag.StringVar(&openDataFilename, "opendata-raw", "/home/fnargesian/OPENDATA/cod.csv",
+		"open dataset file")
+	// "/home/fnargesian/OPENDATA/csv_files_2016-12-15-canada.csv"
+	flag.StringVar(&searchIndexSqliteDB, "searchindex-db", "/home/fnargesian/OPENDATA/search-index.db",
+		"sqlite database file for search index vecs, will be created if not exist")
+	flag.StringVar(&openDataDir, "opendata-dir", "/home/fnargesian/OPENDATA/datasets",
+		"Directory for storing opendata CSV files, will be created if not exist")
+	flag.BoolVar(&rebuildOpenDataStore, "rebuild-opendata", false,
+		"Set to true to rebuild opendata store, existing CSV files will be skipped")
 	flag.BoolVar(&rebuildSearchIndex, "rebuild-searchindex", false,
 		"Set to true to rebuild search index from scratch, the existing search index sqlite database will be removed")
-	flag.StringVar(&port, "port", "4004", "Server port")
+	flag.StringVar(&port, "port", "4003", "Server port")
 	flag.IntVar(&l, "l", 5, "LSH Parameter: number of bands or hash tables")
 	flag.IntVar(&m, "m", 20, "LSH Parameter: size of each band or hash key")
+	flag.IntVar(&pcsNum, "pcs", 3, "Number of principal components for representing a domain")
 	flag.Parse()
 
 	// Create Sqlite DB for fastText if not exists
@@ -55,24 +62,40 @@ func main() {
 		log.Print("Finished building FastText Sqlite database")
 	}
 	ft := fasttext.NewFastText(fastTextSqliteDB)
+	defer ft.Close()
 
-	// Create wikitable store, build if not exists
-	ts := wikitable.NewWikiTableStore(benchmarkDir)
-	// No need to build CSV files
-	if ts.IsNotBuilt() || rebuildWikiTableStore {
+	// Create opendata store, build if not exists
+	ts := table.NewTableStore(openDataDir)
+	if ts.IsNotBuilt() || rebuildOpenDataStore {
+		log.Print("Building opendata store")
+		f, err := os.Open(openDataFilename)
+		if err != nil {
+			panic(err)
+		}
+		if err := ts.BuildOD(f); err != nil {
+			panic(err)
+		}
+		f.Close()
+		log.Print("Finish building open data store")
+	}
+
+	if rebuildSearchIndex {
 		if err := os.Remove(searchIndexSqliteDB); err != nil {
 			panic(err)
 		}
 	}
 
-	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, embserver.NewCosineLsh(FastTextDim, l, m))
+	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, embserver.NewCosineLsh(FastTextDim, l, m), pcsNum)
 	// Build search index if it is not built
 	if si.IsNotBuilt() {
 		log.Print("Building search index from scratch")
 		if err := si.Build(ts); err != nil {
+			log.Print(err)
 			panic(err)
 		}
 		log.Print("Finish building search index")
+	} else {
+		si.Load()
 	}
 
 	// Start server

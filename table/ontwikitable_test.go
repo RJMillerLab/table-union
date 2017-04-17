@@ -1,4 +1,4 @@
-package wikitable
+package table
 
 import (
 	"os"
@@ -6,7 +6,7 @@ import (
 )
 
 func TestOntBuild(t *testing.T) {
-	ts := NewWikiTableStore("testdata/wikitables")
+	ts := NewTableStore("testdata/ontwikitables")
 	f, err := os.Open("testdata/tables.json")
 	if err != nil {
 		t.Fail()

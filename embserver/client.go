@@ -1,7 +1,6 @@
 package embserver
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
@@ -13,27 +12,26 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/RJMillerLab/table-union/embedding"
-	"github.com/RJMillerLab/table-union/wikitable"
+	"github.com/RJMillerLab/table-union/table"
 	"github.com/ekzhu/datatable"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
 type Client struct {
 	ft       *fasttext.FastText
-	ts       *wikitable.WikiTableStore
+	ts       *table.TableStore
 	host     string
 	cli      *http.Client
 	transFun func(string) string
 	tokenFun func(string) []string
 }
 
-func NewClient(ft *fasttext.FastText, ts *wikitable.WikiTableStore, host string) (*Client, error) {
+func NewClient(ft *fasttext.FastText, ts *table.TableStore, host string) (*Client, error) {
 	if ts.IsNotBuilt() {
-		return nil, errors.New("The WikiTable directory is not built")
+		return nil, errors.New("The Table directory is not built")
 	}
 	return &Client{
 		ft:       ft,
@@ -138,16 +136,15 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 		if err := os.MkdirAll(colResultDir, 0777); err != nil {
 			panic(err)
 		}
-		rf, err := os.Create(filepath.Join(resultDir, "results"))
-		if err != nil {
-			panic(err)
-		}
-		wr := bufio.NewWriter(rf)
+		//rf, err := os.Create(filepath.Join(resultDir, "results"))
+		//if err != nil {
+		//	panic(err)
+		//}
+		//wr := bufio.NewWriter(rf)
 		for rank, entry := range result {
 			log.Printf("(Rank %d) Table %s, Column %d", rank, entry.TableID, entry.ColumnIndex)
 			t, err := c.ts.GetTable(entry.TableID)
 			// Find the top-k values in this column
-			log.Printf("t: %v", t)
 			topkWords := c.findTopKWords(t.Columns[entry.ColumnIndex], vecs[i], k)
 			// Create output directory for this column
 			outputDir := filepath.Join(colResultDir,
@@ -177,22 +174,22 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 			}
 			f.Close()
 			// Output original table
-			filename := filepath.Join(outputDir, "table.csv")
-			f, err = os.Create(filename)
-			if err != nil {
-				panic(err)
-			}
-			if err := t.ToCSV(f); err != nil {
-				panic(err)
-			}
-			f.Close()
+			//filename := filepath.Join(outputDir, "table.csv")
+			//f, err = os.Create(filename)
+			//if err != nil {
+			//	panic(err)
+			//}
+			//if err := t.ToCSV(f); err != nil {
+			//	panic(err)
+			//}
+			//f.Close()
 			// Output result table and column
-			if _, err := wr.WriteString(entry.TableID + " " + strconv.Itoa(entry.ColumnIndex) + "\n"); err != nil {
-				panic(err)
-			}
+			//if _, err := wr.WriteString(entry.TableID + " " + strconv.Itoa(entry.ColumnIndex) + "\n"); err != nil {
+			//	panic(err)
+			//}
 
 		}
-		wr.Flush()
+		//wr.Flush()
 	}
 	log.Printf("Query results written to %s", resultDir)
 }

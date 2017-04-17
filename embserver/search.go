@@ -10,7 +10,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/RJMillerLab/table-union/embedding"
-	"github.com/RJMillerLab/table-union/wikitable"
+	"github.com/RJMillerLab/table-union/table"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
@@ -74,19 +74,19 @@ func (index *SearchIndex) IsNotBuilt() bool {
 	return !index.checkSqlitTableExist()
 }
 
-func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
+func (index *SearchIndex) Build(ts *table.TableStore) error {
 	if index.checkSqlitTableExist() {
 		return errors.New("Sqlite database already exists")
 	}
 	if ts.IsNotBuilt() {
-		return errors.New("Wikitable store is not built, build it first")
+		return errors.New("Table store is not built, build it first")
 	}
 
-	// Compute embedding entries from wikitables
+	// Compute embedding entries from tables
 	entries := make(chan *EmbEntry)
 	go func() {
 		defer close(entries)
-		ts.Apply(func(table *wikitable.WikiTable) {
+		ts.Apply(func(table *table.Table) {
 			for i, column := range table.Columns {
 				if table.Headers[i].IsNum {
 					continue
@@ -120,18 +120,26 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 		);
 		`, index.tablename))
 	if err != nil {
+		log.Fatal(err)
 		panic(err)
 	}
 	stmt, err := index.db.Prepare(fmt.Sprintf(`
 		INSERT INTO %s(table_id, column_index, pc_index, vec) VALUES(?, ?, ?, ?);
 		`, index.tablename))
 	if err != nil {
+		log.Fatal(err)
 		panic(err)
 	}
 	defer stmt.Close()
+	count := 0
 	for e := range entries {
+		count++
+		if count%20 == 0 {
+			log.Printf("Processed %d domains.", count)
+		}
 		binVec := embedding.VecToBytes(e.Vec, index.byteOrder)
 		if _, err := stmt.Exec(e.TableID, e.ColumnIndex, e.PCIndex, binVec); err != nil {
+			log.Fatal(err)
 			panic(err)
 		}
 	}
@@ -139,6 +147,7 @@ func (index *SearchIndex) Build(ts *wikitable.WikiTableStore) error {
 		CREATE INDEX ind_column_id ON %s(table_id, column_index);
 		`, index.tablename))
 	if err != nil {
+		log.Fatal(err)
 		panic(err)
 	}
 

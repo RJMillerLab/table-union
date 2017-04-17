@@ -1,27 +1,63 @@
-package wikitable
+package table
 
 import (
 	"bufio"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"os"
 	"strconv"
-	"strings"
 )
 
-type ontCellRaw struct {
-	Entity string `json:"tdHtmlString"`
+type cellRaw struct {
+	Text string `json:"text"`
 }
 
-type ontWikiTableRaw struct {
-	ID      int            `json:"tableId"`
-	Headers [][]Header     `json:"tableHeaders"`
-	Rows    [][]ontCellRaw `json:"tableData"`
+type wikiTableRaw struct {
+	ID      int         `json:"tableId"`
+	Headers [][]Header  `json:"tableHeaders"`
+	Rows    [][]cellRaw `json:"tableData"`
 }
 
-func readRawOnt(t ontWikiTableRaw) (*WikiTable, error) {
+// Write the wikitable in CSV format.
+func (t *Table) WTToCSV(file io.Writer) error {
+	if len(t.Columns) == 0 {
+		return errors.New("Empty table")
+	}
+	writer := csv.NewWriter(file)
+	row := make([]string, len(t.Headers))
+	// Write headers
+	for i := range row {
+		row[i] = t.Headers[i].Text
+	}
+	if err := writer.Write(row); err != nil {
+		return err
+	}
+	// Write column types
+	for i := range row {
+		row[i] = strconv.FormatBool(t.Headers[i].IsNum)
+	}
+	if err := writer.Write(row); err != nil {
+		return err
+	}
+	// Write rows
+	for i := 0; i < len(t.Columns[0]); i++ {
+		for j := range row {
+			row[j] = t.Columns[j][i]
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func readRawWT(t wikiTableRaw) (*Table, error) {
 	if len(t.Rows) <= 0 {
 		return nil, errors.New("Raw table has no row")
 	}
@@ -45,25 +81,24 @@ func readRawOnt(t ontWikiTableRaw) (*WikiTable, error) {
 	}
 	for i := range t.Rows {
 		for j := range cols {
-			// extract the entity correspondinf to a cell from html
-			v := cellToEntity(t.Rows[i][j].Entity)
+			v := t.Rows[i][j].Text
 			cols[j][i] = v
 		}
 	}
-	return &WikiTable{
+	return &Table{
 		Headers: headers,
 		Columns: cols,
 	}, nil
 }
 
-// OntBuild creates the wikitable directory and populate it with
-// wikitable CSV files where cell values are entities corresponding to raw text.
-func (ts *WikiTableStore) OntBuild(wikiTableFile io.Reader) error {
-	if err := os.MkdirAll(ts.wikiTableDir, 0777); err != nil {
+// Build creates the wikitable directory and populate it with
+// wikitable CSV files, given the raw wikitable dataset file.
+func (ts *TableStore) BuildWT(wikiTableFile io.Reader) error {
+	if err := os.MkdirAll(ts.tableDir, 0777); err != nil {
 		return err
 	}
 
-	tables := make(chan *WikiTable)
+	tables := make(chan *Table)
 	go func() {
 		defer close(tables)
 		var count int
@@ -79,14 +114,14 @@ func (ts *WikiTableStore) OntBuild(wikiTableFile io.Reader) error {
 				continue
 			}
 			data := scanner.Bytes()
-			var tableRaw ontWikiTableRaw
+			var tableRaw wikiTableRaw
 			err := json.Unmarshal(data, &tableRaw)
 			if err != nil {
 				panic(err)
 			}
-			t, err := readRawOnt(tableRaw)
+			t, err := readRawWT(tableRaw)
 			if err != nil {
-				log.Printf("ReadWikiTable (ID %d): %s", count, err)
+				// log.Printf("ReadTable (ID %d): %s", count, err)
 				continue
 			}
 			t.ID = id
@@ -103,24 +138,10 @@ func (ts *WikiTableStore) OntBuild(wikiTableFile io.Reader) error {
 		if err != nil {
 			return err
 		}
-		if err := table.ToCSV(f); err != nil {
+		if err := table.WTToCSV(f); err != nil {
 			return err
 		}
 		f.Close()
 	}
 	return nil
-}
-
-// cellToEntity extracts the entity name from html tag
-// example:
-//"tdHtmlString" : "<td colspan=\"1\" rowspan=\"5\"><a href=\"http://www.wikipedia.org/wiki/Football_League_First_Division\" shape=\"rect\">Division One</a> </td>"
-func cellToEntity(htmlCell string) string {
-	ahinx := strings.Index(htmlCell, "a href=\"http://www.wikipedia.org/wiki/")
-	c := ""
-	if ahinx != -1 {
-		c = htmlCell[strings.Index(htmlCell, "a href=\"http://www.wikipedia.org/wiki/"):]
-		c = strings.Replace(c, "a href=\"http://www.wikipedia.org/wiki/", "", 1)
-		c = c[:strings.Index(c, "\"")]
-	}
-	return c
 }

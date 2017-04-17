@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/RJMillerLab/table-union/embserver"
-	"github.com/RJMillerLab/table-union/wikitable"
+	"github.com/RJMillerLab/table-union/table"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
@@ -70,14 +70,14 @@ func main() {
 	defer ft.Close()
 
 	// Create wikitable store, build if not exists
-	ts := wikitable.NewWikiTableStore(wikiTableDir)
+	ts := table.NewTableStore(wikiTableDir)
 	if ts.IsNotBuilt() || rebuildWikiTableStore {
 		log.Print("Building wikitable store")
 		f, err := os.Open(wikiTableFilename)
 		if err != nil {
 			panic(err)
 		}
-		if err := ts.Build(f); err != nil {
+		if err := ts.BuildWT(f); err != nil {
 			panic(err)
 		}
 		f.Close()
@@ -85,7 +85,7 @@ func main() {
 	}
 
 	// Create ontology wikitable store, build if not exists
-	ots := wikitable.NewWikiTableStore(ontWikiTableDir)
+	ots := table.NewTableStore(ontWikiTableDir)
 	if ots.IsNotBuilt() || rebuildOntWikiTableStore {
 		log.Print("Building ontology wikitable store")
 		f, err := os.Open(wikiTableFilename)
