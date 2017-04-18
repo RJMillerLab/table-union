@@ -48,7 +48,7 @@ for i in range(len(pairs)):
     p = pairs[i]
     if i % 100 == 1:
         print("Processed %d domain pairs." % i)
-    if jaccards[i] < 0.3:
+    if jaccards[i] < 0.2:
         continue
     d1 = list(get_domain(args.wikitabledir, p[0], p[1]))
     d2 = list(get_domain(args.wikitabledir, p[2], p[3]))
@@ -71,7 +71,27 @@ for i in range(len(pairs)):
         f.write("\n\nDomain2: \n")
         for a in d2:
             f.write(a + ",")
-    if jaccards[i] > 0.3:
+    path = ""
+    if first_cosines[i] > 0.25:
+        path = os.path.join(os.path.join(args.firstpcdir, "cosine1"), p[0] + "_" + str(p[1]) + "_" + p[2] + "_" + str(p[3]))
+    elif first_cosines[i] < -0.25:
+        path = os.path.join(os.path.join(args.firstpcdir, "cosine_1"), p[0] + "_" + str(p[1]) + "_" + p[2] + "_" + str(p[3]))
+    elif first_cosines[i] < 0.25 and best_cosines[i] > -0.25:
+        path = os.path.join(os.path.join(args.firstpcdir, "cosine0"), p[0] + "_" + str(p[1]) + "_" + p[2] + "_" + str(p[3]))
+    else:
+        continue
+    with open(path, 'w') as f:
+        f.write("first_cosines: " + str(first_cosines[i]) + "\n")
+        f.write("best_cosines: " + str(best_cosines[i]) + "\n")
+        f.write("jaccards: " + str(jaccards[i]) + "\n")
+        f.write("\nDomain1: \n")
+        for a in d1:
+            f.write(a + ",")
+        f.write("\n\nDomain2: \n")
+        for a in d2:
+            f.write(a + ",")
+
+    if jaccards[i] > 0.2:
         path = os.path.join(args.jaccarddir, p[0] + "_" + str(p[1]) + "_" + p[2] + "_" + str(p[3]))
         with open(path, 'w') as f:
             f.write("first_cosine: " + str(first_cosines[i]) + "\n")
