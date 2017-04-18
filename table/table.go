@@ -115,7 +115,7 @@ func (ts *TableStore) Apply(fn func(*Table)) {
 				ids <- id
 				//
 				count++
-				if count == 1000 {
+				if count == 10000 {
 					return
 				}
 				//

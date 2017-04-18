@@ -29,9 +29,8 @@ func main() {
 		"Facebook fastText word vec file")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs, will be created if not exist")
-	flag.StringVar(&openDataFilename, "opendata-raw", "/home/fnargesian/OPENDATA/cod.csv",
+	flag.StringVar(&openDataFilename, "opendata-raw", "/home/fnargesian/OPENDATA/csv_files_2016-12-15-canada.csv",
 		"open dataset file")
-	// "/home/fnargesian/OPENDATA/csv_files_2016-12-15-canada.csv"
 	flag.StringVar(&searchIndexSqliteDB, "searchindex-db", "/home/fnargesian/OPENDATA/search-index.db",
 		"sqlite database file for search index vecs, will be created if not exist")
 	flag.StringVar(&openDataDir, "opendata-dir", "/home/fnargesian/OPENDATA/datasets",
