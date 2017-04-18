@@ -94,7 +94,8 @@ with open('testdata/pairs.json', 'w') as fp:
 # plotting jaccards
 print("Plotting...")
 plt.figure(figsize=(18, 18))
-xs = [i for i in range(len(pairs))]
+jaccards.sort()
+xs = [i for i in range(len(jaccards))]
 plt.ylabel('ontology jaccard score', fontsize=24)
 plt.xlabel('domain pairs', fontsize=24)
 plt.title('ontology jaccard of domain pairs', fontsize=24)
