@@ -77,7 +77,7 @@ func (s *Server) queryHandler(c *gin.Context) {
 		result = append(result, QueryResult{
 			TableID:     emb.TableID,
 			ColumnIndex: emb.ColumnIndex,
-			Vec:         emb.Vec,
+			Vec:         emb.PCVec,
 		})
 	}
 	response := QueryResponse{

@@ -27,7 +27,8 @@ type EmbEntry struct {
 	TableID     string    `json:"table_id"`
 	ColumnIndex int       `json:"column_index"`
 	PCIndex     int       `json:"pc_index"`
-	Vec         []float64 `json:"vec"`
+	PCVec       []float64 `json:"vec"`
+	AvgVec      []float64 `json:"avgvec"`
 }
 
 type LSHEntry struct {
@@ -91,8 +92,9 @@ func (index *SearchIndex) Build(ts *table.TableStore) error {
 				if table.Headers[i].IsNum {
 					continue
 				}
-				vecs, err := embedding.GetDomainEmbPCA(index.ft, index.tokenFun, index.transFun, column, index.kPCs)
-				if err != nil {
+				vecs, errp := embedding.GetDomainEmbPCA(index.ft, index.tokenFun, index.transFun, column, index.kPCs)
+				avgvec, erra := embedding.GetDomainEmbAve(index.ft, index.tokenFun, index.transFun, column)
+				if erra != nil || errp != nil {
 					continue
 				}
 				id := toColumnID(table.ID, i)
@@ -102,7 +104,8 @@ func (index *SearchIndex) Build(ts *table.TableStore) error {
 						TableID:     table.ID,
 						ColumnIndex: i,
 						PCIndex:     ipc,
-						Vec:         vecs[ipc],
+						PCVec:       vecs[ipc],
+						AvgVec:      avgvec,
 					}
 					entries <- entry
 				}
@@ -116,7 +119,8 @@ func (index *SearchIndex) Build(ts *table.TableStore) error {
 			table_id TEXT,
 			column_index INTEGER,
 			pc_index INTEGER,
-			vec BLOB
+			pc_vec BLOB,
+			avg_vec BLOB
 		);
 		`, index.tablename))
 	if err != nil {
@@ -124,7 +128,7 @@ func (index *SearchIndex) Build(ts *table.TableStore) error {
 		panic(err)
 	}
 	stmt, err := index.db.Prepare(fmt.Sprintf(`
-		INSERT INTO %s(table_id, column_index, pc_index, vec) VALUES(?, ?, ?, ?);
+		INSERT INTO %s(table_id, column_index, pc_index, pc_vec, avg_vec) VALUES(?, ?, ?, ?, ?);
 		`, index.tablename))
 	if err != nil {
 		log.Fatal(err)
@@ -137,8 +141,9 @@ func (index *SearchIndex) Build(ts *table.TableStore) error {
 		if count%20 == 0 {
 			log.Printf("Processed %d domains.", count)
 		}
-		binVec := embedding.VecToBytes(e.Vec, index.byteOrder)
-		if _, err := stmt.Exec(e.TableID, e.ColumnIndex, e.PCIndex, binVec); err != nil {
+		binVec := embedding.VecToBytes(e.PCVec, index.byteOrder)
+		binAvgVec := embedding.VecToBytes(e.AvgVec, index.byteOrder)
+		if _, err := stmt.Exec(e.TableID, e.ColumnIndex, e.PCIndex, binVec, binAvgVec); err != nil {
 			log.Fatal(err)
 			panic(err)
 		}
@@ -284,7 +289,7 @@ func (index *SearchIndex) Get(tableID string, columnIndex int) (*EmbEntry, error
 	return &EmbEntry{
 		TableID:     tableID,
 		ColumnIndex: columnIndex,
-		Vec:         vec,
+		PCVec:       vec,
 	}, nil
 }
 
@@ -298,7 +303,7 @@ func (index *SearchIndex) TopK(query []float64, k int) []*EmbEntry {
 		if err != nil {
 			panic(err)
 		}
-		queue.Push(entry, dotProduct(query, entry.Vec))
+		queue.Push(entry, dotProduct(query, entry.PCVec))
 	}
 	result := make([]*EmbEntry, queue.Size())
 	for i := len(result) - 1; i >= 0; i-- {

@@ -10,11 +10,12 @@ import (
 )
 
 type Ontology struct {
-	EntityType map[string][]string
-	Taxonomy   map[string][]string
+	EntityType   map[string][]string
+	Taxonomy     map[string][]string
+	FlatTaxonomy map[string][]string
 }
 
-func NewOntology(rawTypesFile, rawTaxonomyFile, typesFile, taxonomyFile string) *Ontology {
+func NewOntology(rawTypesFile, rawTaxonomyFile, typesFile, taxonomyFile, flatTaxonomyFile string) *Ontology {
 	es := readEntityType(rawTypesFile)
 	err := dumpJson(typesFile, &es)
 	if err != nil {
@@ -25,13 +26,20 @@ func NewOntology(rawTypesFile, rawTaxonomyFile, typesFile, taxonomyFile string) 
 	if err != nil {
 		log.Fatal(err)
 	}
+	fts := flattenTaxonomy(rawTaxonomyFile)
+	err = dumpJson(flatTaxonomyFile, &fts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("flattened taxonomy")
 	return &Ontology{
-		EntityType: es,
-		Taxonomy:   ts,
+		EntityType:   es,
+		Taxonomy:     ts,
+		FlatTaxonomy: fts,
 	}
 }
 
-func LoadOntology(entitiesFile, taxonomyFile string) *Ontology {
+func LoadOntology(entitiesFile, taxonomyFile, flatTaxonomyFile string) *Ontology {
 	es := make(map[string][]string)
 	err := loadJson(entitiesFile, &es)
 	if err != nil {
@@ -42,9 +50,15 @@ func LoadOntology(entitiesFile, taxonomyFile string) *Ontology {
 	if err != nil {
 		log.Fatal(err)
 	}
+	fts := make(map[string][]string)
+	err = loadJson(flatTaxonomyFile, &fts)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return &Ontology{
-		EntityType: es,
-		Taxonomy:   ts,
+		EntityType:   es,
+		Taxonomy:     ts,
+		FlatTaxonomy: fts,
 	}
 }
 
@@ -67,7 +81,8 @@ func readEntityType(typesFile string) map[string][]string {
 	return entities
 }
 
-func readTaxonomy(taxonomyFile string) map[string][]string {
+// flattenTaxonomy creates a map from leaf classes to all their ancestor classes
+func flattenTaxonomy(taxonomyFile string) map[string][]string {
 	taxonomy := make(map[string][]string)
 	// skipping the comment line in YAGO tsv file
 	lines, _ := readLines(taxonomyFile)
@@ -92,6 +107,49 @@ func readTaxonomy(taxonomyFile string) map[string][]string {
 		}
 	}
 	return taxonomy
+}
+
+//creates a map from classes (at different levels of taxonomy) to all their immediate parent classes
+func readTaxonomy(taxonomyFile string) map[string][]string {
+	taxonomy := make(map[string][]string)
+	// skipping the comment line in YAGO tsv file
+	lines, _ := readLines(taxonomyFile)
+	lines = lines[1:]
+	// line example: <id_1wfbzo7_1m6_1k87a1> <wordnet_agape_101028534>       rdfs:subClassOf <wordnet_religious_ceremony_101028082>
+	for _, line := range lines {
+		parts := strings.Fields(strings.ToLower(line))
+		ch := strings.Replace(strings.Replace(parts[1], "<", "", -1), ">", "", -1)
+		p := strings.Replace(strings.Replace(parts[3], "<", "", -1), ">", "", -1)
+		if _, ok := taxonomy[ch]; !ok {
+			taxonomy[ch] = []string{p}
+		} else {
+			if contains(taxonomy[ch], p) != true {
+				taxonomy[ch] = append(taxonomy[ch], p)
+			}
+		}
+	}
+	return taxonomy
+}
+
+func (o *Ontology) entityToAncestors(ancestorFileName string) map[string][]string {
+	ancestors := make(map[string][]string)
+	for e, lc := range o.EntityType {
+		for _, t := range lc {
+			if !contains(ancestors[e], t) {
+				ancestors[e] = append(ancestors[e], t)
+				for _, nlc := range o.Taxonomy[t] {
+					if !contains(ancestors[e], nlc) {
+						ancestors[e] = append(ancestors[e], nlc)
+					}
+				}
+			}
+		}
+	}
+	err := dumpJson(ancestorFileName, &ancestors)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return ancestors
 }
 
 func loadJson(file string, v interface{}) error {
