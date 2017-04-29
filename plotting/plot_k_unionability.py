@@ -9,7 +9,7 @@ cs = ['b','g','r','c','m','y','k','orchid']
 ks = [2,3,4]
 plt.figure(figsize=(18, 18))
 plt.xlabel('Tables', fontsize=24)
-plt.ylabel('Number of Unionable Tables (log scale)', fontsize=24)
+plt.ylabel('Number of K-unionable Tables (log scale)', fontsize=24)
 plt.title('Soft K-unionability in Ontology and Embedding Space', fontsize=24)
 legends = []
 for i in range(len(ks)):
@@ -45,7 +45,7 @@ plt.savefig(os.path.join('plots', 'soft_unionability.pdf'))
 #
 plt.figure(figsize=(18, 18))
 plt.xlabel('Tables', fontsize=24)
-plt.ylabel('Number of Unionable Tables (log scale)', fontsize=24)
+plt.ylabel('Number of K-unionable Tables (log scale)', fontsize=24)
 plt.title('Hard K-unionability in Ontology and Embedding Space', fontsize=24)
 legends = []
 for i in range(len(ks)):
