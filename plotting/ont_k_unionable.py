@@ -8,6 +8,7 @@ import sqlite3
 import os
 import json
 import time
+from itertools import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--dataset", default="/home/fnargesian/WIKI_TABLE/search-index.db")
@@ -20,20 +21,22 @@ cursor2 = db2.cursor()
 count = 0
 ks = [1,2,3,4,5]
 ontology_threshold = 0.0
-all_unionable_ont = [{} for i in ks]
+soft_unionable_ont = [{} for i in ks]
+hard_unionable_ont = [{} for i in ks]
 seen_pairs = []
 start_time = time.time()
 for table_id1, table_id2 in cursor2.execute("select distinct table_id1, table_id2 from scores;").fetchall():
     for k in range(len(ks)):
-        if str(table_id1) not in all_unionable_ont[k]:
-            all_unionable_ont[k][str(table_id1)] = []
-        if str(table_id2) not in all_unionable_ont[k]:
-            all_unionable_ont[k][str(table_id2)] = []
+        if str(table_id1) not in soft_unionable_ont[k]:
+            soft_unionable_ont[k][str(table_id1)] = []
+        if str(table_id2) not in soft_unionable_ont[k]:
+            soft_unionable_ont[k][str(table_id2)] = []
+        if str(table_id1) not in hard_unionable_ont[k]:
+            hard_unionable_ont[k][str(table_id1)] = []
+        if str(table_id2) not in hard_unionable_ont[k]:
+            hard_unionable_ont[k][str(table_id2)] = []
 for table_id1, table_id2 in \
     cursor2.execute("select distinct table_id1, table_id2 from scores where ontology_plus_jaccard > ? group by table_id1, table_id2 having count(distinct column_index1) >= ? and count(distinct column_index2) >= ?;", (ontology_threshold, ks[0], ks[0])).fetchall():
-    for k in range(len(ks)):
-        if str(table_id1) not in all_unionable_ont[k]:
-            all_unionable_ont[k][str(table_id1)] = []
     count += 1
     if count % 2 == 0:
         print("Processed %d pairs." % count)
@@ -55,18 +58,29 @@ for table_id1, table_id2 in \
         matched = [k for k,v in matching.items() if k in nodes0]
         for k in ks:
             if len(matched) >= k:
-                if str(table_id2) not in all_unionable_ont[ks.index(k)][str(table_id1)]:
-                    all_unionable_ont[ks.index(k)][str(table_id1)].append(str(table_id2))
-                if str(table_id1) not in all_unionable_ont[ks.index(k)][str(table_id2)]:
-                    all_unionable_ont[ks.index(k)][str(table_id2)].append(str(table_id1))
-                all_unionable_ont[ks.index(k)][str(table_id1)].append(str(table_id2))
+                if str(table_id2) not in soft_unionable_ont[ks.index(k)][str(table_id1)]:
+                    soft_unionable_ont[ks.index(k)][str(table_id1)].append(str(table_id2))
+                if str(table_id1) not in soft_unionable_ont[ks.index(k)][str(table_id2)]:
+                    soft_unionable_ont[ks.index(k)][str(table_id2)].append(str(table_id1))
+                hard_cond = True
+                for c in list(combinations(nodes0, k)):
+                    if not set(c) <= set(matched):
+                        hard_cond = False
+                        break
+                if hard_cond:
+                    if str(table_id2) not in hard_unionable_ont[ks.index(k)][str(table_id1)]:
+                        hard_unionable_ont[ks.index(k)][str(table_id1)].append(str(table_id2))
+                    if str(table_id1) not in hard_unionable_ont[ks.index(k)][str(table_id2)]:
+                        hard_unionable_ont[ks.index(k)][str(table_id2)].append(str(table_id1))
 print("--- Execution time: %s seconds ---" % (time.time() - start_time))
 print("Number of processed pairs is %d." % count)
-print("Number of k-unionable tables is %d." % len(all_unionable_ont[0]))
+print("Number of k-unionable tables is %d." % len(soft_unionable_ont[0]))
 # writing points to json
 print("Saving k-unionability info...")
 print("Plotting...")
 for i in range(len(ks)):
-    with open('testdata/' + str(ks[i]) + '_unionable_ont.json', 'w') as fp:
-        json.dump(all_unionable_ont[i], fp)
+    with open('testdata/' + str(ks[i]) + '_soft_unionable_ont.json', 'w') as fp:
+        json.dump(soft_unionable_ont[i], fp)
+    with open('testdata/' + str(ks[i]) + '_hard_unionable_ont.json', 'w') as fp:
+        json.dump(hard_unionable_ont[i], fp)
 print("Done.")
