@@ -46,7 +46,7 @@ for table_id1, table_id2 in \
         nodes1 = []
         edges = []
         for column_index1, column_index2 in \
-            cursor2.execute("select column_index1, column_index2 from scores where table_id1 = ? and table_id2 = ?;", (table_id1, table_id2)).fetchall():
+            cursor2.execute("select column_index1, column_index2 from scores where table_id1 = ? and table_id2 = ? and best_pc_cosine > ?;", (table_id1, table_id2, cosine_threshold)).fetchall():
             nodes0.append(str(table_id1) + "_" + str(column_index1))
             nodes1.append(str(table_id2) + "_" + str(column_index2))
             edges.append((str(table_id1) + "_" + str(column_index1), str(table_id2) + "_" + str(column_index2)))
