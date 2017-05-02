@@ -29,15 +29,10 @@ for table_id1, table_id2 in cursor2.execute("select distinct table_id1, table_id
     for k in range(len(ks)):
         if str(table_id1) not in soft_unionable_ont[k]:
             soft_unionable_ont[k][str(table_id1)] = []
-        #if str(table_id2) not in soft_unionable_ont[k]:
-        #    soft_unionable_ont[k][str(table_id2)] = []
         if str(table_id1) not in hard_unionable_ont[k]:
             hard_unionable_ont[k][str(table_id1)] = []
-        #if str(table_id2) not in hard_unionable_ont[k]:
-        #    hard_unionable_ont[k][str(table_id2)] = []
 for table_id1, table_id2 in \
     cursor2.execute("select distinct table_id1, table_id2 from allscores where sarma > ? group by table_id1, table_id2 having count(distinct column_index1) >= ? and count(distinct column_index2) >= ?;", (ontology_threshold, ks[0], ks[0])).fetchall():
-    #    cursor2.execute("select distinct table_id1, table_id2 from scores where ontology_plus_jaccard > ? group by table_id1, table_id2 having count(distinct column_index1) >= ? and count(distinct column_index2) >= ?;", (ontology_threshold, ks[0], ks[0])).fetchall():
     count += 1
     if count % 10 == 0:
         print("Processed %d pairs." % count)
@@ -59,8 +54,6 @@ for table_id1, table_id2 in \
         if len(matched) >= k:
             if str(table_id2) not in soft_unionable_ont[ks.index(k)][str(table_id1)]:
                 soft_unionable_ont[ks.index(k)][str(table_id1)].append(str(table_id2))
-            #if str(table_id1) not in soft_unionable_ont[ks.index(k)][str(table_id2)]:
-            #    soft_unionable_ont[ks.index(k)][str(table_id2)].append(str(table_id1))
             hard_cond = True
             for c in list(combinations(nodes0, k)):
                 if not set(c) <= set(matched):
@@ -69,8 +62,6 @@ for table_id1, table_id2 in \
             if hard_cond:
                 if str(table_id2) not in hard_unionable_ont[ks.index(k)][str(table_id1)]:
                     hard_unionable_ont[ks.index(k)][str(table_id1)].append(str(table_id2))
-                #if str(table_id1) not in hard_unionable_ont[ks.index(k)][str(table_id2)]:
-                #    hard_unionable_ont[ks.index(k)][str(table_id2)].append(str(table_id1))
 print("--- Execution time: %s seconds ---" % (time.time() - start_time))
 print("Number of processed pairs is %d." % count)
 print("Number of k-unionable tables is %d." % len(soft_unionable_ont[0]))
