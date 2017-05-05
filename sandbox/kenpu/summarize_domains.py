@@ -1,68 +1,29 @@
-import sqlite3
 import sys
-import os
-import csv
+import d
+from pprint import pprint
 
-REPO = "/home/fnargesian/WIKI_TABLE/onttables"
-DB_NAME = "./yago.sqlite3"
+R1, C1 = sys.argv[1:3]
+R2, C2 = sys.argv[3:5]
 
-if len(sys.argv) != 3:
-    print("Usage: <table> <column-index>>")
-    sys.exit()
+C1 = int(C1)
+C2 = int(C2)
 
-relname = sys.argv[1]
-colindex = int(sys.argv[2])
+db = d.get_db()
 
-def get_domain(relname, colindex):
-    with open(os.path.join(REPO, relname), "r") as f:
-        rdr = csv.reader(f)
-        next(rdr)
-        next(rdr)
-        for row in rdr:
-            yield row[colindex]
+dom1 = d.get_domain(R1, C1)
+h1 = d.get_cat2(db, dom1) + d.get_types(db, dom1)
+ent1 = d.get_entropy(h1)
+nent1 = d.get_normalized_entropy(h1)
 
-def in_domain(attrname, domain):
-    values = list(set(domain))
-    return "%s IN (%s) " % (attrname, ",".join("?" for i in values)), values
+dom2 = d.get_domain(R2, C2)
+h2 = d.get_cat2(db, dom2) + d.get_types(db, dom2)
+ent2 = d.get_entropy(h2)
+nent2 = d.get_normalized_entropy(h2)
 
-def get_types(db, domain):
-    c = db.cursor()
-    in_clause, values = in_domain("entity", domain)
-    sql = """
-    SELECT category, count(*) as freq
-    FROM types
-    WHERE %s
-    GROUP BY category
-    ORDER BY freq
-    """ % in_clause
-    c.execute(sql, values)
-    result = c.fetchall()
-    c.close()
-    return result
+delta_ent = d.entropy_change(h1, h2)
+delta_ent2 = d.entropy_change(h2, h1)
+delta_nent = d.normalized_entropy_change(h1, h2)
+delta_nent2 = d.normalized_entropy_change(h2, h1)
 
-def get_cat2(db, domain):
-    c = db.cursor()
-    in_clause, values = in_domain("entity", domain)
-
-    sql = """
-    SELECT supcategory, count(*) as freq
-    FROM types JOIN taxonomy ON types.category = taxonomy.subcategory
-    WHERE %s
-    GROUP BY supcategory
-    ORDER BY freq
-    """ % in_clause
-
-    c.execute(sql, values)
-    result = c.fetchall()
-    c.close()
-    return result
-
-db = sqlite3.connect(DB_NAME)
-domain = list(get_domain(relname, colindex))
-print("domain (%d)" % len(domain))
-print("\n".join(domain))
-print("========================")
-print("\n".join(str(x) for x in get_types(db, domain)))
-print("========================")
-print("\n".join(str(x) for x in get_cat2(db, domain)))
-
+# print("ENTROPY: %.3f   %.3f    %.3f / %.3f" % (ent1, ent2, delta_ent, delta_ent2))
+print("N-ENTRO: %.3f   %.3f    %.3f / %.3f" % (nent1, nent2, delta_nent, delta_nent2))
