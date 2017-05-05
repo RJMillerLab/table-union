@@ -28,13 +28,15 @@ for i in range(len(ks)):
     e_unionable = np.asarray(e_unionable)
     ts = np.argsort(o_unionable)[::-1]
     o_unionable = list(o_unionable[ts])
-    e_unionable = list(e_unionable[ts])
+    #e_unionable = list(e_unionable[ts])
     xs = [j for j in range(len(o_unionable))]
     ys = list(np.log(np.asarray(o_unionable)+1))
     #ys = list(np.asarray(o_unionable))
     #l1 = plt.scatter(xs, ys, color=cs[i*2], marker='x', llabel='k = ' + str(ks[i]) + '(ontology)')
     l1 = plt.plot(xs, ys, color=cs[i*2], label='k = ' + str(ks[i]) + '(ontology)')
     legends.append(l1[0])
+    ts = np.argsort(e_unionable)[::-1]
+    e_unionable = list(e_unionable[ts])
     ys = list(np.log(np.asarray(e_unionable)+1))
     #ys = list(np.asarray(e_unionable))
     l2 = plt.plot(xs, ys, color=cs[i*2+1], label='k = ' + str(ks[i]) + '(embedding)')
@@ -64,13 +66,15 @@ for i in range(len(ks)):
     e_unionable = np.asarray(e_unionable)
     ts = np.argsort(o_unionable)[::-1]
     o_unionable = list(o_unionable[ts])
-    e_unionable = list(e_unionable[ts])
+    #e_unionable = list(e_unionable[ts])
     xs = [j for j in range(len(o_unionable))]
     ys = list(np.log(np.asarray(o_unionable)+1))
     #ys = list(np.asarray(o_unionable))
     #l1 = plt.scatter(xs, ys, color=cs[i*2], marker='x', llabel='k = ' + str(ks[i]) + '(ontology)')
     l1 = plt.plot(xs, ys, color=cs[i*2], label='k = ' + str(ks[i]) + '(ontology)')
     legends.append(l1[0])
+    ts = np.argsort(e_unionable)[::-1]
+    e_unionable = list(e_unionable[ts])
     ys = list(np.log(np.asarray(e_unionable)+1))
     #ys = list(np.asarray(e_unionable))
     l2 = plt.plot(xs, ys, color=cs[i*2+1], label='k = ' + str(ks[i]) + '(embedding)')
