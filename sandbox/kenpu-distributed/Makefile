@@ -8,10 +8,10 @@ YAGO_DB 	= /home/kenpu/clones/table-union/sandbox/kenpu/yago.sqlite3
 # sets the environment, and start the go annotation
 all:
 	OPENDATA_DIR=$(OPENDATA_DIR) \
-	OPENDATA_LIST=$(OPENDATA_LIST) \
+	OPENDATA_LIST=$(PWD)/output/debug.list \
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
-	go run go/src/cmd/make_domain_values.go 
+	go run go/src/cmd/main.go 
 
 output/opendata.list:
 	cd python; python build-opendata-index.py

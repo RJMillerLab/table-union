@@ -1,6 +1,9 @@
-package od
+package opendata
 
-import "os"
+import (
+	"os"
+	"path"
+)
 
 const PARALLEL = 64
 const MIN_DOMSIZE = 5
@@ -21,4 +24,8 @@ func CheckEnv() {
 	if opendata_dir == "" || output_dir == "" || yago_db == "" {
 		panic("Environment missing")
 	}
+}
+
+func Filepath(filename string) string {
+	return path.Join(opendata_dir, filename)
 }
