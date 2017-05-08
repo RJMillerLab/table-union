@@ -3,6 +3,7 @@ package opendata
 import (
 	"os"
 	"path"
+	"time"
 )
 
 const PARALLEL = 64
@@ -28,4 +29,8 @@ func CheckEnv() {
 
 func Filepath(filename string) string {
 	return path.Join(opendata_dir, filename)
+}
+
+func GetNow() float64 {
+	return float64(time.Now().UnixNano()) / 1E9
 }
