@@ -2,6 +2,7 @@ package opendata
 
 import (
 	"bufio"
+	"database/sql"
 	"encoding/csv"
 	"fmt"
 	"hash/fnv"
@@ -9,9 +10,12 @@ import (
 	"log"
 	"os"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func readLines(filename string, maxLines int) (lines []string, err error) {
@@ -24,9 +28,12 @@ func readLines(filename string, maxLines int) (lines []string, err error) {
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-		if maxLines > 0 && maxLines <= len(lines) {
-			break
+		value := strings.TrimSpace(scanner.Text())
+		if value != "" {
+			lines = append(lines, scanner.Text())
+			if maxLines > 0 && maxLines <= len(lines) {
+				break
+			}
 		}
 	}
 	return lines, nil
@@ -42,6 +49,8 @@ func StreamFilenames() <-chan string {
 
 	go func() {
 		f, _ := os.Open(opendata_list)
+		defer f.Close()
+
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			parts := strings.SplitN(scanner.Text(), " ", 3)
@@ -241,8 +250,61 @@ func DoSaveDomainValues(fanout int, domains <-chan *Domain) <-chan ProgressCount
 	return progress
 }
 
+// Classifies the values into one of several categories
+// "numeric"
+// "id"
+// "word"
+// "phrase"
+// "text"
+
+var (
+	patternInteger *regexp.Regexp
+	patternFloat   *regexp.Regexp
+	patternWord    *regexp.Regexp
+)
+
+func init() {
+	patternInteger = regexp.MustCompile(`^\d+$`)
+	patternFloat = regexp.MustCompile(`^\d+\.\d+$`)
+	patternWord = regexp.MustCompile(`[[:alpha:]]{2,}`)
+}
+
+func isNumeric(val string) bool {
+	return patternInteger.MatchString(val) || patternFloat.MatchString(val)
+}
+
+func isText(val string) bool {
+	return patternWord.MatchString(val)
+}
+
+// Classifies an array of strings.  The most dominant choice
+// is the class reported.
 func classifyValues(values []string) string {
-	return "unknown"
+	var counts = make(map[string]int)
+
+	for _, value := range values {
+		var key string
+		switch {
+		case isNumeric(value):
+			key = "numeric"
+		case isText(value):
+			key = "text"
+		}
+		if key != "" {
+			counts[key] += 1
+		}
+	}
+
+	var (
+		maxKey   string
+		maxCount int
+	)
+	for k, v := range counts {
+		if v > maxCount {
+			maxKey = k
+		}
+	}
+	return maxKey
 }
 
 func classifyDomains(file string) {
@@ -251,14 +313,20 @@ func classifyDomains(file string) {
 	defer fout.Close()
 
 	if err != nil {
-		return
+		panic(err)
 	}
 
 	for i := 0; i < len(header.Values); i++ {
-		domain_file := path.Join(output_dir, "domains", file, strconv.Itoa(i), "values")
+		domain_file := path.Join(output_dir, "domains", file, fmt.Sprintf("%d.values", i))
+		if !exists(domain_file) {
+			continue
+		}
+
 		values, err := readLines(domain_file, 100)
-		if err != nil {
+		if err == nil {
 			fmt.Fprintf(fout, "%d %s\n", i, classifyValues(values))
+		} else {
+			panic(err)
 		}
 	}
 }
@@ -290,4 +358,156 @@ func DoClassifyDomainsFromFiles(fanout int, files <-chan string) <-chan int {
 	}()
 
 	return out
+}
+
+func getTextDomains(file string) (indices []int) {
+	typesFile := path.Join(output_dir, "domains", file, "types")
+	f, err := os.Open(typesFile)
+	defer f.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		parts := strings.SplitN(scanner.Text(), " ", 2)
+		if len(parts) == 2 {
+			index, err := strconv.Atoi(parts[0])
+			if err != nil {
+				panic(err)
+			}
+			if parts[1] == "text" {
+				indices = append(indices, index)
+			}
+		}
+	}
+
+	return
+}
+
+func normalize(w string) string {
+	return strings.ToLower(w)
+}
+
+var patternSymb *regexp.Regexp
+
+func init() {
+	patternSymb = regexp.MustCompile(`[^a-z ]`)
+}
+
+func wordsFromLine(line string) []string {
+	line = normalize(line)
+	words := patternSymb.Split(line, -1)
+
+	return words
+}
+
+func streamDomainWords(file string, index int, out chan *Domain) {
+	filepath := path.Join(output_dir, "domains", file, fmt.Sprintf("%d.values", index))
+	f, err := os.Open(filepath)
+	defer f.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	var values []string
+	scanner := bufio.NewScanner(f)
+
+	for scanner.Scan() {
+		words := wordsFromLine(scanner.Text())
+		for _, word := range words {
+			values = append(values, normalize(word))
+			if len(values) >= 1000 {
+				out <- &Domain{
+					Filename: file,
+					Index:    index,
+					Values:   values,
+				}
+				values = nil
+			}
+		}
+	}
+}
+
+func StreamDomainValuesFromFiles(fanout int, files <-chan string) <-chan *Domain {
+	out := make(chan *Domain)
+	wg := &sync.WaitGroup{}
+
+	for i := 0; i < fanout; i++ {
+		wg.Add(1)
+		go func(id int) {
+			for file := range files {
+				for _, index := range getTextDomains(file) {
+					streamDomainWords(file, index, out)
+				}
+			}
+			wg.Done()
+		}(i)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
+}
+
+func cleanEntityName(ent string) string {
+	x := strings.Replace(strings.ToLower(ent), "_", " ", -1)
+	i := strings.Index(x, "(")
+	if i > 0 {
+		x = x[0:i]
+	}
+	return strings.TrimSpace(x)
+}
+
+type Entities map[string]map[string]bool
+
+func OpenYagoEntities() Entities {
+	db, err := sql.Open("sqlite3", yago_db)
+	defer db.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	rows, err := db.Query(`
+        SELECT entity, category
+        FROM types
+    `)
+	defer rows.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	var m = make(map[string]map[string]bool)
+
+	total := 16920001
+	counter := 0
+	s := GetNow()
+	for rows.Next() {
+		var ent string
+		var cat string
+		err = rows.Scan(&ent, &cat)
+		if err != nil {
+			panic(err)
+		}
+
+		ent = cleanEntityName(ent)
+
+		if _, ok := m[ent]; !ok {
+			m[ent] = make(map[string]bool)
+		}
+		m[ent][cat] = true
+		counter += 1
+		if counter%40000 == 0 {
+			fmt.Printf("[entitydb] %d/%d rows in %.2f seconds\n", counter, total, GetNow()-s)
+		}
+	}
+
+	return Entities(m)
+}
+
+func (ent Entities) Annotate(value string) map[string]bool {
+	return ent[value]
 }

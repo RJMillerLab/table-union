@@ -9,12 +9,18 @@ func main() {
 	CheckEnv()
 
 	filenames := StreamFilenames()
-	progress := DoClassifyDomainsFromFiles(10, filenames)
+	progress := DoClassifyDomainsFromFiles(1, filenames)
 
-	s := GetNow()
+	start := GetNow()
+	tick := start
 	total := 0
 	for n := range progress {
 		total += n
-		fmt.Printf("Classified %d data files in %.2f seconds\n", total, GetNow()-s)
+		now := GetNow()
+
+		if now-tick > 10 {
+			tick = now
+			fmt.Printf("Classified %d data files in %.2f seconds\n", total, GetNow()-start)
+		}
 	}
 }
