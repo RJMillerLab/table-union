@@ -14,17 +14,21 @@ func main() {
 	fmt.Printf("Yago loaded: %d entities in %.2f seconds\n", len(yago), GetNow()-start)
 
 	filenames := StreamFilenames()
-	domains := StreamDomainValuesFromFiles(1, filenames)
+	domains := StreamDomainValuesFromFiles(20, filenames)
 
 	count := 0
+	annotated := 0
+	start = GetNow()
 	for domain := range domains {
-		if count > 1 {
-			break
-		}
-		fmt.Printf("--- %s(%d) ---\n", domain.Filename, domain.Index)
-		for i, word := range domain.Values {
+		for _, word := range domain.Values {
 			cats := yago.Annotate(word)
-			fmt.Printf("  [%d] \"%s\" cats %d\n", i, word, len(cats))
+			if cats != nil {
+				annotated += 1
+			}
+		}
+		count += 1
+		if count%100 == 0 {
+			fmt.Printf("Processed %d domains, annotated %d in %.2f seconds\n", count, annotated, GetNow()-start)
 		}
 	}
 }
