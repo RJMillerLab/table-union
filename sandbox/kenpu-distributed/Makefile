@@ -2,25 +2,14 @@
 # Set the variables
 OUTPUT_DIR 	= $(PWD)/output
 OPENDATA_LIST	= $(PWD)/output/opencanada.list
-# OPENDATA_LIST	= $(PWD)/output/debug.list
+OPENDATA_LIST	= $(PWD)/output/debug.list
 OPENDATA_DIR 	= /home/ekzhu/OPENDATA/resource-2016-12-15-csv-only
 YAGO_DB 	= /home/kenpu/clones/table-union/sandbox/kenpu-build-yago/yago.sqlite3
 
-
-step3:
-	OPENDATA_DIR=$(OPENDATA_DIR) \
-	OPENDATA_LIST=$(OPENDATA_LIST) \
-	YAGO_DB=$(YAGO_DB) \
-	OUTPUT_DIR=$(OUTPUT_DIR) \
-	go run go/src/cmd/annotate-domains.go
-
-
-
-
-
 all:
-	echo "make clean rmtypes step0 step1 step2 ..."
-
+	@echo "make clean rmtypes step0 step1 step2 ..."
+	@echo $(OUTPUT_DIR)
+	@echo $(OPENDATA_LIST)
 
 step0:
 	OPENDATA_DIR=$(OPENDATA_DIR) \
@@ -42,6 +31,13 @@ step2:
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
 	go run go/src/cmd/classify-domain-values.go
+
+step3:
+	OPENDATA_DIR=$(OPENDATA_DIR) \
+	OPENDATA_LIST=$(OPENDATA_LIST) \
+	YAGO_DB=$(YAGO_DB) \
+	OUTPUT_DIR=$(OUTPUT_DIR) \
+	go run go/src/cmd/annotate-domains.go
 
 
 output/opendata.list:

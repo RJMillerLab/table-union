@@ -18,6 +18,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// Reads the first `maxLines` lines from a file.
+// Returns an array of strings, and error if any
 func readLines(filename string, maxLines int) (lines []string, err error) {
 	f, err := os.Open(filename)
 	defer f.Close()
@@ -39,11 +41,13 @@ func readLines(filename string, maxLines int) (lines []string, err error) {
 	return lines, nil
 }
 
+// Checks if a file exists or not
 func exists(filename string) bool {
 	_, err := os.Stat(filename)
 	return err == nil
 }
 
+// Creates a channel of filenames
 func StreamFilenames() <-chan string {
 	output := make(chan string)
 
@@ -63,12 +67,15 @@ func StreamFilenames() <-chan string {
 	return output
 }
 
+// The projected column fragment.
 type Domain struct {
-	Filename string
-	Index    int
-	Values   []string
+	Filename string   // the logical filename of the CSV file
+	Index    int      // the position of the domain in the csv file
+	Values   []string // the list of values in THIS fragment.
 }
 
+// Saves the domain values into its value file
+// and reports the status using the logger provided
 func (domain *Domain) Save(logger *log.Logger) int {
 	var filepath string
 	dirPath := path.Join(output_dir, "domains", domain.Filename)
@@ -96,6 +103,8 @@ func (domain *Domain) Save(logger *log.Logger) int {
 	return len(domain.Values)
 }
 
+// Loads the headers from the index file
+// of the csv file
 func GetDomainHeader(file string) *Domain {
 	filepath := path.Join(output_dir, "domains", file, "index")
 	lines, err := readLines(filepath, -1)
@@ -109,6 +118,8 @@ func GetDomainHeader(file string) *Domain {
 	}
 }
 
+// cells - 2D array of values, a fragment of the total CSV file content
+// Returns the projected domain fragments from cells
 func domainsFromCells(cells [][]string, filename string, width int) []*Domain {
 	if len(cells) == 0 {
 		return nil
@@ -131,6 +142,8 @@ func domainsFromCells(cells [][]string, filename string, width int) []*Domain {
 	return domains
 }
 
+// A single worker function that "moves" filenames
+// for the input channel to domains of the output channel
 func makeDomains(filenames <-chan string, out chan *Domain) {
 	for filename := range filenames {
 		f, err := os.Open(Filepath(filename))
@@ -139,6 +152,9 @@ func makeDomains(filenames <-chan string, out chan *Domain) {
 			continue
 		}
 
+		// Uses the csv parser to read
+		// the csv content line by line
+		// the first row is the headers of the domains
 		rdr := csv.NewReader(f)
 		header, err := rdr.Read()
 		if err != nil {
@@ -159,11 +175,14 @@ func makeDomains(filenames <-chan string, out chan *Domain) {
 		for {
 			row, err := rdr.Read()
 			if err == io.EOF {
+				// at the end-of-file, we output the domains from the
+				// cells buffer
 				for _, domain := range domainsFromCells(cells, filename, width) {
 					out <- domain
 				}
 				break
 			} else {
+				// read row by row into the cells buffer until there are over 1 million entries
 				cells = append(cells, row)
 				if len(cells)*width > 1000000 {
 					for _, domain := range domainsFromCells(cells, filename, width) {
@@ -177,6 +196,8 @@ func makeDomains(filenames <-chan string, out chan *Domain) {
 	}
 }
 
+// Maps makeDomain to the input channel of filenames
+// Uses fanout number of goroutines
 func StreamDomainsFromFilenames(fanout int, filenames <-chan string) <-chan *Domain {
 	out := make(chan *Domain)
 
@@ -207,16 +228,26 @@ func hash(s string) int {
 	return int(h.Sum32())
 }
 
+// Saves the domain fragments from an input channel to disk
+// using multiple goroutines specified by fanout.
+// Returns a channel of progress counter
 func DoSaveDomainValues(fanout int, domains <-chan *Domain) <-chan ProgressCounter {
 	progress := make(chan ProgressCounter)
-	queues := make([]chan *Domain, fanout)
 	wg := &sync.WaitGroup{}
+
+	// For each worker, have its own input queue as a channel
+	// of domains
+	queues := make([]chan *Domain, fanout)
 
 	for i := 0; i < fanout; i++ {
 		queues[i] = make(chan *Domain)
 		wg.Add(1)
+		// Start the goroutine and pass it
+		// its own input queue
 		go func(id int, queue chan *Domain) {
-			logf, err := os.OpenFile(path.Join(output_dir, "logs", fmt.Sprintf("save_domain_values_%d.log", id)), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+			logf, err := os.OpenFile(path.Join(output_dir, "logs", fmt.Sprintf("save_domain_values_%d.log", id)),
+				os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+				0644)
 			defer logf.Close()
 
 			if err != nil {
@@ -232,6 +263,8 @@ func DoSaveDomainValues(fanout int, domains <-chan *Domain) <-chan ProgressCount
 		}(i, queues[i])
 	}
 
+	// Start the router that moves domains
+	// from the input channel to the individual worker input queues
 	go func() {
 		for domain := range domains {
 			k := hash(domain.Filename) % fanout
@@ -252,10 +285,8 @@ func DoSaveDomainValues(fanout int, domains <-chan *Domain) <-chan ProgressCount
 
 // Classifies the values into one of several categories
 // "numeric"
-// "id"
-// "word"
-// "phrase"
 // "text"
+// "" (for unknown)
 
 var (
 	patternInteger *regexp.Regexp

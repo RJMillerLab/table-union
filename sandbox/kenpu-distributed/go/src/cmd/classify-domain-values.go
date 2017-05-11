@@ -8,8 +8,11 @@ import (
 func main() {
 	CheckEnv()
 
+	// Get the stream of filenames as a channel of strings
 	filenames := StreamFilenames()
-	progress := DoClassifyDomainsFromFiles(1, filenames)
+
+	// Classify the domains
+	progress := DoClassifyDomainsFromFiles(10, filenames)
 
 	start := GetNow()
 	tick := start
