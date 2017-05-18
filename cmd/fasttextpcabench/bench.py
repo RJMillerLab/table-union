@@ -1,7 +1,7 @@
 import time
 import numpy as np
 import sqlite3
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, IncrementalPCA
 
 def get_embs(db, n):
     data = []
@@ -16,9 +16,18 @@ def pca(matrix):
     PCA().fit(matrix)
     return time.time() - start
 
+def ipca(matrix):
+    start = time.time()
+    IncrementalPCA().fit(matrix)
+    return time.time() - start
+
 db = sqlite3.connect("/home/ekzhu/FB_WORD_VEC/fasttext.db")
 scales = [10, 100, 1000, 10000, 100000, 1000000]
+#for scale in scales:
+#    matrix = get_embs(db, scale)
+#    dur = pca(matrix)
+#    print("n = %d:\tPCA took %fs" % (scale, dur))
 for scale in scales:
     matrix = get_embs(db, scale)
     dur = pca(matrix)
-    print("n = %d:\tPCA took %fs" % (scale, dur))
+    print("n = %d:\tIPCA took %fs" % (scale, dur))
