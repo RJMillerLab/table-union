@@ -1,0 +1,20 @@
+sklearn.decomposition.PCA
+=========================
+
+n = 10:	        PCA took 0.076810s
+n = 100:        PCA took 0.465346s
+n = 1000:       PCA took 0.249151s
+n = 10000:      PCA took 1.055391s
+n = 100000:     PCA took 9.118483s
+n = 1000000:    PCA took 106.014102s
+
+
+gonum/stat
+==========
+
+n = 10:         PCA took 0.000539s
+n = 100:        PCA took 0.025539s
+n = 1000:       PCA took 0.608526s
+n = 10000:      PCA took 2.398362s
+n = 100000:     PCA took 40.002747s
+n = 1000000:    PCA took 392.085210s
