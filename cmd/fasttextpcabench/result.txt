@@ -1,0 +1,30 @@
+sklearn.decomposition.PCA
+=========================
+
+n = 10:	        PCA took 0.076810s
+n = 100:        PCA took 0.465346s
+n = 1000:       PCA took 0.249151s
+n = 10000:      PCA took 1.055391s
+n = 100000:     PCA took 9.118483s
+n = 1000000:    PCA took 106.014102s
+
+
+sklearn.decomposition.IncrementalPCA
+====================================
+
+n = 10:         IPCA took 0.054269s
+n = 100:        IPCA took 0.150184s
+n = 1000:       IPCA took 0.139898s
+n = 10000:      IPCA took 0.613431s
+n = 100000:     IPCA took 7.655827s
+n = 1000000:    IPCA took 93.796478s
+
+gonum/stat
+==========
+
+n = 10:         PCA took 0.000539s
+n = 100:        PCA took 0.025539s
+n = 1000:       PCA took 0.608526s
+n = 10000:      PCA took 2.398362s
+n = 100000:     PCA took 40.002747s
+n = 1000000:    PCA took 392.085210s
