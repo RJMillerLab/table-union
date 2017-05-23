@@ -1,4 +1,4 @@
 __pycache__
 output/
 deps
-*.sqlite3
+*.sqlite3*

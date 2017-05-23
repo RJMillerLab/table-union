@@ -2,7 +2,6 @@ package opendata
 
 import (
 	"bufio"
-	"database/sql"
 	"encoding/csv"
 	"fmt"
 	"hash/fnv"
@@ -101,6 +100,20 @@ func (domain *Domain) Save(logger *log.Logger) int {
 
 	logger.Printf("Written to %s\n", filepath)
 	return len(domain.Values)
+}
+
+func (domain *Domain) PhysicalFilename(ext string) string {
+	fullpath := path.Join(output_dir, "domains", domain.Filename)
+
+	if ext != "" {
+		fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", domain.Index, ext))
+	}
+
+	return fullpath
+}
+
+func (domain *Domain) Id() string {
+	return fmt.Sprintf("%s/%d", domain.Filename, domain.Index)
 }
 
 // Loads the headers from the index file
@@ -222,7 +235,7 @@ type ProgressCounter struct {
 	Values int
 }
 
-func hash(s string) int {
+func Hash(s string) int {
 	h := fnv.New32a()
 	h.Write([]byte(s))
 	return int(h.Sum32())
@@ -267,7 +280,7 @@ func DoSaveDomainValues(fanout int, domains <-chan *Domain) <-chan ProgressCount
 	// from the input channel to the individual worker input queues
 	go func() {
 		for domain := range domains {
-			k := hash(domain.Filename) % fanout
+			k := Hash(domain.Filename) % fanout
 			queues[k] <- domain
 		}
 		for i := 0; i < fanout; i++ {
@@ -482,63 +495,4 @@ func StreamDomainValuesFromFiles(fanout int, files <-chan string) <-chan *Domain
 	}()
 
 	return out
-}
-
-func cleanEntityName(ent string) string {
-	x := strings.Replace(strings.ToLower(ent), "_", " ", -1)
-	i := strings.Index(x, "(")
-	if i > 0 {
-		x = x[0:i]
-	}
-	return strings.TrimSpace(x)
-}
-
-type Entities map[string]map[string]bool
-
-func OpenYagoEntities() Entities {
-	db, err := sql.Open("sqlite3", yago_db)
-	defer db.Close()
-	if err != nil {
-		panic(err)
-	}
-
-	rows, err := db.Query(`
-        SELECT entity, category
-        FROM types
-    `)
-	defer rows.Close()
-	if err != nil {
-		panic(err)
-	}
-
-	var m = make(map[string]map[string]bool)
-
-	total := 16920001
-	counter := 0
-	s := GetNow()
-	for rows.Next() {
-		var ent string
-		var cat string
-		err = rows.Scan(&ent, &cat)
-		if err != nil {
-			panic(err)
-		}
-
-		ent = cleanEntityName(ent)
-
-		if _, ok := m[ent]; !ok {
-			m[ent] = make(map[string]bool)
-		}
-		m[ent][cat] = true
-		counter += 1
-		if counter%40000 == 0 {
-			fmt.Printf("[entitydb] %d/%d rows in %.2f seconds\n", counter, total, GetNow()-s)
-		}
-	}
-
-	return Entities(m)
-}
-
-func (ent Entities) Annotate(value string) map[string]bool {
-	return ent[value]
 }
