@@ -1,3 +1,11 @@
+## Development Guide
+
+Each Go executables source code (`main.go`) is located inside a subdirectory of the `cmd` directory.
+The name of the executable is the name of the subdirectory.
+
+The Go packages live inside the top-level directory.
+Importing a package use the full path. E.g., `github.com/RJMillerLab/table-union/embedding`.
+
 ## Problem Definition
 Given a query table and a repository, use the tables in the repository to vertically extend 
 the query table by aligning columns. 

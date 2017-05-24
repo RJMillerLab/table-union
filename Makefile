@@ -6,6 +6,12 @@ OPENDATA_LIST	= $(PWD)/output/opencanada-en.list
 OPENDATA_DIR 	= /home/ekzhu/OPENDATA/resource-2016-12-15-csv-only
 YAGO_DB 	= /home/kenpu/clones/table-union/sandbox/kenpu-build-yago/yago.sqlite3.0
 
+build:
+	go build ./...
+
+install:
+	go install ./...
+
 all:
 	@echo "make clean rmtypes step0 step1 step2 ..."
 	@echo $(OUTPUT_DIR)

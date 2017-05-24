@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	. "opendata"
 	"os"
 	"regexp"
 	"strings"
 	"sync"
+
+	. "github.com/RJMillerLab/table-union/opendata"
 
 	_ "github.com/mattn/go-sqlite3"
 )

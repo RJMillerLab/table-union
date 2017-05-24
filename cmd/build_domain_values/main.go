@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	. "opendata"
+
+	. "github.com/RJMillerLab/table-union/opendata"
 )
 
 // Use 30 threads for reading the filename stream

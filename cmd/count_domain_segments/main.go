@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	. "opendata"
+
+	. "github.com/RJMillerLab/table-union/opendata"
 )
 
 func main() {
