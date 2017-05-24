@@ -1,10 +1,17 @@
 
 # Set the variables
-OUTPUT_DIR 	= $(PWD)/output
-OPENDATA_LIST	= $(PWD)/output/opencanada-en.list
-# OPENDATA_LIST	= $(PWD)/output/debug.list
+OUTPUT_DIR 	= $(HOME)/TABLE_UNION_OUTPUT
+OPENDATA_LIST	= $(OUTPUT_DIR)/opencanada-en.list
+OPENDATA_LIST	= $(OUTPUT_DIR)/debug.list
 OPENDATA_DIR 	= /home/ekzhu/OPENDATA/resource-2016-12-15-csv-only
-YAGO_DB 	= /home/kenpu/clones/table-union/sandbox/kenpu-build-yago/yago.sqlite3.0
+YAGO_DB 	= $(OUTPUT_DIR)/yago.sqlite3.0
+
+now: step4
+
+all:
+	@echo "make clean rmtypes step0 step1 step2 ..."
+	@echo "OUTPUT_DIR=" $(OUTPUT_DIR)
+	@echo "OPENDATA_LIST=" $(OPENDATA_LIST)
 
 build:
 	go build ./...
@@ -12,10 +19,6 @@ build:
 install:
 	go install ./...
 
-all:
-	@echo "make clean rmtypes step0 step1 step2 ..."
-	@echo $(OUTPUT_DIR)
-	@echo $(OPENDATA_LIST)
 
 step0:
 	OPENDATA_DIR=$(OPENDATA_DIR) \
@@ -29,28 +32,35 @@ step1:
 	OPENDATA_LIST=$(OPENDATA_LIST) \
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
-	go run go/src/cmd/builddomainvalues/main.go
+	go run cmd/build_domain_values/main.go
 
 step2: rmtypes
 	OPENDATA_DIR=$(OPENDATA_DIR) \
 	OPENDATA_LIST=$(OPENDATA_LIST) \
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
-	go run go/src/cmd/classifydomainvalues/main.go
+	go run cmd/classify_domain_values/main.go
 
 step3: rmentities
 	OPENDATA_DIR=$(OPENDATA_DIR) \
 	OPENDATA_LIST=$(OPENDATA_LIST) \
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
-	go run go/src/cmd/annotatedomains/main.go
+	go run cmd/annotate_domains/main.go
+
+step4: 
+	OPENDATA_DIR=$(OPENDATA_DIR) \
+	OPENDATA_LIST=$(OPENDATA_LIST) \
+	YAGO_DB=$(YAGO_DB) \
+	OUTPUT_DIR=$(OUTPUT_DIR) \
+	go run cmd/build_domain_embeddings/main.go
 
 count_domains:
 	OPENDATA_DIR=$(OPENDATA_DIR) \
 	OPENDATA_LIST=$(OPENDATA_LIST) \
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
-	go run go/src/cmd/countdomainsegments/main.go
+	go run cmd/count_domain_segments/main.go
 
 
 
