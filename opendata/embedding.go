@@ -1,0 +1,610 @@
+package opendata
+
+import (
+	"bufio"
+	"encoding/csv"
+	"errors"
+	"fmt"
+	"hash/fnv"
+	"io"
+	"log"
+	"os"
+	"path"
+	"regexp"
+	"strconv"
+	"strings"
+	"sync"
+	"unicode"
+
+	fasttext "github.com/ekzhu/go-fasttext"
+	_ "github.com/mattn/go-sqlite3"
+)
+
+// Reads the first `maxLines` lines from a file.
+// Returns an array of strings, and error if any
+func readLines(filename string, maxLines int) (lines []string, err error) {
+	f, err := os.Open(filename)
+	defer f.Close()
+
+	if err != nil {
+		return nil, err
+	}
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		value := strings.TrimSpace(scanner.Text())
+		if value != "" {
+			lines = append(lines, scanner.Text())
+			if maxLines > 0 && maxLines <= len(lines) {
+				break
+			}
+		}
+	}
+	return lines, nil
+}
+
+// Checks if a file exists or not
+func exists(filename string) bool {
+	_, err := os.Stat(filename)
+	return err == nil
+}
+
+// Creates a channel of filenames
+func StreamFilenames() <-chan string {
+	output := make(chan string)
+
+	go func() {
+		f, _ := os.Open(opendata_list)
+		defer f.Close()
+
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			parts := strings.SplitN(scanner.Text(), " ", 3)
+			filename := path.Join(parts...)
+			output <- filename
+		}
+		close(output)
+	}()
+
+	return output
+}
+
+// The projected column fragment.
+type DomainEmb struct {
+	Filename string    // the logical filename of the CSV file
+	Index    int       // the position of the domain in the csv file
+	Values   []string  // the list of values in THIS fragment.
+	Embs     []float64 // embedding vector of a domain - sum of domain value embeddings
+}
+
+func VectorizeDomainSegments(fanout int, files <-chan string) <-chan *DomainEmb {
+	out := make(chan *DomainEmb)
+	wg := &sync.WaitGroup{}
+
+	for i := 0; i < fanout; i++ {
+		wg.Add(1)
+		go func(id int) {
+			for file := range files {
+				for _, index := range getTextDomains(file) {
+					ft := fasttext.NewFastText("/home/ekzhu/FB_WORD_VEC/fasttext.db")
+					streamDomainWordEmbeddingsFromFilename(ft, file, index, out)
+					ft.Close()
+				}
+			}
+			wg.Done()
+		}(i)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
+}
+
+// Saves the domain values into its value file
+// and reports the status using the logger provided
+func (domain *DomainEmb) SaveEmb(logger *log.Logger, dirname string) int {
+	var filepath string
+	dirPath := path.Join(output_dir, dirname, domain.Filename)
+	//dirPath := path.Join(output_dir, "domains", domain.Filename)
+
+	if domain.Index < 0 {
+		// Encountered a file for the first time.
+		// This is the header, so create the index file
+		filepath = path.Join(dirPath, "index")
+	} else {
+		filepath = path.Join(dirPath, fmt.Sprintf("%d.embs", domain.Index))
+	}
+
+	f, err := os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	defer f.Close()
+
+	if err == nil {
+		for _, value := range domain.Embs {
+			fmt.Fprintln(f, value)
+		}
+	} else {
+		panic(fmt.Sprintf("Unable to save: %s", err.Error()))
+	}
+
+	logger.Printf("Written to %s\n", filepath)
+	return len(domain.Embs)
+}
+
+// Get the embedding vector of a tokenized value by sum all the tokens' vectors
+func getValueEmb(ft *fasttext.FastText, tokenizedValue []string) ([]float64, error) {
+	var valueVec []float64
+	var count int
+	for _, token := range tokenizedValue {
+		emb, err := ft.GetEmb(token)
+		if err == fasttext.ErrNoEmbFound {
+			continue
+		}
+		if err != nil {
+			panic(err)
+		}
+		if valueVec == nil {
+			valueVec = emb.Vec
+		} else {
+			add(valueVec, emb.Vec)
+		}
+		count++
+	}
+	if valueVec == nil {
+		return nil, ErrNoEmbFound
+	}
+	return valueVec, nil
+}
+
+func domainTokensFromLine(line string, tokenFun func(string) []string, transFun func(string) string) []string {
+	v := transFun(line)
+	// Tokenize
+	tokens := tokenFun(v)
+	if len(tokens) > 5 {
+		// Skip text values
+		for i, t := range tokens {
+			tokens[i] = transFun(t)
+		}
+	}
+	return tokens
+}
+
+// Saves the fast text embedding of domain fragments from an input channel to disk
+// using multiple goroutines specified by fanout.
+// Returns a channel of progress counter
+func DoSaveDomainEmbeddings(fanout int, domains <-chan *DomainEmb) <-chan ProgressCounter {
+	progress := make(chan ProgressCounter)
+	wg := &sync.WaitGroup{}
+
+	// For each worker, have its own input queue as a channel
+	// of domains
+	queues := make([]chan *DomainEmb, fanout)
+
+	for i := 0; i < fanout; i++ {
+		queues[i] = make(chan *DomainEmb)
+		wg.Add(1)
+		// Start the goroutine and pass it
+		// its own input queue
+		go func(id int, queue chan *DomainEmb) {
+			logf, err := os.OpenFile(path.Join(output_dir, "logs", fmt.Sprintf("save_domain_embs_%d.log", id)),
+				os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+				0644)
+			defer logf.Close()
+
+			if err != nil {
+				panic(err)
+			}
+			logger := log.New(logf, fmt.Sprintf("[%d]", id), log.Lshortfile)
+
+			for domain := range queue {
+				n := domain.SaveEmb(logger, "embeddings")
+				progress <- ProgressCounter{n}
+			}
+			wg.Done()
+		}(i, queues[i])
+	}
+
+	// Start the router that moves domains
+	// from the input channel to the individual worker input queues
+	go func() {
+		for domain := range domains {
+			k := hash(domain.Filename) % fanout
+			queues[k] <- domain
+		}
+		for i := 0; i < fanout; i++ {
+			close(queues[i])
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(progress)
+	}()
+
+	return progress
+}
+
+func streamDomainWordEmbeddingsFromFilename(ft *fasttext.FastText, file string, index int, out chan *DomainEmb) {
+	filepath := path.Join(output_dir, "domains", file, fmt.Sprintf("%d.values", index))
+	f, err := os.Open(filepath)
+	defer f.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	var embs [][]float64
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		tokenFun := DefaultTokenFun
+		transFun := DefaultTransFun
+		values := domainTokensFromLine(scanner.Text(), tokenFun, transFun)
+		valueVec, err := getValueEmb(ft, values)
+		if err != nil {
+			continue
+		}
+		embs = append(embs, valueVec)
+		if len(embs) >= 1000 {
+			out <- &DomainEmb{
+				Filename: file,
+				Index:    index,
+				//Embs:     embs,
+			}
+			embs = nil
+		}
+
+	}
+	out <- &DomainEmb{
+		Filename: file,
+		Index:    index,
+		//Embs:     embs,
+	}
+}
+
+func (domain *DomainEmb) Id() string {
+	return fmt.Sprintf("%s/%d", domain.Filename, domain.Index)
+}
+
+// Loads the headers from the index file
+// of the csv file
+func GetDomainHeader(file string) *Domain {
+	filepath := path.Join(output_dir, "domains", file, "index")
+	lines, err := readLines(filepath, -1)
+	if err != nil {
+		panic(err)
+	}
+	return &Domain{
+		Filename: file,
+		Index:    -1,
+		Values:   lines,
+	}
+}
+
+// cells - 2D array of values, a fragment of the total CSV file content
+// Returns the projected domain fragments from cells
+func domainsFromCells(cells [][]string, filename string, width int) []*Domain {
+	if len(cells) == 0 {
+		return nil
+	}
+
+	domains := make([]*Domain, width)
+	for i := 0; i < width; i++ {
+		domains[i] = &Domain{filename, i, nil}
+	}
+	for _, row := range cells {
+		for c := 0; c < width; c++ {
+			if c < len(row) {
+				value := strings.TrimSpace(row[c])
+				if len(value) > 2 {
+					domains[c].Values = append(domains[c].Values, row[c])
+				}
+			}
+		}
+	}
+	return domains
+}
+
+// A single worker function that "moves" filenames
+// for the input channel to domains of the output channel
+func makeDomains(filenames <-chan string, out chan *Domain) {
+	for filename := range filenames {
+		f, err := os.Open(Filepath(filename))
+		if err != nil {
+			f.Close()
+			continue
+		}
+
+		// Uses the csv parser to read
+		// the csv content line by line
+		// the first row is the headers of the domains
+		rdr := csv.NewReader(f)
+		header, err := rdr.Read()
+		if err != nil {
+			continue
+		}
+		width := len(header)
+
+		headerDomain := &Domain{
+			Filename: filename,
+			Index:    -1,
+			Values:   header,
+		}
+
+		out <- headerDomain
+
+		var cells [][]string
+
+		for {
+			row, err := rdr.Read()
+			if err == io.EOF {
+				// at the end-of-file, we output the domains from the
+				// cells buffer
+				for _, domain := range domainsFromCells(cells, filename, width) {
+					out <- domain
+				}
+				break
+			} else {
+				// read row by row into the cells buffer until there are over 1 million entries
+				cells = append(cells, row)
+				if len(cells)*width > 1000000 {
+					for _, domain := range domainsFromCells(cells, filename, width) {
+						out <- domain
+					}
+					cells = nil
+				}
+			}
+		}
+		f.Close()
+	}
+}
+
+// Maps makeDomain to the input channel of filenames
+// Uses fanout number of goroutines
+func StreamDomainsFromFilenames(fanout int, filenames <-chan string) <-chan *Domain {
+	out := make(chan *Domain)
+
+	wg := &sync.WaitGroup{}
+
+	for id := 0; id < fanout; id++ {
+		wg.Add(1)
+		go func(id int) {
+			makeDomains(filenames, out)
+			wg.Done()
+		}(id)
+	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
+}
+
+type ProgressCounter struct {
+	Values int
+}
+
+func Hash(s string) int {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return int(h.Sum32())
+}
+
+// Saves the domain fragments from an input channel to disk
+// using multiple goroutines specified by fanout.
+// Returns a channel of progress counter
+func DoSaveDomainValues(fanout int, domains <-chan *Domain) <-chan ProgressCounter {
+	progress := make(chan ProgressCounter)
+	wg := &sync.WaitGroup{}
+
+	// For each worker, have its own input queue as a channel
+	// of domains
+	queues := make([]chan *Domain, fanout)
+
+	for i := 0; i < fanout; i++ {
+		queues[i] = make(chan *Domain)
+		wg.Add(1)
+		// Start the goroutine and pass it
+		// its own input queue
+		go func(id int, queue chan *Domain) {
+			logf, err := os.OpenFile(path.Join(output_dir, "logs", fmt.Sprintf("save_domain_values_%d.log", id)),
+				os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+				0644)
+			defer logf.Close()
+
+			if err != nil {
+				panic(err)
+			}
+			logger := log.New(logf, fmt.Sprintf("[%d]", id), log.Lshortfile)
+
+			for domain := range queue {
+				n := domain.Save(logger)
+				progress <- ProgressCounter{n}
+			}
+			wg.Done()
+		}(i, queues[i])
+	}
+
+	// Start the router that moves domains
+	// from the input channel to the individual worker input queues
+	go func() {
+		for domain := range domains {
+			k := Hash(domain.Filename) % fanout
+			queues[k] <- domain
+		}
+		for i := 0; i < fanout; i++ {
+			close(queues[i])
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(progress)
+	}()
+
+	return progress
+}
+
+// Classifies the values into one of several categories
+// "numeric"
+// "text"
+// "" (for unknown)
+
+var (
+	patternInteger  *regexp.Regexp
+	patternFloat    *regexp.Regexp
+	patternWord     *regexp.Regexp
+	ErrNoEmbFound   = errors.New("No embedding found")
+	DefaultTransFun = func(s string) string {
+		return strings.ToLower(strings.TrimFunc(strings.TrimSpace(s), unicode.IsPunct))
+	}
+	DefaultTokenFun = func(s string) []string { return strings.Split(s, " ") }
+)
+
+func init() {
+	patternInteger = regexp.MustCompile(`^\d+$`)
+	patternFloat = regexp.MustCompile(`^\d+\.\d+$`)
+	patternWord = regexp.MustCompile(`[[:alpha:]]{2,}`)
+}
+
+func isNumeric(val string) bool {
+	return patternInteger.MatchString(val) || patternFloat.MatchString(val)
+}
+
+func isText(val string) bool {
+	return patternWord.MatchString(val)
+}
+
+// Classifies an array of strings.  The most dominant choice
+// is the class reported.
+func classifyValues(values []string) string {
+	var counts = make(map[string]int)
+
+	for _, value := range values {
+		var key string
+		switch {
+		case isNumeric(value):
+			key = "numeric"
+		case isText(value):
+			key = "text"
+		}
+		if key != "" {
+			counts[key] += 1
+		}
+	}
+
+	var (
+		maxKey   string
+		maxCount int
+	)
+	for k, v := range counts {
+		if v > maxCount {
+			maxKey = k
+		}
+	}
+	return maxKey
+}
+
+func classifyDomains(file string) {
+	header := GetDomainHeader(file)
+	fout, err := os.OpenFile(path.Join(output_dir, "domains", file, "types"), os.O_CREATE|os.O_WRONLY, 0644)
+	defer fout.Close()
+
+	if err != nil {
+		panic(err)
+	}
+
+	for i := 0; i < len(header.Values); i++ {
+		domain_file := path.Join(output_dir, "domains", file, fmt.Sprintf("%d.values", i))
+		if !exists(domain_file) {
+			continue
+		}
+
+		values, err := readLines(domain_file, 100)
+		if err == nil {
+			fmt.Fprintf(fout, "%d %s\n", i, classifyValues(values))
+		} else {
+			panic(err)
+		}
+	}
+}
+
+func DoClassifyDomainsFromFiles(fanout int, files <-chan string) <-chan int {
+	out := make(chan int)
+	wg := &sync.WaitGroup{}
+
+	for i := 0; i < fanout; i++ {
+		wg.Add(1)
+		go func(id int) {
+			n := 0
+			for file := range files {
+				classifyDomains(file)
+				n += 1
+				if n%100 == 0 {
+					out <- n
+					n = 0
+				}
+			}
+			out <- n
+			wg.Done()
+		}(i)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
+}
+
+func getTextDomains(file string) (indices []int) {
+	typesFile := path.Join(output_dir, "domains", file, "types")
+	f, err := os.Open(typesFile)
+	defer f.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		parts := strings.SplitN(scanner.Text(), " ", 2)
+		if len(parts) == 2 {
+			index, err := strconv.Atoi(parts[0])
+			if err != nil {
+				panic(err)
+			}
+			if parts[1] == "text" {
+				indices = append(indices, index)
+			}
+		}
+	}
+
+	return
+}
+
+func normalize(w string) string {
+	return strings.ToLower(w)
+}
+
+var patternSymb *regexp.Regexp
+
+func init() {
+	patternSymb = regexp.MustCompile(`[^a-z ]`)
+}
+
+func add(dst, src []float64) {
+	if len(dst) != len(src) {
+		panic("Length of vectors not equal")
+	}
+	for i := range src {
+		dst[i] = dst[i] + src[i]
+	}
+}
+
+func hash(s string) int {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return int(h.Sum32())
+}
