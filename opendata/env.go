@@ -17,24 +17,24 @@ const MIN_DOMSIZE = 5
 
 // Environment variables required to
 // locate the necessary input files
-var opendata_dir = os.Getenv("OPENDATA_DIR")
-var opendata_list = os.Getenv("OPENDATA_LIST")
+var OpendataDir = os.Getenv("OPENDATA_DIR")
+var OpendataList = os.Getenv("OPENDATA_LIST")
 
 // Environment variable required to
 // write output
-var output_dir = os.Getenv("OUTPUT_DIR")
+var OutputDir = os.Getenv("OUTPUT_DIR")
 
 // Environment variable for the Yago database
 var Yago_db = os.Getenv("YAGO_DB")
 
 func CheckEnv() {
-	if opendata_dir == "" || output_dir == "" || Yago_db == "" {
+	if OpendataDir == "" || OutputDir == "" || Yago_db == "" {
 		panic("Environment missing")
 	}
 }
 
 func Filepath(filename string) string {
-	return path.Join(opendata_dir, filename)
+	return path.Join(OpendataDir, filename)
 }
 
 func GetNow() float64 {
@@ -51,7 +51,7 @@ func GenericStrings(s []string) []interface{} {
 
 func LoadEntityWords() map[string]map[string]bool {
 	lookup := make(map[string]map[string]bool)
-	f, err := os.Open(path.Join(output_dir, "word-entity.txt"))
+	f, err := os.Open(path.Join(OutputDir, "word-entity.txt"))
 	if err != nil {
 		panic(err)
 	}

@@ -53,7 +53,7 @@ func StreamFilenames() <-chan string {
 	output := make(chan string)
 
 	go func() {
-		f, _ := os.Open(opendata_list)
+		f, _ := os.Open(OpendataList)
 		defer f.Close()
 
 		scanner := bufio.NewScanner(f)
@@ -79,7 +79,7 @@ type Domain struct {
 // and reports the status using the logger provided
 func (domain *Domain) Save(logger *log.Logger) int {
 	var filepath string
-	dirPath := path.Join(output_dir, "domains", domain.Filename)
+	dirPath := path.Join(OutputDir, "domains", domain.Filename)
 
 	if domain.Index < 0 {
 		// Encountered a file for the first time.
@@ -105,7 +105,7 @@ func (domain *Domain) Save(logger *log.Logger) int {
 }
 
 func (domain *Domain) PhysicalFilename(ext string) string {
-	fullpath := path.Join(output_dir, "domains", domain.Filename)
+	fullpath := path.Join(OutputDir, "domains", domain.Filename)
 
 	if ext != "" {
 		fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", domain.Index, ext))
@@ -121,7 +121,7 @@ func (domain *Domain) Id() string {
 // Loads the headers from the index file
 // of the csv file
 func GetDomainHeader(file string) *Domain {
-	filepath := path.Join(output_dir, "domains", file, "index")
+	filepath := path.Join(OutputDir, "domains", file, "index")
 	lines, err := readLines(filepath, -1)
 	if err != nil {
 		panic(err)
@@ -260,7 +260,7 @@ func DoSaveDomainValues(fanout int, domains <-chan *Domain) <-chan ProgressCount
 		// Start the goroutine and pass it
 		// its own input queue
 		go func(id int, queue chan *Domain) {
-			logf, err := os.OpenFile(path.Join(output_dir, "logs", fmt.Sprintf("save_domain_values_%d.log", id)),
+			logf, err := os.OpenFile(path.Join(OutputDir, "logs", fmt.Sprintf("save_domain_values_%d.log", id)),
 				os.O_CREATE|os.O_WRONLY|os.O_APPEND,
 				0644)
 			defer logf.Close()
@@ -355,7 +355,7 @@ func classifyValues(values []string) string {
 
 func classifyDomains(file string) {
 	header := GetDomainHeader(file)
-	fout, err := os.OpenFile(path.Join(output_dir, "domains", file, "types"), os.O_CREATE|os.O_WRONLY, 0644)
+	fout, err := os.OpenFile(path.Join(OutputDir, "domains", file, "types"), os.O_CREATE|os.O_WRONLY, 0644)
 	defer fout.Close()
 
 	if err != nil {
@@ -363,7 +363,7 @@ func classifyDomains(file string) {
 	}
 
 	for i := 0; i < len(header.Values); i++ {
-		domain_file := path.Join(output_dir, "domains", file, fmt.Sprintf("%d.values", i))
+		domain_file := path.Join(OutputDir, "domains", file, fmt.Sprintf("%d.values", i))
 		if !exists(domain_file) {
 			continue
 		}
@@ -407,7 +407,7 @@ func DoClassifyDomainsFromFiles(fanout int, files <-chan string) <-chan int {
 }
 
 func getTextDomains(file string) (indices []int) {
-	typesFile := path.Join(output_dir, "domains", file, "types")
+	typesFile := path.Join(OutputDir, "domains", file, "types")
 	f, err := os.Open(typesFile)
 	defer f.Close()
 	if err != nil {
@@ -449,7 +449,7 @@ func wordsFromLine(line string) []string {
 }
 
 func streamDomainWords(file string, index int, out chan *Domain) {
-	filepath := path.Join(output_dir, "domains", file, fmt.Sprintf("%d.values", index))
+	filepath := path.Join(OutputDir, "domains", file, fmt.Sprintf("%d.values", index))
 	f, err := os.Open(filepath)
 	defer f.Close()
 	if err != nil {
