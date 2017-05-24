@@ -2,10 +2,12 @@ package opendata
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"hash/fnv"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -487,6 +489,81 @@ func StreamDomainValuesFromFiles(fanout int, files <-chan string) <-chan *Domain
 			}
 			wg.Done()
 		}(i)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
+}
+
+type ValueFreq struct {
+	Filename string
+	Index    int
+	Values   []string
+	Freq     []int
+}
+
+func (vf *ValueFreq) String() string {
+	var buf bytes.Buffer
+	for i := 0; i < len(vf.Values); i++ {
+		v := vf.Values[i]
+		f := vf.Freq[i]
+		fmt.Fprintf(&buf, "%s: %d\n", v, f)
+	}
+	return buf.String()
+}
+
+func getValueFreq(filename, datafilename string, index int) *ValueFreq {
+	content, err := ioutil.ReadFile(filename)
+	if err != nil {
+		panic(err)
+	}
+
+	values := strings.Split(string(content), "\n")
+	freq := make(map[string]int)
+	for _, value := range values {
+		freq[value] += 1
+	}
+	n := len(freq)
+
+	valuefreq := &ValueFreq{
+		Filename: datafilename,
+		Index:    index,
+		Values:   make([]string, n),
+		Freq:     make([]int, n),
+	}
+
+	i := 0
+	for k, v := range freq {
+		valuefreq.Values[i] = k
+		valuefreq.Freq[i] = v
+		i += 1
+	}
+
+	return valuefreq
+}
+
+func StreamValueFreqFromCache(fanout int, filenames <-chan string) <-chan *ValueFreq {
+	out := make(chan *ValueFreq)
+	wg := &sync.WaitGroup{}
+	for i := 0; i < fanout; i++ {
+		wg.Add(1)
+		go func(id int, out chan<- *ValueFreq) {
+			for filename := range filenames {
+				for _, index := range getTextDomains(filename) {
+					d := &Domain{
+						Filename: filename,
+						Index:    index,
+					}
+					valueFilename := d.PhysicalFilename("values")
+					out <- getValueFreq(valueFilename, filename, index)
+				}
+			}
+			wg.Done()
+		}(i, out)
 	}
 
 	go func() {

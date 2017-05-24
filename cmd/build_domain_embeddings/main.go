@@ -2,34 +2,25 @@ package main
 
 import (
 	"fmt"
-	. "opendata"
-)
 
-const nWriters = 30
+	. "github.com/RJMillerLab/table-union/opendata"
+)
 
 func main() {
 	CheckEnv()
 	//ft := fasttext.NewFastText("/home/ekzhu/FB_WORD_VEC/fasttext.db")
 
 	filenames := StreamFilenames()
-	domains := VectorizeDomainSegments(20, filenames)
-	progress := DoSaveDomainEmbeddings(nWriters, domains)
+	valuefreqs := StreamValueFreqFromCache(10, filenames)
 
-	i := 0
-	total := ProgressCounter{}
+	count := 0
 	start := GetNow()
-	tick := GetNow()
-	for n := range progress {
-		total.Values += n.Values
-		i += 1
-		now := GetNow()
-
-		if now-tick > 10 {
-			tick = now
-			fmt.Printf("[fragment %d] written %d values in %.2f seconds\n", i, total.Values, now-start)
+	for vf := range valuefreqs {
+		count += 1
+		_ = vf
+		if count%1000 == 0 {
+			fmt.Printf("Counted %d domains in %.2f seconds\n", count, GetNow()-start)
 		}
 	}
-
-	ft.Close()
-	fmt.Printf("Done, written %d values in %.2f seconds\n", total.Values, GetNow()-start)
+	fmt.Printf("Counted %d domains in %.2f seconds\n", count, GetNow()-start)
 }
