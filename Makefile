@@ -23,28 +23,28 @@ step1:
 	OPENDATA_LIST=$(OPENDATA_LIST) \
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
-	go run go/src/cmd/build-domain-values.go
+	go run go/src/cmd/builddomainvalues/main.go
 
 step2: rmtypes
 	OPENDATA_DIR=$(OPENDATA_DIR) \
 	OPENDATA_LIST=$(OPENDATA_LIST) \
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
-	go run go/src/cmd/classify-domain-values.go
+	go run go/src/cmd/classifydomainvalues/main.go
 
 step3: rmentities
 	OPENDATA_DIR=$(OPENDATA_DIR) \
 	OPENDATA_LIST=$(OPENDATA_LIST) \
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
-	go run go/src/cmd/annotate-domains.go
+	go run go/src/cmd/annotatedomains/main.go
 
 count_domains:
 	OPENDATA_DIR=$(OPENDATA_DIR) \
 	OPENDATA_LIST=$(OPENDATA_LIST) \
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
-	go run go/src/cmd/count_domain_segments.go
+	go run go/src/cmd/countdomainsegments/main.go
 
 
 
