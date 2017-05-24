@@ -48,7 +48,7 @@ step3: rmentities
 	OUTPUT_DIR=$(OUTPUT_DIR) \
 	go run cmd/annotate_domains/main.go
 
-step4: 
+step4: rmftsum
 	OPENDATA_DIR=$(OPENDATA_DIR) \
 	OPENDATA_LIST=$(OPENDATA_LIST) \
 	YAGO_DB=$(YAGO_DB) \
@@ -68,11 +68,14 @@ output/opendata.list:
 	cd python; python build-opendata-index.py
 
 rmtypes:
-	rm -f `find $(PWD)/output/domains -name "types"`
+	rm -f `find $(OUTPUT_DIR)/domains -name "types"`
+
+rmftsum:
+	rm -f `find $(OUTPUT_DIR)/domains -name "*.ft-sum"`
 
 rmentities:
-	rm -f `find $(PWD)/output/domains -name "*.entities"`
+	rm -f `find $(OUTPUT_DIR)/domains -name "*.entities"`
 
 clean:
-	rm -rf $(PWD)/output/domains
-	rm -rf $(PWD)/output/logs
+	rm -rf $(OUTPUT_DIR)/domains
+	rm -rf $(OUTPUT_DIR)/logs
