@@ -26,6 +26,10 @@ func InitInMemoryFastText(dbFilename string, tokenFun func(string) []string, tra
 	if err != nil {
 		return nil, err
 	}
+	_, err = db.Exec(`create index inx_ft on fasttext(word);`)
+	if err != nil {
+		return nil, err
+	}
 	return &InMemFastText{
 		db:       db,
 		tokenFun: tokenFun,
