@@ -2,6 +2,7 @@ package embserver
 
 import (
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 	"unicode"
@@ -9,6 +10,9 @@ import (
 
 var (
 	DefaultTransFun = func(s string) string {
+		return strings.ToLower(strings.TrimFunc(strings.TrimSpace(s), unicode.IsPunct))
+	}
+	AdvancedTransFun = func(s string) string {
 		return strings.ToLower(strings.TrimFunc(strings.TrimSpace(s), unicode.IsPunct))
 	}
 	DefaultTokenFun = func(s string) []string { return strings.Split(s, " ") }
@@ -44,4 +48,22 @@ func dotProduct(x, y []float64) float64 {
 		p += x[i] * y[i]
 	}
 	return p
+}
+
+//func filenameToColumnID(filename string) (columnID string) {
+//	tableID := strings.strings.Replace(filename, OutputDir, "", -1)
+//	columnID = fmt.Sprintf("%s:%d", tableID, columnIndex)
+//	return
+//}
+
+func filenameToColumnID(filename string) string {
+	tableID := strings.Replace(path.Dir(filename), OutputDir+"/domains/", "", -1)
+	columnIndex := strings.Replace(path.Base(filename), path.Ext(filename), "", -1)
+	columnID := fmt.Sprintf("%s:%s", tableID, columnIndex)
+	return columnID
+}
+
+func getTablePath(tableID string) string {
+	path := path.Join("/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only/", tableID)
+	return path
 }

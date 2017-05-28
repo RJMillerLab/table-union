@@ -3,20 +3,24 @@ package embserver
 import (
 	"database/sql"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"log"
+	"os"
+	"path"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/RJMillerLab/table-union/embedding"
-	"github.com/RJMillerLab/table-union/table"
+	"github.com/RJMillerLab/table-union/opendata"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
 const (
 	TableName    = "search_index"
-	LSHTableName = "lsh_index"
+	LSHTableName = "lsh_index_sum"
+	Ext          = "ft-sum"
+	OutputDir    = "/home/fnargesian/TABLE_UNION_OUTPUT"
 )
 
 var (
@@ -28,7 +32,9 @@ type EmbEntry struct {
 	ColumnIndex int       `json:"column_index"`
 	PCIndex     int       `json:"pc_index"`
 	PCVec       []float64 `json:"vec"`
+	PCVar       float64   `json:"var"`
 	AvgVec      []float64 `json:"avgvec"`
+	SumVec      []float64 `json:"sumvec""`
 }
 
 type LSHEntry struct {
@@ -46,10 +52,9 @@ type SearchIndex struct {
 	tokenFun  func(string) []string
 	tablename string
 	byteOrder binary.ByteOrder
-	kPCs      int
 }
 
-func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *CosineLsh, kPCs int) *SearchIndex {
+func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *CosineLsh) *SearchIndex {
 	db, err := sql.Open("sqlite3", dbFilename)
 	if err != nil {
 		panic(err)
@@ -62,7 +67,6 @@ func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *CosineLsh, kP
 		tokenFun:  DefaultTokenFun,
 		tablename: TableName,
 		byteOrder: ByteOrder,
-		kPCs:      kPCs,
 	}
 	return index
 }
@@ -71,164 +75,28 @@ func (index *SearchIndex) Close() error {
 	return index.db.Close()
 }
 
-func (index *SearchIndex) IsNotBuilt() bool {
-	return !index.checkSqlitTableExist()
-}
-
-func (index *SearchIndex) Build(ts *table.TableStore) error {
-	if index.checkSqlitTableExist() {
-		return errors.New("Sqlite database already exists")
-	}
-	if ts.IsNotBuilt() {
-		return errors.New("Table store is not built, build it first")
-	}
-
-	// Compute embedding entries from tables
-	entries := make(chan *EmbEntry)
-	go func() {
-		defer close(entries)
-		ts.Apply(func(table *table.Table) {
-			for i, column := range table.Columns {
-				if table.Headers[i].IsNum {
-					continue
-				}
-				vecs, errp := embedding.GetDomainEmbPCA(index.ft, index.tokenFun, index.transFun, column, index.kPCs)
-				avgvec, erra := embedding.GetDomainEmbAve(index.ft, index.tokenFun, index.transFun, column)
-				if erra != nil || errp != nil {
-					continue
-				}
-				id := toColumnID(table.ID, i)
-				for ipc, _ := range vecs {
-					index.lsh.Insert(vecs[ipc], id)
-					entry := &EmbEntry{
-						TableID:     table.ID,
-						ColumnIndex: i,
-						PCIndex:     ipc,
-						PCVec:       vecs[ipc],
-						AvgVec:      avgvec,
-					}
-					entries <- entry
-				}
-			}
-		})
-	}()
-
-	// Saving embedding entries to Sqlite
-	_, err := index.db.Exec(fmt.Sprintf(`
-		CREATE TABLE %s (
-			table_id TEXT,
-			column_index INTEGER,
-			pc_index INTEGER,
-			pc_vec BLOB,
-			avg_vec BLOB
-		);
-		`, index.tablename))
-	if err != nil {
-		log.Fatal(err)
-		panic(err)
-	}
-	stmt, err := index.db.Prepare(fmt.Sprintf(`
-		INSERT INTO %s(table_id, column_index, pc_index, pc_vec, avg_vec) VALUES(?, ?, ?, ?, ?);
-		`, index.tablename))
-	if err != nil {
-		log.Fatal(err)
-		panic(err)
-	}
-	defer stmt.Close()
+func (index *SearchIndex) Build() error {
+	domainfilenames := opendata.StreamFilenames()
+	embfilename := opendata.StreamEmbVectors(10, domainfilenames)
 	count := 0
-	for e := range entries {
-		count++
-		if count%20 == 0 {
-			log.Printf("Processed %d domains.", count)
+	for file := range embfilename {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			log.Printf("file %s does not exist.", err)
+			continue
 		}
-		binVec := embedding.VecToBytes(e.PCVec, index.byteOrder)
-		binAvgVec := embedding.VecToBytes(e.AvgVec, index.byteOrder)
-		if _, err := stmt.Exec(e.TableID, e.ColumnIndex, e.PCIndex, binVec, binAvgVec); err != nil {
-			log.Fatal(err)
-			panic(err)
+		count += 1
+		if count%100 == 0 {
+			log.Printf("indexed %d domains", count)
 		}
-	}
-	_, err = index.db.Exec(fmt.Sprintf(`
-		CREATE INDEX ind_column_id ON %s(table_id, column_index);
-		`, index.tablename))
-	if err != nil {
-		log.Fatal(err)
-		panic(err)
-	}
-
-	return nil
-}
-
-// Load recovers the search index entries from the Sqlite database.
-func (index *SearchIndex) Load() {
-	rows, err := index.db.Query(fmt.Sprintf(`
-	SELECT table_id, column_index, pc_index, vec FROM %s;
-	`, index.tablename))
-	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
-	var count int
-	for rows.Next() {
-		var tableID string
-		var columnIndex int
-		var binVec []byte
-		var pcIndex int
-		if err := rows.Scan(&tableID, &columnIndex, &pcIndex, &binVec); err != nil {
-			panic(err)
-		}
-		// a domain is represented with its 1st pricipal component
-		if pcIndex == 0 {
-			vec, err := embedding.BytesToVec(binVec, index.byteOrder)
-			if err != nil {
-				panic(err)
-			}
-			id := toColumnID(tableID, columnIndex)
-			index.lsh.Insert(vec, id)
-			count++
-		}
-		fmt.Printf("\rLoaded %d embeddings into index", count)
-	}
-	fmt.Println()
-}
-
-func (index *SearchIndex) GetLSHIndexEntries() chan *LSHEntry {
-	out := make(chan *LSHEntry)
-	go func() {
-		defer close(out)
-		rows, err := index.db.Query(fmt.Sprintf(`
-		SELECT table_id, column_index, pc_index, vec FROM %s;
-		`, index.tablename))
+		vec, err := embedding.ReadVecFromDisk(file, binary.BigEndian)
 		if err != nil {
-			panic(err)
+			return err
 		}
-		defer rows.Close()
-		for rows.Next() {
-			var tableID string
-			var columnIndex int
-			var binVec []byte
-			var pcIndex int
-			if err := rows.Scan(&tableID, &columnIndex, &pcIndex, &binVec); err != nil {
-				panic(err)
-			}
-			if pcIndex == 0 {
-				vec, err := embedding.BytesToVec(binVec, index.byteOrder)
-				if err != nil {
-					panic(err)
-				}
-				hashKeys := index.lsh.toBasicHashTableKeys(index.lsh.hash(vec))
-				for bandIndex, hashKey := range hashKeys {
-					out <- &LSHEntry{
-						TableID:     tableID,
-						ColumnIndex: columnIndex,
-						BandIndex:   bandIndex,
-						HashKey:     hashKey,
-					}
-				}
-			}
-		}
-	}()
-	return out
+		id := filenameToColumnID(file)
+		index.lsh.Insert(vec, id)
+	}
+	return nil
+
 }
 
 func (index *SearchIndex) SaveLSHIndex(lshEntries <-chan *LSHEntry, lshdbFilename string) {
@@ -271,31 +139,22 @@ func (index *SearchIndex) SaveLSHIndex(lshEntries <-chan *LSHEntry, lshdbFilenam
 }
 
 func (index *SearchIndex) Get(tableID string, columnIndex int) (*EmbEntry, error) {
-	var binVec []byte
-	err := index.db.QueryRow(fmt.Sprintf(`
-	SELECT vec FROM %s
-	WHERE table_id=? AND column_index=? AND pc_index=0;
-	`, index.tablename), tableID, columnIndex).Scan(&binVec)
-	if err == sql.ErrNoRows {
-		return nil, errors.New("The column does not exist in the index")
-	}
-	if err != nil {
-		return nil, err
-	}
-	vec, err := embedding.BytesToVec(binVec, index.byteOrder)
+	vec, err := embedding.ReadVecFromDisk(physicalFilename(tableID, columnIndex), binary.BigEndian)
 	if err != nil {
 		panic(err)
 	}
 	return &EmbEntry{
 		TableID:     tableID,
 		ColumnIndex: columnIndex,
-		PCVec:       vec,
+		SumVec:      vec,
 	}, nil
 }
 
 func (index *SearchIndex) TopK(query []float64, k int) []*EmbEntry {
+	start := time.Now()
 	lshResults := index.lsh.Query(query)
-	log.Printf("LSH Returns %d candidates", len(lshResults))
+	log.Printf("LSH Returns %d candidates in %.4f", len(lshResults), time.Now().Sub(start).Seconds())
+	start = time.Now()
 	queue := NewTopKQueue(k)
 	for _, id := range lshResults {
 		tableID, columnIndex := fromColumnID(id)
@@ -303,26 +162,23 @@ func (index *SearchIndex) TopK(query []float64, k int) []*EmbEntry {
 		if err != nil {
 			panic(err)
 		}
-		queue.Push(entry, dotProduct(query, entry.PCVec))
+		queue.Push(entry, dotProduct(query, entry.SumVec))
 	}
 	result := make([]*EmbEntry, queue.Size())
 	for i := len(result) - 1; i >= 0; i-- {
 		v, _ := queue.Pop()
 		result[i] = v.(*EmbEntry)
 	}
+	log.Printf("Post-proc took %.4f secs", time.Now().Sub(start).Seconds())
 	return result
 }
 
-func (index *SearchIndex) checkSqlitTableExist() bool {
-	var name string
-	err := index.db.QueryRow(`
-	SELECT name FROM sqlite_master WHERE type='table' AND name=?;
-	`, index.tablename).Scan(&name)
-	if err == sql.ErrNoRows {
-		return false
+func physicalFilename(tableID string, columnIndex int) string {
+	fullpath := path.Join(OutputDir, "domains", tableID)
+
+	if Ext != "" {
+		fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", columnIndex, Ext))
 	}
-	if err != nil {
-		panic(err)
-	}
-	return true
+
+	return fullpath
 }

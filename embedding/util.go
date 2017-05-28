@@ -28,3 +28,24 @@ func WriteVecToDisk(vec []float64, order binary.ByteOrder, filename string) erro
 	}
 	return nil
 }
+
+func ReadVecFromDisk(filename string, order binary.ByteOrder) ([]float64, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	stats, serr := file.Stat()
+	if serr != nil {
+		return nil, serr
+	}
+
+	var size int64 = stats.Size()
+	binVec := make([]byte, size)
+	if _, rerr := file.Read(binVec); rerr != nil {
+		return nil, rerr
+	}
+	vec, verr := BytesToVec(binVec, order)
+	return vec, verr
+}

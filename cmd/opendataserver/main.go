@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/RJMillerLab/table-union/embserver"
+	"github.com/RJMillerLab/table-union/opendata"
 	"github.com/RJMillerLab/table-union/table"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
@@ -15,6 +16,8 @@ var (
 )
 
 func main() {
+	opendata.CheckEnv()
+
 	var fastTextFilename string
 	var fastTextSqliteDB string
 	var openDataFilename string
@@ -65,37 +68,37 @@ func main() {
 
 	// Create opendata store, build if not exists
 	ts := table.NewTableStore(openDataDir)
-	if ts.IsNotBuilt() || rebuildOpenDataStore {
-		log.Print("Building opendata store")
-		f, err := os.Open(openDataFilename)
-		if err != nil {
-			panic(err)
-		}
-		if err := ts.BuildOD(f); err != nil {
-			panic(err)
-		}
-		f.Close()
-		log.Print("Finish building open data store")
-	}
+	//if ts.IsNotBuilt() || rebuildOpenDataStore {
+	//	log.Print("Building opendata store")
+	//	f, err := os.Open(openDataFilename)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	if err := ts.BuildOD(f); err != nil {
+	//		panic(err)
+	//	}
+	//	f.Close()
+	//	log.Print("Finish building open data store")
+	//}
 
-	if rebuildSearchIndex {
-		if err := os.Remove(searchIndexSqliteDB); err != nil {
-			panic(err)
-		}
-	}
+	//if rebuildSearchIndex {
+	//	if err := os.Remove(searchIndexSqliteDB); err != nil {
+	//		panic(err)
+	//	}
+	//}
 
-	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, embserver.NewCosineLsh(FastTextDim, l, m), pcsNum)
+	si := embserver.NewSearchIndex(ft, searchIndexSqliteDB, embserver.NewCosineLsh(FastTextDim, l, m)) //, pcsNum)
 	// Build search index if it is not built
-	if si.IsNotBuilt() {
-		log.Print("Building search index from scratch")
-		if err := si.Build(ts); err != nil {
-			log.Print(err)
-			panic(err)
-		}
-		log.Print("Finish building search index")
-	} else {
-		si.Load()
+	//if si.IsNotBuilt() {
+	log.Print("Building search index from scratch")
+	if err := si.Build(); err != nil {
+		log.Print(err)
+		panic(err)
 	}
+	log.Print("Finished building search index")
+	//} else {
+	//	si.Load()
+	//}
 
 	// Start server
 	s := embserver.NewServer(ft, ts, si)

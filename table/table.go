@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 )
 
 var (
@@ -18,6 +17,12 @@ var (
 type Header struct {
 	IsNum bool   `json:"isNumeric"`
 	Text  string `json:"text"`
+}
+
+type Domain struct {
+	Table    string
+	ColIndex int
+	Values   []string
 }
 
 // Table is a in-memory representation of a wikitable or an open table.
@@ -41,7 +46,8 @@ func NewTableStore(tableDir string) *TableStore {
 
 // GetTable gets a table given its ID.
 func (ts *TableStore) GetTable(id string) (*Table, error) {
-	p := ts.getTableFilename(id)
+	p := id
+	//p := ts.getTableFilename(id)
 	f, err := os.Open(p)
 	if os.IsNotExist(err) {
 		return nil, ErrNoTableFound
@@ -71,13 +77,13 @@ func FromCSV(file io.Reader) (*Table, error) {
 	// Make headers
 	headers := make([]Header, len(rows[0]))
 	for i := range headers {
-		isNum, err := strconv.ParseBool(rows[1][i])
-		if err != nil {
-			return nil, err
-		}
+		//isNum, err := strconv.ParseBool(rows[1][i])
+		//if err != nil {
+		//	return nil, err
+		//}
 		headers[i] = Header{
-			IsNum: isNum,
-			Text:  rows[0][i],
+			//	IsNum: isNum,
+			Text: rows[0][i],
 		}
 	}
 	// Make columns

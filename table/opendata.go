@@ -1,13 +1,12 @@
 package table
 
 import (
-	"bufio"
 	"encoding/csv"
 	"errors"
 	"io"
+	"log"
 	"os"
 	"strconv"
-	"strings"
 )
 
 var (
@@ -94,9 +93,9 @@ func (ods *TableStore) BuildOD(openDataFile io.Reader) error {
 	go func() {
 		defer close(datasets)
 		var count int
-		scanner := bufio.NewScanner(openDataFile)
-		scanner.Buffer(make([]byte, bufio.MaxScanTokenSize), bufio.MaxScanTokenSize*256)
-		for scanner.Scan() {
+
+		r := csv.NewReader(openDataFile)
+		for {
 			count++
 			// Use the order as the table id
 			id := strconv.Itoa(count)
@@ -105,17 +104,21 @@ func (ods *TableStore) BuildOD(openDataFile io.Reader) error {
 			if _, err := os.Stat(p); err == nil {
 				continue
 			}
-			odf := strings.Split(scanner.Text(), ",")[0]
-			odr, err := readRawOD(odf)
+			odf, rerr := r.Read()
+			if rerr == io.EOF {
+				break
+			}
+			if rerr != nil {
+				log.Fatal(rerr)
+			}
+			odr, err := readRawOD(odf[0])
 			if err != nil {
 				continue
 			}
 			odr.ID = id
 			datasets <- odr
 		}
-		if err := scanner.Err(); err != nil {
-			panic(err)
-		}
+
 	}()
 
 	for dataset := range datasets {

@@ -51,7 +51,6 @@ func exists(filename string) bool {
 // Creates a channel of filenames
 func StreamFilenames() <-chan string {
 	output := make(chan string)
-
 	go func() {
 		f, _ := os.Open(OpendataList)
 		defer f.Close()
@@ -571,5 +570,32 @@ func StreamValueFreqFromCache(fanout int, filenames <-chan string) <-chan *Value
 		close(out)
 	}()
 
+	return out
+}
+
+func StreamEmbVectors(fanout int, filenames <-chan string) <-chan string {
+	out := make(chan string)
+	wg := &sync.WaitGroup{}
+	wg.Add(fanout)
+	for i := 0; i < fanout; i++ {
+		go func(id int, out chan<- string) {
+			for filename := range filenames {
+				for _, index := range getTextDomains(filename) {
+					d := &Domain{
+						Filename: filename,
+						Index:    index,
+					}
+					embFilename := d.PhysicalFilename("ft-sum")
+					out <- embFilename
+				}
+			}
+			wg.Done()
+		}(i, out)
+
+	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
 	return out
 }

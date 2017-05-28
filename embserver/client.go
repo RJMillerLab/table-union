@@ -64,6 +64,7 @@ func (c *Client) mkReq(queryRequest QueryRequest) QueryResponse {
 	defer resp.Body.Close()
 	var queryResponse QueryResponse
 	if err := json.Unmarshal(queryResponseData, &queryResponse); err != nil {
+		log.Printf("No response found")
 		panic(err)
 	}
 	return queryResponse
@@ -105,12 +106,14 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 	// Create embeddings
 	vecs := make([][]float64, queryTable.NumCol())
 	for i := range vecs {
-		pcvecs, err := embedding.GetDomainEmbPCA(c.ft, c.tokenFun, c.transFun, queryTable.GetColumn(i), 1)
+		//pcvecs, _, err := embedding.GetDomainEmbPCABiased(c.ft, c.tokenFun, c.transFun, queryTable.GetColumn(i), 1)
+		vec, err := embedding.GetDomainEmbSum(c.ft, c.tokenFun, c.transFun, queryTable.GetColumn(i))
 		if err != nil {
 			log.Printf("Embedding not found for column %d", i)
 			continue
 		}
-		vecs[i] = pcvecs[0]
+		//	vecs[i] = pcvecs[0]
+		vecs[i] = vec
 	}
 	// Query server
 	results := make([][]QueryResult, len(vecs))
@@ -143,7 +146,11 @@ func (c *Client) Query(queryCSVFilename string, k int, resultDir string) {
 		//wr := bufio.NewWriter(rf)
 		for rank, entry := range result {
 			log.Printf("(Rank %d) Table %s, Column %d", rank, entry.TableID, entry.ColumnIndex)
-			t, err := c.ts.GetTable(entry.TableID)
+			//t, err := c.ts.GetTable(entry.TableID)
+			t, err := c.ts.GetTable(getTablePath(entry.TableID))
+			if err != nil {
+				panic(err)
+			}
 			// Find the top-k values in this column
 			topkWords := c.findTopKWords(t.Columns[entry.ColumnIndex], vecs[i], k)
 			// Create output directory for this column

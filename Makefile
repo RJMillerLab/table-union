@@ -1,8 +1,8 @@
 
 # Set the variables
-OUTPUT_DIR 	= $(HOME)/TABLE_UNION_OUTPUT
+OUTPUT_DIR 	= /home/fnargesian/TABLE_UNION_OUTPUT
 OPENDATA_LIST	= $(OUTPUT_DIR)/opencanada-en.list
-OPENDATA_LIST	= $(OUTPUT_DIR)/debug.list
+#OPENDATA_LIST	= $(OUTPUT_DIR)/debug.list
 OPENDATA_DIR 	= /home/ekzhu/OPENDATA/resource-2016-12-15-csv-only
 YAGO_DB 	= $(OUTPUT_DIR)/yago.sqlite3.0
 
@@ -62,7 +62,19 @@ count_domains:
 	OUTPUT_DIR=$(OUTPUT_DIR) \
 	go run cmd/count_domain_segments/main.go
 
+server:
+	OPENDATA_DIR=$(OPENDATA_DIR) \
+	OPENDATA_LIST=$(OPENDATA_LIST) \
+	YAGO_DB=$(YAGO_DB) \
+	OUTPUT_DIR=$(OUTPUT_DIR) \
+	go run cmd/opendataserver/main.go
 
+client:
+	OPENDATA_DIR=$(OPENDATA_DIR) \
+	OPENDATA_LIST=$(OPENDATA_LIST) \
+	YAGO_DB=$(YAGO_DB) \
+	OUTPUT_DIR=$(OUTPUT_DIR) \
+	go run cmd/opendataclient/main.go -query /home/ekzhu/WIKI_TABLE/q1/query.csv -result-dir result 
 
 output/opendata.list:
 	cd python; python build-opendata-index.py
@@ -75,6 +87,9 @@ rmftsum:
 
 rmentities:
 	rm -f `find $(OUTPUT_DIR)/domains -name "*.entities"`
+
+rmsamples:
+	rm -f `find $(OUTPUT_DIR)/domains -name "*.samples"`
 
 clean:
 	rm -rf $(OUTPUT_DIR)/domains

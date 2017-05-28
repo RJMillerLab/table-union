@@ -43,9 +43,28 @@ func GetDomainEmbAve(ft *fasttext.FastText, tokenFun func(string) []string, tran
 	return vec, nil
 }
 
-// Get the embedding vector of a column domain by taking the first K principal
-// component of the distinct values (tokenized) vectors
-func GetDomainEmbPCA(ft *fasttext.FastText, tokenFun func(string) []string, transFun func(string) string, column []string, kfirst int) ([][]float64, error) {
+// Get the embedding vector of a column by taking the sum of the values (tokenized) vectors.
+func GetDomainEmbSum(ft *fasttext.FastText, tokenFun func(string) []string, transFun func(string) string, column []string) ([]float64, error) {
+	values := TokenizedValues(column, tokenFun, transFun)
+	var vec []float64
+	for tokens := range values {
+		valueVec, err := GetValueEmb(ft, tokens)
+		if err != nil {
+			continue
+		}
+		if vec == nil {
+			vec = valueVec
+		} else {
+			add(vec, valueVec)
+		}
+	}
+	if vec == nil {
+		return nil, ErrNoEmbFound
+	}
+	return vec, nil
+}
+
+func GetDomainEmb(ft *fasttext.FastText, tokenFun func(string) []string, transFun func(string) string, column []string, kfirst int) (*mat64.Dense, error) {
 	values := TokenizedValues(column, tokenFun, transFun)
 	var data []float64
 	var count int
@@ -65,21 +84,63 @@ func GetDomainEmbPCA(ft *fasttext.FastText, tokenFun func(string) []string, tran
 		return nil, ErrNoEmbFound
 	}
 	matrix := mat64.NewDense(count, fasttext.Dim, data)
+	return matrix, nil
+}
+
+func GetPCAs(matrix *mat64.Dense, kfirst int) ([][]float64, []float64, error) {
 	var pc stat.PC
 	if ok := pc.PrincipalComponents(matrix, nil); !ok {
-		return nil, ErrPCAFailure
+		return nil, nil, ErrPCAFailure
 	}
 	pcs := pc.Vectors(nil)
+	pcvars := pc.Vars(nil)
 	_, c := pcs.Dims()
 	// choose maximum kfirst PCs
 	pcsNum := int(math.Min(float64(kfirst), float64(c)))
 	kpcs := make([][]float64, pcsNum)
+	kpcvars := make([]float64, pcsNum)
 	for i := 0; i < pcsNum; i++ {
 		vec := make([]float64, fasttext.Dim)
 		mat64.Col(vec, i, pcs)
 		kpcs[i] = vec
+		kpcvars[i] = pcvars[i]
 	}
-	return kpcs, nil
+	return kpcs, kpcvars, nil
+}
+
+// Get the embedding vector of a column domain by taking the first K principal
+// component of the distinct values (tokenized) vectors
+func GetDomainEmbPCA(ft *fasttext.FastText, tokenFun func(string) []string, transFun func(string) string, column []string, kfirst int) ([][]float64, []float64, error) {
+	matrix, err := GetDomainEmb(ft, tokenFun, transFun, column, kfirst)
+	if err != nil {
+		return nil, nil, err
+	}
+	return GetPCAs(matrix, kfirst)
+}
+
+// Get the embedding vector of a column domain by taking the first K principal
+// component of the distinct values (tokenized) vectors
+func GetDomainEmbPCABiased(ft *fasttext.FastText, tokenFun func(string) []string, transFun func(string) string, column []string, kfirst int) ([][]float64, []float64, error) {
+	matrix, err := GetDomainEmb(ft, tokenFun, transFun, column, kfirst)
+	if err != nil {
+		return nil, nil, err
+	}
+	r, c := matrix.Dims()
+	sum := mat64.NewVector(c, nil)
+	for i := 0; i < r; i++ {
+		vec := matrix.RowView(i)
+		sum.AddScaledVec(vec, 1.0/float64(c), sum)
+	}
+	pcas, pcvars, err := GetPCAs(matrix, kfirst)
+	if err != nil {
+		return nil, nil, err
+	}
+	for i := range pcas {
+		for j, v := range pcas[i] {
+			pcas[i][j] = v + sum.At(j, 0)
+		}
+	}
+	return pcas, pcvars, err
 }
 
 // Get the embedding vector of a tokenized value by sum all the tokens' vectors
@@ -107,8 +168,30 @@ func GetValueEmb(ft *fasttext.FastText, tokenizedValue []string) ([]float64, err
 	return valueVec, nil
 }
 
-// Produce a channel of distinct values (tokenized)
+// Produce a channel of values (tokenized)
 func TokenizedValues(values []string, tokenFun func(string) []string, transFun func(string) string) chan []string {
+	out := make(chan []string)
+	go func() {
+		for _, v := range values {
+			v = transFun(v)
+			// Tokenize
+			tokens := tokenFun(v)
+			if len(tokens) > 5 {
+				// Skip text values
+				continue
+			}
+			for i, t := range tokens {
+				tokens[i] = transFun(t)
+			}
+			out <- tokens
+		}
+		close(out)
+	}()
+	return out
+}
+
+// Produce a channel of distinct values (tokenized)
+func TokenizedDistinctValues(values []string, tokenFun func(string) []string, transFun func(string) string) chan []string {
 	out := make(chan []string)
 	go func() {
 		counter := counter.NewCounter()

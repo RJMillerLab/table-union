@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 
 	"github.com/RJMillerLab/table-union/table"
@@ -60,13 +59,11 @@ func (s *Server) Close() error {
 func (s *Server) queryHandler(c *gin.Context) {
 	body, err := ioutil.ReadAll(io.LimitReader(c.Request.Body, 1048576))
 	if err != nil {
-		log.Println(err)
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 	var queryRequest QueryRequest
 	if err := json.Unmarshal(body, &queryRequest); err != nil {
-		log.Println(err)
 		c.AbortWithStatus(http.StatusUnprocessableEntity)
 		return
 	}
@@ -77,7 +74,7 @@ func (s *Server) queryHandler(c *gin.Context) {
 		result = append(result, QueryResult{
 			TableID:     emb.TableID,
 			ColumnIndex: emb.ColumnIndex,
-			Vec:         emb.PCVec,
+			Vec:         emb.SumVec,
 		})
 	}
 	response := QueryResponse{
