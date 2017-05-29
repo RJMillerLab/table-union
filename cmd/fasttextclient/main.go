@@ -5,25 +5,21 @@ import (
 	"os"
 
 	"github.com/RJMillerLab/table-union/embserver"
-	"github.com/RJMillerLab/table-union/table"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
 func main() {
+	var domainDir string
 	var host string
 	var queryCSVFilename string
-	var resultDir string
 	var k int
-	var wikiTableDir string
 	var fastTextSqliteDB string
-	flag.StringVar(&wikiTableDir, "wikitable-dir", "/home/ekzhu/WIKI_TABLE/tables",
-		"Directory for storing wikitable CSV files")
+	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/domains",
+		"The top-level director for all domain and embedding files")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs")
 	flag.StringVar(&queryCSVFilename, "query", "",
 		"Query CSV file")
-	flag.StringVar(&resultDir, "result-dir", "",
-		"Query result directory")
 	flag.StringVar(&host, "host", "http://localhost:4003", "Server host")
 	flag.IntVar(&k, "k", 5, "Top-K")
 	flag.Parse()
@@ -32,11 +28,10 @@ func main() {
 		panic("FastText Sqlite DB does not exist")
 	}
 	ft := fasttext.NewFastText(fastTextSqliteDB)
-	ts := table.NewTableStore(wikiTableDir)
 
-	client, err := embserver.NewClient(ft, ts, host)
+	client, err := embserver.NewClient(ft, host)
 	if err != nil {
 		panic(err)
 	}
-	client.Query(queryCSVFilename, k, resultDir)
+	_ = client.Query(queryCSVFilename, k)
 }

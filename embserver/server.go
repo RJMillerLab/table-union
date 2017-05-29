@@ -6,14 +6,10 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/RJMillerLab/table-union/table"
-	fasttext "github.com/ekzhu/go-fasttext"
 	"github.com/gin-gonic/gin"
 )
 
 type Server struct {
-	ft     *fasttext.FastText
-	ts     *table.TableStore
 	si     *SearchIndex
 	router *gin.Engine
 }
@@ -33,11 +29,8 @@ type QueryResult struct {
 	Vec         []float64 `json:"vec"`
 }
 
-func NewServer(ft *fasttext.FastText, ts *table.TableStore,
-	si *SearchIndex) *Server {
+func NewServer(si *SearchIndex) *Server {
 	s := &Server{
-		ft:     ft,
-		ts:     ts,
 		si:     si,
 		router: gin.Default(),
 	}
@@ -50,10 +43,7 @@ func (s *Server) Run(port string) error {
 }
 
 func (s *Server) Close() error {
-	if err := s.ft.Close(); err != nil {
-		return err
-	}
-	return s.si.Close()
+	return nil
 }
 
 func (s *Server) queryHandler(c *gin.Context) {

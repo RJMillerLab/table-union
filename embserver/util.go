@@ -1,11 +1,15 @@
 package embserver
 
 import (
+	"bufio"
 	"fmt"
-	"path"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/RJMillerLab/table-union/embedding"
 )
 
 var (
@@ -39,31 +43,40 @@ func toColumnID(tableID string, columnIndex int) (columnID string) {
 	return
 }
 
-func dotProduct(x, y []float64) float64 {
-	if len(x) != len(y) {
-		panic("Length of vectors not equal")
+func parseFilename(domainDir, filename string) (tableID string, columnIndex int) {
+	tableID = strings.TrimPrefix(filepath.Dir(filename), domainDir)
+	columnIndex, err := strconv.Atoi(strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename)))
+	if err != nil {
+		panic(err)
 	}
-	p := 0.0
-	for i := range x {
-		p += x[i] * y[i]
-	}
-	return p
+	return
 }
 
-//func filenameToColumnID(filename string) (columnID string) {
-//	tableID := strings.strings.Replace(filename, OutputDir, "", -1)
-//	columnID = fmt.Sprintf("%s:%d", tableID, columnIndex)
-//	return
-//}
-
-func filenameToColumnID(filename string) string {
-	tableID := strings.Replace(path.Dir(filename), OutputDir+"/domains/", "", -1)
-	columnIndex := strings.Replace(path.Base(filename), path.Ext(filename), "", -1)
-	columnID := fmt.Sprintf("%s:%s", tableID, columnIndex)
-	return columnID
+func GetTablePath(tableDir, tableID string) string {
+	return filepath.Join(tableDir, tableID)
 }
 
-func getTablePath(tableID string) string {
-	path := path.Join("/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only/", tableID)
-	return path
+func GetDomainValues(domainDir, tableID string, columnIndex int) ([]string, error) {
+	p := filepath.Join(domainDir, tableID, fmt.Sprintf("%d.values", columnIndex))
+	file, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	file.Close()
+	values := make([]string, 0)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		v := scanner.Text()
+		values = append(values, v)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return values, nil
+}
+
+func GetSumEmbVec(domainDir, tableID string, columnIndex int) ([]float64, error) {
+	p := filepath.Join(domainDir, tableID, fmt.Sprintf("%d.ft-sum", columnIndex))
+	return embedding.ReadVecFromDisk(p, ByteOrder)
+
 }

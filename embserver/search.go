@@ -6,21 +6,17 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/RJMillerLab/table-union/embedding"
 	"github.com/RJMillerLab/table-union/opendata"
-	fasttext "github.com/ekzhu/go-fasttext"
 )
 
 const (
-	TableName    = "search_index"
 	LSHTableName = "lsh_index_sum"
-	Ext          = "ft-sum"
-	OutputDir    = "/home/fnargesian/TABLE_UNION_OUTPUT"
+	FastTextDim  = 300
 )
 
 var (
@@ -45,41 +41,29 @@ type LSHEntry struct {
 }
 
 type SearchIndex struct {
-	ft        *fasttext.FastText
-	db        *sql.DB // Sqlite store for the embedding entries
 	lsh       *CosineLsh
 	transFun  func(string) string
 	tokenFun  func(string) []string
-	tablename string
+	domainDir string
 	byteOrder binary.ByteOrder
 }
 
-func NewSearchIndex(ft *fasttext.FastText, dbFilename string, lsh *CosineLsh) *SearchIndex {
-	db, err := sql.Open("sqlite3", dbFilename)
-	if err != nil {
-		panic(err)
-	}
+func NewSearchIndex(domainDir string, lsh *CosineLsh) *SearchIndex {
 	index := &SearchIndex{
-		ft:        ft,
-		db:        db,
 		lsh:       lsh,
 		transFun:  DefaultTransFun,
 		tokenFun:  DefaultTokenFun,
-		tablename: TableName,
+		domainDir: domainDir,
 		byteOrder: ByteOrder,
 	}
 	return index
 }
 
-func (index *SearchIndex) Close() error {
-	return index.db.Close()
-}
-
 func (index *SearchIndex) Build() error {
 	domainfilenames := opendata.StreamFilenames()
-	embfilename := opendata.StreamEmbVectors(10, domainfilenames)
+	embfilenames := opendata.StreamEmbVectors(10, domainfilenames)
 	count := 0
-	for file := range embfilename {
+	for file := range embfilenames {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			log.Printf("file %s does not exist.", err)
 			continue
@@ -88,15 +72,14 @@ func (index *SearchIndex) Build() error {
 		if count%100 == 0 {
 			log.Printf("indexed %d domains", count)
 		}
-		vec, err := embedding.ReadVecFromDisk(file, binary.BigEndian)
+		vec, err := embedding.ReadVecFromDisk(file, ByteOrder)
 		if err != nil {
 			return err
 		}
-		id := filenameToColumnID(file)
-		index.lsh.Insert(vec, id)
+		tableID, columnIndex := parseFilename(index.domainDir, file)
+		index.lsh.Insert(vec, toColumnID(tableID, columnIndex))
 	}
 	return nil
-
 }
 
 func (index *SearchIndex) SaveLSHIndex(lshEntries <-chan *LSHEntry, lshdbFilename string) {
@@ -139,7 +122,7 @@ func (index *SearchIndex) SaveLSHIndex(lshEntries <-chan *LSHEntry, lshdbFilenam
 }
 
 func (index *SearchIndex) Get(tableID string, columnIndex int) (*EmbEntry, error) {
-	vec, err := embedding.ReadVecFromDisk(physicalFilename(tableID, columnIndex), binary.BigEndian)
+	vec, err := GetSumEmbVec(index.domainDir, tableID, columnIndex)
 	if err != nil {
 		panic(err)
 	}
@@ -162,7 +145,7 @@ func (index *SearchIndex) TopK(query []float64, k int) []*EmbEntry {
 		if err != nil {
 			panic(err)
 		}
-		queue.Push(entry, dotProduct(query, entry.SumVec))
+		queue.Push(entry, embedding.Cosine(query, entry.SumVec))
 	}
 	result := make([]*EmbEntry, queue.Size())
 	for i := len(result) - 1; i >= 0; i-- {
@@ -171,14 +154,4 @@ func (index *SearchIndex) TopK(query []float64, k int) []*EmbEntry {
 	}
 	log.Printf("Post-proc took %.4f secs", time.Now().Sub(start).Seconds())
 	return result
-}
-
-func physicalFilename(tableID string, columnIndex int) string {
-	fullpath := path.Join(OutputDir, "domains", tableID)
-
-	if Ext != "" {
-		fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", columnIndex, Ext))
-	}
-
-	return fullpath
 }
