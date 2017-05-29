@@ -1,9 +1,7 @@
 package embserver
 
 import (
-	"database/sql"
 	"encoding/binary"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -80,45 +78,6 @@ func (index *SearchIndex) Build() error {
 		index.lsh.Insert(vec, toColumnID(tableID, columnIndex))
 	}
 	return nil
-}
-
-func (index *SearchIndex) SaveLSHIndex(lshEntries <-chan *LSHEntry, lshdbFilename string) {
-	// Open connection
-	db, err := sql.Open("sqlite3", lshdbFilename)
-	if err != nil {
-		panic(err)
-	}
-	// Saving embedding entries to Sqlite
-	_, err = db.Exec(fmt.Sprintf(`
-		CREATE TABLE %s (
-			table_id TEXT,
-			column_index INTEGER,
-			band_index INTEGER,
-			hash_key INTEGER
-		);
-		`, LSHTableName))
-	if err != nil {
-		panic(err)
-	}
-	stmt, err := db.Prepare(fmt.Sprintf(`
-		INSERT INTO %s(table_id, column_index, band_index, hash_key) VALUES(?, ?, ?, ?);
-		`, LSHTableName))
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-	for e := range lshEntries {
-		if _, err := stmt.Exec(e.TableID, e.ColumnIndex, e.BandIndex, e.HashKey); err != nil {
-			panic(err)
-		}
-	}
-	_, err = db.Exec(fmt.Sprintf(`
-		CREATE INDEX ind_band ON %s(band_index, hash_key);
-		`, LSHTableName))
-	if err != nil {
-		panic(err)
-	}
-	db.Close()
 }
 
 func (index *SearchIndex) Get(tableID string, columnIndex int) (*EmbEntry, error) {

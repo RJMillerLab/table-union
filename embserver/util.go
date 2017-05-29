@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/RJMillerLab/table-union/embedding"
+	"github.com/deckarep/golang-set"
 )
 
 var (
@@ -62,7 +63,7 @@ func GetDomainValues(domainDir, tableID string, columnIndex int) ([]string, erro
 	if err != nil {
 		return nil, err
 	}
-	file.Close()
+	defer file.Close()
 	values := make([]string, 0)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -79,4 +80,27 @@ func GetSumEmbVec(domainDir, tableID string, columnIndex int) ([]float64, error)
 	p := filepath.Join(domainDir, tableID, fmt.Sprintf("%d.ft-sum", columnIndex))
 	return embedding.ReadVecFromDisk(p, ByteOrder)
 
+}
+
+func convertSliceToSet(slice []string) mapset.Set {
+	set := mapset.NewSet()
+	for _, v := range slice {
+		set.Add(strings.ToLower(v))
+	}
+	return set
+}
+
+func Jaccard(dom1, dom2 []string) float64 {
+	d1set := convertSliceToSet(dom1)
+	d2set := convertSliceToSet(dom2)
+	d1andd2 := d1set.Intersect(d2set).Cardinality()
+	d1ord2 := d1set.Union(d2set).Cardinality()
+	return float64(d1andd2) / float64(d1ord2)
+}
+
+func Containment(dom1, dom2 []string) float64 {
+	d1set := convertSliceToSet(dom1)
+	d2set := convertSliceToSet(dom2)
+	d1andd2 := d1set.Intersect(d2set).Cardinality()
+	return float64(d1andd2) / float64(d1set.Cardinality())
 }

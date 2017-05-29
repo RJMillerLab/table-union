@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/RJMillerLab/table-union/embedding"
 	"github.com/ekzhu/datatable"
@@ -15,20 +17,22 @@ import (
 )
 
 type Client struct {
-	ft       *fasttext.FastText
-	host     string
-	cli      *http.Client
-	transFun func(string) string
-	tokenFun func(string) []string
+	ft        *fasttext.FastText
+	host      string
+	cli       *http.Client
+	transFun  func(string) string
+	tokenFun  func(string) []string
+	domainDir string
 }
 
-func NewClient(ft *fasttext.FastText, host string) (*Client, error) {
+func NewClient(ft *fasttext.FastText, host, domainDir string) (*Client, error) {
 	return &Client{
-		ft:       ft,
-		host:     host,
-		cli:      &http.Client{},
-		transFun: DefaultTransFun,
-		tokenFun: DefaultTokenFun,
+		ft:        ft,
+		host:      host,
+		cli:       &http.Client{},
+		transFun:  DefaultTransFun,
+		tokenFun:  DefaultTokenFun,
+		domainDir: domainDir,
 	}, nil
 }
 
@@ -87,6 +91,7 @@ func (c *Client) Query(queryCSVFilename string, k int) [][]QueryResult {
 	}
 	// Query server
 	results := make([][]QueryResult, len(vecs))
+	//values := make([]string, 0)
 	for i := range vecs {
 		if vecs[i] == nil {
 			continue
@@ -101,6 +106,17 @@ func (c *Client) Query(queryCSVFilename string, k int) [][]QueryResult {
 		log.Printf("Query results for column %d (%s):", i, headers[i])
 		for rank, entry := range resp.Result {
 			log.Printf("> (%d) Column %d in %s", rank, entry.ColumnIndex, entry.TableID)
+			values, err := GetDomainValues(c.domainDir, entry.TableID, entry.ColumnIndex)
+			if err != nil {
+				panic(err)
+			}
+			jacc := Jaccard(queryTable.GetColumn(i), values)
+			cont := Containment(queryTable.GetColumn(i), values)
+			log.Printf("Jaccard: %f", jacc)
+			log.Printf("Containment: %f", cont)
+			log.Printf("==== values ====")
+			log.Printf(strings.Join(values[:int(math.Min(10.0, float64(len(values))))], ","))
+			log.Printf("================\n")
 		}
 	}
 	return results

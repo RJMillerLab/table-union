@@ -5,19 +5,18 @@ import (
 	"os"
 
 	"github.com/RJMillerLab/table-union/embserver"
-	"github.com/RJMillerLab/table-union/table"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
 func main() {
+	var domainDir string
 	var host string
 	var queryCSVFilename string
-	var resultDir string
 	var k int
-	var openDataDir string
 	var fastTextSqliteDB string
-	flag.StringVar(&openDataDir, "opendata-dir", "/home/fnargesian/OPENDATA/datasets",
-		"Directory for storing opendata CSV files")
+	var resultDir string
+	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/domains",
+		"The top-level director for all domain and embedding files")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs")
 	flag.StringVar(&queryCSVFilename, "query", "",
@@ -32,11 +31,10 @@ func main() {
 		panic("FastText Sqlite DB does not exist")
 	}
 	ft := fasttext.NewFastText(fastTextSqliteDB)
-	ts := table.NewTableStore(openDataDir)
 
-	client, err := embserver.NewClient(ft, ts, host)
+	client, err := embserver.NewClient(ft, host, domainDir)
 	if err != nil {
 		panic(err)
 	}
-	client.Query(queryCSVFilename, k, resultDir)
+	_ = client.Query(queryCSVFilename, k)
 }

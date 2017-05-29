@@ -36,7 +36,10 @@ func ReadVecFromDisk(filename string, order binary.ByteOrder) ([]float64, error)
 		return nil, err
 	}
 	defer file.Close()
-
+	stats, serr := file.Stat()
+	if serr != nil {
+		return nil, serr
+	}
 	var size int64 = stats.Size()
 	binVec := make([]byte, size)
 	if _, rerr := file.Read(binVec); rerr != nil {
