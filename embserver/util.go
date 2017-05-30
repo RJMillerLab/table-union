@@ -76,6 +76,25 @@ func GetDomainValues(domainDir, tableID string, columnIndex int) ([]string, erro
 	return values, nil
 }
 
+func GetDomainEntities(domainDir, tableID string, columnIndex int) ([]string, error) {
+	p := filepath.Join(domainDir, tableID, fmt.Sprintf("%d.entities", columnIndex))
+	file, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	values := make([]string, 0)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		v := scanner.Text()
+		values = append(values, v)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return values, nil
+}
+
 func GetSumEmbVec(domainDir, tableID string, columnIndex int) ([]float64, error) {
 	p := filepath.Join(domainDir, tableID, fmt.Sprintf("%d.ft-sum", columnIndex))
 	return embedding.ReadVecFromDisk(p, ByteOrder)

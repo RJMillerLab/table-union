@@ -24,7 +24,7 @@ func main() {
 	flag.StringVar(&resultDir, "result-dir", "",
 		"Query result directory")
 	flag.StringVar(&host, "host", "http://localhost:4003", "Server host")
-	flag.IntVar(&k, "k", 5, "Top-K")
+	flag.IntVar(&k, "k", 10, "Top-K")
 	flag.Parse()
 
 	if _, err := os.Stat(fastTextSqliteDB); os.IsNotExist(err) {

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/RJMillerLab/table-union/embedding"
+	"github.com/RJMillerLab/table-union/ontology"
 	"github.com/ekzhu/datatable"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
@@ -23,9 +24,11 @@ type Client struct {
 	transFun  func(string) string
 	tokenFun  func(string) []string
 	domainDir string
+	annotator *ontology.Annotator
 }
 
 func NewClient(ft *fasttext.FastText, host, domainDir string) (*Client, error) {
+	annotator := ontology.NewAnnotator()
 	return &Client{
 		ft:        ft,
 		host:      host,
@@ -33,6 +36,7 @@ func NewClient(ft *fasttext.FastText, host, domainDir string) (*Client, error) {
 		transFun:  DefaultTransFun,
 		tokenFun:  DefaultTokenFun,
 		domainDir: domainDir,
+		annotator: annotator,
 	}, nil
 }
 
@@ -110,10 +114,18 @@ func (c *Client) Query(queryCSVFilename string, k int) [][]QueryResult {
 			if err != nil {
 				panic(err)
 			}
+			entities, err := GetDomainEntities(c.domainDir, entry.TableID, entry.ColumnIndex)
+			if err != nil {
+				panic(err)
+			}
 			jacc := Jaccard(queryTable.GetColumn(i), values)
 			cont := Containment(queryTable.GetColumn(i), values)
+			entityjacc := Jaccard(c.annotator.DoAnnotateDomain(queryTable.GetColumn(i)), entities)
+			entitycont := Containment(c.annotator.DoAnnotateDomain(queryTable.GetColumn(i)), entities)
 			log.Printf("Jaccard: %f", jacc)
 			log.Printf("Containment: %f", cont)
+			log.Printf("Entity Jaccard: %f", entityjacc)
+			log.Printf("Entity Containment: %f", entitycont)
 			log.Printf("==== values ====")
 			log.Printf(strings.Join(values[:int(math.Min(10.0, float64(len(values))))], ","))
 			log.Printf("================\n")
