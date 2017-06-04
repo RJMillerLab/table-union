@@ -1,0 +1,51 @@
+unit_code,group_code,unit_short_name,unit_full_name
+CHE,ENG,"Chemical Engineering","Chemical Engineering"
+CGC,CGC,"Conrad Grebel Univ College","Conrad Grebel University College"
+CIVE,ENG,"Civil & Environmental Engg","Civil and Environmental Engineering"
+ENVDEAN,ENV,"Dean of Environment","Dean of Environment"
+REN,REN,"Renison University College","Renison University College"
+GEOE,ENG,"Geological Engineering","Geological Engineering"
+PHIL,ART,Philosophy,Philosophy
+STV,ENG,"Society, Technology&Values Ctr","Society, Technology & Values Centre"
+CHEM,SCI,Chemistry,Chemistry
+SCI,SCI,Science,Science
+CS,MAT,"Computer Sci - Cheriton School","Computer Science - David R. Cheriton School of"
+REC,AHS,"Recreation & Leisure Studies","Recreation & Leisure Studies"
+SEED,ENV,"Env, Entr & Dev - School of","Environment, Enterprise & Development - School of"
+ECON,ART,Economics,Economics
+ECE,ENG,"Electrical & Computer Engg","Electrical & Computer Engineering"
+ANTH,ART,Anthropology,Anthropology
+FINE,ART,"Fine Arts","Fine Arts"
+MAT,MAT,Math,Math
+CBET,ENG,"Conrad Bus, Entrepren & Tech","Conrad Business, Entrepreneurship & Technology Ctr"
+ENG,ENG,Engineering,Engineering
+BIOL,SCI,Biology,Biology
+KIN,AHS,Kinesiology,Kinesiology
+CO,MAT,"Combinatorics & Optimization","Combinatorics & Optimization"
+ART,ART,Arts,Arts
+DANCE,AHS,Dance,Dance
+ACC,ART,"Accounting&Finance - School of","Accounting & Finance - School of"
+ERS,ENV,"Environment & Resource Studies","Environment & Resource Studies"
+UW,VPA,"University of Waterloo","University of Waterloo"
+GRADDEAN,GRAD,"Graduate Dean","Graduate Dean"
+DRAMA,ART,"Drama & Speech Communication","Drama & Speech Communication"
+CECS,VPA,"Coop Educn & Career Action","Co-operative Education & Career Action"
+HIST,ART,History,History
+MSCI,ENG,"Management Sciences","Management Sciences"
+EARTH,SCI,"Earth & Environmental Sciences","Earth and Environmental Sciences"
+THC,VPA,"Theatre Centre","Theatre Centre"
+GERSLAV,ART,"Germanic & Slavic Studies","Germanic & Slavic Studies"
+PSYCH,ART,Psychology,Psychology
+RS,ART,"Religious Studies","Religious Studies"
+HLTHGERON,AHS,"Public Hlth&Hlth Sys-School of","Public Health and Health Systems - School of"
+IS,IS,"Independent Studies","Independent Studies"
+VPA,VPA,"Interdisciplinary Studies","Interdisciplinary Studies"
+ARTSDEAN,ART,"Dean of Arts","Dean of Arts"
+SYDE,ENG,"Systems Design Engineering","Systems Design Engineering"
+PMATH,MAT,"Pure Mathematics","Pure Mathematics"
+SCIDEAN,SCI,"Dean of Science Office","Dean of Science Office"
+AHS,AHS,"Applied Health Sciences","Applied Health Sciences"
+ME,ENG,"Mechanical & Mechatronics Engg","Mechanical and Mechatronics Engineering"
+ARCH,ENG,"Architecture - School of","Architecture - School of"
+ENV,ENV,Environment,Environment
+AMATH,MAT,"Applied Mathematics","Applied Mathematics"

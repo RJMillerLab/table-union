@@ -1,0 +1,51 @@
+unit_code,group_code,unit_short_name,unit_full_name
+ECON,ART,Economics,Economics
+AHS,AHS,"Applied Health Sciences","Applied Health Sciences"
+PSYCH,ART,Psychology,Psychology
+ICR,VPA,"Inst for Computer Research","Institute for Computer Research"
+CGC,CGC,"Conrad Grebel Univ College","Conrad Grebel University College"
+HLTHGERON,AHS,"Public Hlth&Hlth Sys-School of","Public Health and Health Systems - School of"
+ACC,ART,"Accounting&Finance - School of","Accounting & Finance - School of"
+ENV,ENV,Environment,Environment
+SYDE,ENG,"Systems Design Engineering","Systems Design Engineering"
+CLASSICS,ART,"Classical Studies","Classical Studies"
+KIN,AHS,Kinesiology,Kinesiology
+ENGL,ART,"English Language & Literature","English Language & Literature"
+SPAN,ART,"Spanish & Latin American Stud.","Spanish & Latin American Studies"
+FINE,ART,"Fine Arts","Fine Arts"
+SOC,ART,"Sociology & Legal Studies","Sociology and Legal Studies"
+CO,MAT,"Combinatorics & Optimization","Combinatorics & Optimization"
+WS,ART,"Women's Studies","Women's Studies"
+ENG,ENG,Engineering,Engineering
+ERS,ENV,"Environment & Resource Studies","Environment & Resource Studies"
+EARTH,SCI,"Earth & Environmental Sciences","Earth and Environmental Sciences"
+UW,VPA,"University of Waterloo","University of Waterloo"
+REN,REN,"Renison University College","Renison University College"
+GERSLAV,ART,"Germanic & Slavic Studies","Germanic & Slavic Studies"
+OPTOM,SCI,"Optometry & Vision Sci-Sch of","Optometry & Vision Science - School of"
+SCI,SCI,Science,Science
+AHSDEAN,AHS,"Dean of Applied Hlth Sciences","Dean of Applied Health Sciences"
+PHARM,SCI,"Pharmacy - School of","Pharmacy - School of"
+DANCE,AHS,Dance,Dance
+GRADDEAN,GRAD,"Graduate Dean","Graduate Dean"
+ARCH,ENG,"Architecture - School of","Architecture - School of"
+STV,ENG,"Society, Technology&Values Ctr","Society, Technology & Values Centre"
+HIST,ART,History,History
+MATHDEAN,MAT,"Dean of Mathematics","Dean of Mathematics"
+STJ,STJ,"St Jerome's University","St Jerome's University"
+GEOE,ENG,"Geological Engineering","Geological Engineering"
+IS,IS,"Independent Studies","Independent Studies"
+MAT,MAT,Math,Math
+CIVE,ENG,"Civil & Environmental Engg","Civil and Environmental Engineering"
+THC,VPA,"Theatre Centre","Theatre Centre"
+DRAMA,ART,"Drama & Speech Communication","Drama & Speech Communication"
+STATACTSC,MAT,"Statistics & Actuarial Science","Statistics & Actuarial Science"
+GEOG,ENV,"Geography & Environmental Mgmt","Geography & Environmental Management"
+AMATH,MAT,"Applied Mathematics","Applied Mathematics"
+RS,ART,"Religious Studies","Religious Studies"
+FR,ART,"French Studies","French Studies"
+PSCI,ART,"Political Science","Political Science"
+CECS,VPA,"Coop Educn & Career Action","Co-operative Education & Career Action"
+PMATH,MAT,"Pure Mathematics","Pure Mathematics"
+MSCI,ENG,"Management Sciences","Management Sciences"
+SEED,ENV,"Env, Entr & Dev - School of","Environment, Enterprise & Development - School of"
