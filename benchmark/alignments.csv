@@ -1,0 +1,38 @@
+table_1, column_1, table_2, column_2, type
+academic_organizations_1, unit_code, academic_organizations_2, unit_code, text
+academic_organizations_1, group_code, academic_organizations_2, group_code, text
+academic_organizations_1, unit_short_name, academic_organizations_2, unit_short_name, text
+academic_organizations_1, unit_full_name, academic_organizations_2, unit_full_name, text
+colony_1, "Numero de colonie/Colony Number", colony_2, "Numero de colonie/Colony Number", numeric
+colony_1, "Nom de colonie/Colony name", colony_2, "Nom de colonie/Colony name", text
+colony_1, CentroideX, colony_2, CentroideX, numeric
+colony_1, CentroideY, colony_2, CentroideY, numeric
+colony_1, Espece/Species-EN, colony_2, Espece/Species-EN, text
+colony_1, Espece/Species-FR, colony_2, Espece/Species-FR, text
+colony_1, "Jour et mois/Day and Month", colony_2, "Jour et mois/Day and Month", numeric
+colony_1, Annee/Year, colony_2, Annee/Year, numeric
+colony_1, "Nombre de nicheurs/Number of Breeders", colony_2, "Nombre de nicheurs/Number of Breeders", numeric
+colony_1, Methodes, colony_2, Methodes, text
+colony_1, Remarques, colony_2, Remarques, text
+colony_1, Reference, colony_2, Reference, text
+contributors_parties_2000_2004_1, "Political Entity", contributors_parties_2000_2004_2, "Political Entity", text
+contributors_parties_2000_2004_1, "Recipient ID", contributors_parties_2000_2004_2, "Recipient ID", numeric
+contributors_parties_2000_2004_1, Recipient, contributors_parties_2000_2004_2, Recipient, text
+contributors_parties_2000_2004_1, "Political Party", contributors_parties_2000_2004_2, "Political Party", text
+contributors_parties_2000_2004_1, "Electoral event", contributors_parties_2000_2004_2, "Electoral event", text
+contributors_parties_2000_2004_1, "Fiscal date", contributors_parties_2000_2004_2, "Fiscal date", numeric
+contributors_parties_2000_2004_1, "Form ID", contributors_parties_2000_2004_2, "Form ID", numeric
+contributors_parties_2000_2004_1, "Financial Report", ontributors_parties_2000_2004_2, "Financial Report", text
+contributors_parties_2000_2004_1, "Part Number of Return", contributors_parties_2000_2004_2, "Part Number of Return", numeric
+contributors_parties_2000_2004_1, "Financial Report part", contributors_parties_2000_2004_2, "Financial Report part", text
+contributors_parties_2000_2004_1, "Contributor type", contributors_parties_2000_2004_2, "Contributor type", text
+contributors_parties_2000_2004_1, "Contributor name", contributors_parties_2000_2004_2, "Contributor name", text
+contributors_parties_2000_2004_1, "Contributor last name", contributors_parties_2000_2004_2, "Contributor last name", text
+contributors_parties_2000_2004_1, "Contributor first name", contributors_parties_2000_2004_2, "Contributor first name", text
+contributors_parties_2000_2004_1, "Contributor City", contributors_parties_2000_2004_2, "Contributor City", text
+contributors_parties_2000_2004_1, "Contributor Province", contributors_parties_2000_2004_2, "Contributor Province", text
+contributors_parties_2000_2004_1, "Contributor Postal code", contributors_parties_2000_2004_2, "Contributor Postal code", numeric
+contributors_parties_2000_2004_1, "Monetary amount", contributors_parties_2000_2004_2, "Monetary amount", numeric
+contributors_parties_2000_2004_1, "Non-Monetary amount", contributors_parties_2000_2004_2, "Non-Monetary amount", numeric
+contributors_parties_2000_2004_1, "Type of organization that contribution was given through", contributors_parties_2000_2004_2, "Type of organization that contribution was given through", numeric
+contributors_parties_2000_2004_1, "Contribution given through", contributors_parties_2000_2004_2, "Contribution given through", numeric
