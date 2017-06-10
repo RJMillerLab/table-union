@@ -28,7 +28,7 @@ type Client struct {
 }
 
 func NewClient(ft *fasttext.FastText, host, domainDir string) (*Client, error) {
-	annotator := ontology.NewAnnotator()
+	//annotator := ontology.NewAnnotator()
 	return &Client{
 		ft:        ft,
 		host:      host,
@@ -36,7 +36,7 @@ func NewClient(ft *fasttext.FastText, host, domainDir string) (*Client, error) {
 		transFun:  DefaultTransFun,
 		tokenFun:  DefaultTokenFun,
 		domainDir: domainDir,
-		annotator: annotator,
+		//	annotator: annotator,
 	}, nil
 }
 
@@ -110,18 +110,18 @@ func (c *Client) Query(queryCSVFilename string, k int) [][]QueryResult {
 		log.Printf("Query results for column %d (%s):", i, headers[i])
 		for rank, entry := range resp.Result {
 			log.Printf("> (%d) Column %d in %s", rank, entry.ColumnIndex, entry.TableID)
-			values, err := GetDomainValues(c.domainDir, entry.TableID, entry.ColumnIndex)
+			values, err := getDomainValues(c.domainDir, entry.TableID, entry.ColumnIndex)
 			if err != nil {
 				panic(err)
 			}
-			entities, err := GetDomainEntities(c.domainDir, entry.TableID, entry.ColumnIndex)
+			entities, err := getDomainEntities(c.domainDir, entry.TableID, entry.ColumnIndex)
 			if err != nil {
 				panic(err)
 			}
-			jacc := Jaccard(queryTable.GetColumn(i), values)
-			cont := Containment(queryTable.GetColumn(i), values)
-			entityjacc := Jaccard(c.annotator.DoAnnotateDomain(queryTable.GetColumn(i)), entities)
-			entitycont := Containment(c.annotator.DoAnnotateDomain(queryTable.GetColumn(i)), entities)
+			jacc := jaccard(queryTable.GetColumn(i), values)
+			cont := containment(queryTable.GetColumn(i), values)
+			entityjacc := jaccard(c.annotator.DoAnnotateDomain(queryTable.GetColumn(i)), entities)
+			entitycont := containment(c.annotator.DoAnnotateDomain(queryTable.GetColumn(i)), entities)
 			log.Printf("Jaccard: %f", jacc)
 			log.Printf("Containment: %f", cont)
 			log.Printf("Entity Jaccard: %f", entityjacc)

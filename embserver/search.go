@@ -81,7 +81,7 @@ func (index *SearchIndex) Build() error {
 }
 
 func (index *SearchIndex) Get(tableID string, columnIndex int) (*EmbEntry, error) {
-	vec, err := GetSumEmbVec(index.domainDir, tableID, columnIndex)
+	vec, err := getSumEmbVec(index.domainDir, tableID, columnIndex)
 	if err != nil {
 		panic(err)
 	}

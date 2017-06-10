@@ -59,6 +59,7 @@ func StreamFilenames() <-chan string {
 		for scanner.Scan() {
 			parts := strings.SplitN(scanner.Text(), " ", 3)
 			filename := path.Join(parts...)
+			fmt.Println(filename)
 			output <- filename
 		}
 		close(output)

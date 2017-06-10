@@ -55,6 +55,13 @@ step4: rmftsum
 	OUTPUT_DIR=$(OUTPUT_DIR) \
 	go run cmd/build_domain_embeddings/main.go
 
+step5: 
+	OPENDATA_DIR=$(OPENDATA_DIR) \
+	OPENDATA_LIST=$(OPENDATA_LIST) \
+	YAGO_DB=$(YAGO_DB) \
+	OUTPUT_DIR=$(OUTPUT_DIR) \
+	go run cmd/build_domain_minhash/main.go
+
 count_domains:
 	OPENDATA_DIR=$(OPENDATA_DIR) \
 	OPENDATA_LIST=$(OPENDATA_LIST) \

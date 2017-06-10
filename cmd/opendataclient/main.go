@@ -36,5 +36,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	_ = client.Query(queryCSVFilename, k)
+	//_ = client.Query(queryCSVFilename, k)
+	_ = client.QueryPlus(queryCSVFilename, k)
 }
