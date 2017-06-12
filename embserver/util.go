@@ -126,49 +126,6 @@ func containment(dom1, dom2 []string) float64 {
 	return float64(d1andd2) / float64(d1set.Cardinality())
 }
 
-/*
-func readMinhashFromDisk(domainDir, tableID string, columnIndex int) ([]uint64, error) {
-	p := filepath.Join(domainDir, tableID, fmt.Sprintf("%d.minhash", columnIndex))
-	log.Printf(p)
-	return ReadMinhashFromDisk(p, ByteOrder)
-}
-
-func ReadMinhashFromDisk(filename string, order binary.ByteOrder) ([]uint64, error) {
-	filename = "/home/fnargesian/TABLE_UNION_OUTPUT/domains/open.canada.ca_data_en.jsonl/2af37f1e-56cd-4a1b-8a73-24e22b4ff113/3b5e957d-1244-4fba-8cab-3ddf4ba70806____0/01150022-eng.csv/5.minhash"
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Printf("here1")
-		return nil, err
-	}
-	defer file.Close()
-	stats, serr := file.Stat()
-	if serr != nil {
-		return nil, serr
-	}
-	var size int64 = stats.Size()
-	binVec := make([]byte, size)
-	if _, rerr := file.Read(binVec); rerr != nil {
-		return nil, rerr
-	}
-	vec, verr := BytesToIntVec(binVec, order)
-	return vec, verr
-}
-
-func BytesToIntVec(data []byte, order binary.ByteOrder) ([]uint64, error) {
-	size := len(data) / 8
-	vec := make([]uint64, size)
-	buf := bytes.NewReader(data)
-	var v uint64
-	for i := range vec {
-		if err := binary.Read(buf, order, &v); err != nil {
-			return nil, err
-		}
-		vec[i] = v
-	}
-	return vec, nil
-}
-*/
-
 func getDomainName(TableId string, columnIndex int) string {
 	return fmt.Sprintf("%s:%d", TableId, columnIndex)
 }
@@ -205,6 +162,7 @@ func readMinhashSignature(domainDir, tableID string, columnIndex int, numHash in
 	if err != nil {
 		panic(err)
 	}
+	defer f.Close()
 	signature := make([]uint64, numHash)
 	for i := range signature {
 		if err := binary.Read(f, binary.BigEndian, &(signature[i])); err != nil {

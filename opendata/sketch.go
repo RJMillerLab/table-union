@@ -49,11 +49,10 @@ func DoMinhashDomainsFromFiles(fanout int, files <-chan string) <-chan *DomainSk
 func minhashDomainWords(file string, index int, out chan *DomainSketch) {
 	filepath := path.Join(OutputDir, "domains", file, fmt.Sprintf("%d.values", index))
 	f, err := os.Open(filepath)
-	defer f.Close()
 	if err != nil {
 		panic(err)
 	}
-
+	defer f.Close()
 	mh := minhashlsh.NewMinhash(seed, numHash)
 	scanner := bufio.NewScanner(f)
 
@@ -80,13 +79,7 @@ func DoSaveDomainSketches(fanout int, sketches <-chan *DomainSketch) <-chan Prog
 		go func(id int, sketches <-chan *DomainSketch) {
 			for domain := range sketches {
 				minhashFilename := domain.PhysicalFilename("minhash")
-				//f, err := os.OpenFile(output_filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-				//if err != nil {
-				//	panic(err)
-				//}
-				//fmt.Fprintln(f, domain.Sketch)
-				//f.Close()
-				err := writeSignature(domain.Sketch, minhashFilename)
+				err := writeMinhashSignature(domain.Sketch, minhashFilename)
 				if err == nil {
 					progress <- ProgressCounter{1}
 				}
@@ -111,15 +104,31 @@ func (domain *DomainSketch) PhysicalFilename(ext string) string {
 	return fullpath
 }
 
-func writeSignature(mh *minhashlsh.Minhash, filename string) error {
+func writeMinhashSignature(mh *minhashlsh.Minhash, filename string) error {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		panic(err)
 	}
+	defer f.Close()
 	for i := range mh.Signature() {
 		if err := binary.Write(f, binary.BigEndian, mh.Signature()[i]); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func readMinhashSignature(filename string, numHash int) ([]uint64, error) {
+	f, err := os.OpenFile(filename, os.O_RDONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	signature := make([]uint64, numHash)
+	for i := range signature {
+		if err := binary.Read(f, binary.BigEndian, &(signature[i])); err != nil {
+			return nil, err
+		}
+	}
+	return signature, nil
 }

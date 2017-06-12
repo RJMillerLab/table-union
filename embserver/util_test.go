@@ -23,26 +23,59 @@ func Test_Containment(t *testing.T) {
 	}
 }
 
-func Test_Lsh(t *testing.T) {
-	minhashLsh := minhashlsh.NewMinhashLSH32(256, 0.6)
-	sig, err := readMinhashSignature("/home/fnargesian/TABLE_UNION_OUTPUT/domains", "/open.canada.ca_data_en.jsonl/c1b0f627-8c29-427c-ab73-33968ad9176e/6bfc5e0c-86e8-4451-a317-d95d110e1102", 9, 256)
+func Test_Lsh1(t *testing.T) {
+	minhashLsh := minhashlsh.NewMinhashLSH64(256, 0.6)
+	sig1, err := readMinhashSignature("/home/fnargesian/TABLE_UNION_OUTPUT/domains", "open.canada.ca_data_en.jsonl/49fbab13-1a5a-4fed-8ca5-ce6e4d92576d/440423b9-d4ee-427f-ad47-af7a1a630cbe", 1, 256)
 	if err != nil {
 		log.Printf("Could not find minhash")
 	}
-	minhashLsh.Add(getDomainName("/open.canada.ca_data_en.jsonl/c1b0f627-8c29-427c-ab73-33968ad9176e/6bfc5e0c-86e8-4451-a317-d95d110e1102", 9), sig)
-	sig, err = readMinhashSignature("/home/fnargesian/TABLE_UNION_OUTPUT/domains", "/open.canada.ca_data_en.jsonl/c1b0f627-8c29-427c-ab73-33968ad9176e/28e984db-3d5e-4fe8-9d7b-8146be7e5efc", 9, 256)
+	minhashLsh.Add(getDomainName("open.canada.ca_data_en.jsonl/49fbab13-1a5a-4fed-8ca5-ce6e4d92576d/440423b9-d4ee-427f-ad47-af7a1a630cbe", 1), sig1)
+	sig2, err := readMinhashSignature("/home/fnargesian/TABLE_UNION_OUTPUT/domains", "open.canada.ca_data_en.jsonl/49fbab13-1a5a-4fed-8ca5-ce6e4d92576d/440423b9-d4ee-427f-ad47-af7a1a630cbe", 2, 256)
 	if err != nil {
 		log.Printf("Could not find minhash")
 	}
-	minhashLsh.Add(getDomainName("/open.canada.ca_data_en.jsonl/c1b0f627-8c29-427c-ab73-33968ad9176e/28e984db-3d5e-4fe8-9d7b-8146be7e5efc", 9), sig)
-	sig, err = readMinhashSignature("/home/fnargesian/TABLE_UNION_OUTPUT/domains", "/open.canada.ca_data_en.jsonl/c1b0f627-8c29-427c-ab73-33968ad9176e/252f152f-a97a-435d-a15d-14c70de139fc", 8, 256)
+	minhashLsh.Add(getDomainName("open.canada.ca_data_en.jsonl/49fbab13-1a5a-4fed-8ca5-ce6e4d92576d/440423b9-d4ee-427f-ad47-af7a1a630cbe", 2), sig2)
+	sig3, err := readMinhashSignature("/home/fnargesian/TABLE_UNION_OUTPUT/domains", "open.canada.ca_data_en.jsonl/49fbab13-1a5a-4fed-8ca5-ce6e4d92576d/440423b9-d4ee-427f-ad47-af7a1a630cbe", 3, 256)
 	if err != nil {
 		log.Printf("Could not find minhash")
 	}
-	minhashLsh.Add(getDomainName("/open.canada.ca_data_en.jsonl/c1b0f627-8c29-427c-ab73-33968ad9176e/252f152f-a97a-435d-a15d-14c70de139fc", 8), sig)
-	//query := []string{"Gouvernement provincial", "Entreprise", "Entreprise"}
-	//qmh := getMinhash(query, 1, 256)
-	results := minhashLsh.Query(sig)
+	minhashLsh.Add(getDomainName("open.canada.ca_data_en.jsonl/49fbab13-1a5a-4fed-8ca5-ce6e4d92576d/440423b9-d4ee-427f-ad47-af7a1a630cbe", 3), sig3)
+	results := minhashLsh.Query(sig3)
+	log.Printf("%v", results)
+	if len(results) < 1 {
+		t.Fail()
+	}
+}
+
+func Test_Lsh2(t *testing.T) {
+	minhashLsh := minhashlsh.NewMinhashLSH16(256, 0.1)
+	seed = 1
+	numHash = 256
+	mh := minhashlsh.NewMinhash(seed, numHash)
+	words := []string{"hello", "world", "minhash"}
+	for _, word := range words {
+		mh.Push([]byte(word))
+	}
+	sig1 := mh.Signature()
+	minhashLsh.Add("s1", sig1)
+
+	mh = minhashlsh.NewMinhash(seed, numHash)
+	words = []string{"hello", "minhash"}
+	for _, word := range words {
+		mh.Push([]byte(word))
+	}
+	sig2 := mh.Signature()
+	minhashLsh.Add("s2", sig2)
+
+	mh = minhashlsh.NewMinhash(seed, numHash)
+	words = []string{"world", "minhash"}
+	for _, word := range words {
+		mh.Push([]byte(word))
+	}
+	sig3 := mh.Signature()
+	minhashLsh.Add("s3", sig3)
+
+	results := minhashLsh.Query(sig3)
 	log.Printf("%v", results)
 	if len(results) < 1 {
 		t.Fail()
