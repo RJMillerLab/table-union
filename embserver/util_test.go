@@ -40,6 +40,7 @@ func Test_Lsh1(t *testing.T) {
 		log.Printf("Could not find minhash")
 	}
 	minhashLsh.Add(getDomainName("open.canada.ca_data_en.jsonl/49fbab13-1a5a-4fed-8ca5-ce6e4d92576d/440423b9-d4ee-427f-ad47-af7a1a630cbe", 3), sig3)
+	minhashLsh.Index()
 	results := minhashLsh.Query(sig3)
 	log.Printf("%v", results)
 	if len(results) < 1 {
@@ -74,7 +75,7 @@ func Test_Lsh2(t *testing.T) {
 	}
 	sig3 := mh.Signature()
 	minhashLsh.Add("s3", sig3)
-
+	minhashLsh.Index()
 	results := minhashLsh.Query(sig3)
 	log.Printf("%v", results)
 	if len(results) < 1 {
