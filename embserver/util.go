@@ -130,20 +130,20 @@ func getDomainName(TableId string, columnIndex int) string {
 	return fmt.Sprintf("%s:%d", TableId, columnIndex)
 }
 
-func getDomainMinhash(domainDir, TableId string, columnIndex, seed, numHash int) *minhashlsh.Minhash {
+func getDomainMinhashSignature(domainDir, TableId string, columnIndex, seed, numHash int) []uint64 {
 	values, err := getDomainValues(domainDir, TableId, columnIndex)
 	if err != nil {
 		panic(err)
 	}
-	return getMinhash(values, seed, numHash)
+	return getValuesMinhashSignature(values, seed, numHash)
 }
 
-func getMinhash(values []string, seed, numHash int) *minhashlsh.Minhash {
+func getValuesMinhashSignature(values []string, seed, numHash int) []uint64 {
 	mh := minhashlsh.NewMinhash(seed, numHash)
 	for _, value := range values {
 		mh.Push([]byte(value))
 	}
-	return mh
+	return mh.Signature()
 }
 
 func getTableColumnIndexFromDomainName(domainName string) (string, int) {
@@ -158,6 +158,7 @@ func getTableColumnIndexFromDomainName(domainName string) (string, int) {
 
 func readMinhashSignature(domainDir, tableID string, columnIndex int, numHash int) ([]uint64, error) {
 	filename := filepath.Join(domainDir, tableID, fmt.Sprintf("%d.minhash", columnIndex))
+	//filename = "/home/fnargesian/TABLE_UNION_OUTPUT/domains/open.canada.ca_data_en.jsonl/49fbab13-1a5a-4fed-8ca5-ce6e4d92576d/440423b9-d4ee-427f-ad47-af7a1a630cbe/2.minhash"
 	f, err := os.OpenFile(filename, os.O_RDONLY, 0644)
 	if err != nil {
 		panic(err)
