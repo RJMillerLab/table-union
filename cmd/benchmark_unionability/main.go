@@ -22,11 +22,11 @@ func main() {
 			total.Values += n.Values
 			now := GetNow()
 			if total.Values%100 == 0 {
-				fmt.Printf("Calculated ontology unionability scores for %d domains in %.2f seconds\n", total.Values, now-start)
+				fmt.Printf("Calculated unionability scores for %d domains in %.2f seconds\n", total.Values, now-start)
 			}
 		}
 	}
 	now := GetNow()
-	fmt.Printf("Calculated ontology unionability scores for %d domains in %.2f seconds\n", total.Values, now-start)
+	fmt.Printf("Calculated unionability scores for %d domains in %.2f seconds\n", total.Values, now-start)
 	fmt.Println("Done calculating scores.")
 }

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -143,10 +142,10 @@ func DoSaveScores(scores <-chan *OntUnionability, sarmaFilename, jaccardFilename
 				if err != nil {
 					panic(err)
 				}
-				_, err = f4.WriteString(pairScore.Table1 + "," + strconv.Itoa(pairScore.Column1) + "," + pairScore.Table2 + "," + strconv.Itoa(pairScore.Column2) + "," + strconv.FormatFloat(pairScore.Cosine, 'f', 6, 64) + "\n")
-				if err != nil {
-					panic(err)
-				}
+				//_, err = f4.WriteString(pairScore.Table1 + "," + strconv.Itoa(pairScore.Column1) + "," + pairScore.Table2 + "," + strconv.Itoa(pairScore.Column2) + "," + strconv.FormatFloat(pairScore.Cosine, 'f', 6, 64) + "\n")
+				//if err != nil {
+				//	panic(err)
+				//}
 				progress <- ProgressCounter{1}
 			}
 			wg.Done()
@@ -157,6 +156,7 @@ func DoSaveScores(scores <-chan *OntUnionability, sarmaFilename, jaccardFilename
 		f1.Close()
 		f2.Close()
 		f3.Close()
+		f4.Close()
 		close(progress)
 	}()
 	return progress
@@ -266,20 +266,16 @@ func countWordEntity(words []string, ent string, lookup map[string]map[string]bo
 }
 
 func getCosineEmbSum(table1 string, column1 int, table2 string, column2 int) float64 {
+	return 1.0
 	vecFilename1 := filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.ft-sum", table1, column1))
 	vecFilename2 := filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.ft-sum", table2, column2))
-	_, err := embedding.ReadVecFromDisk(vecFilename1, binary.BigEndian)
-	if err == nil {
-		log.Println("emb found")
-		//return 0.0
-		//panic(err)
+	emb1, err := embedding.ReadVecFromDisk(vecFilename1, binary.BigEndian)
+	if err != nil {
+		panic(err)
 	}
-	_, err = embedding.ReadVecFromDisk(vecFilename2, binary.BigEndian)
-	if err == nil {
-		log.Println("emb found")
-		//return 0.0
-		//panic(err)
+	emb2, err := embedding.ReadVecFromDisk(vecFilename2, binary.BigEndian)
+	if err != nil {
+		panic(err)
 	}
-	return 0.0
-	//return embedding.Cosine(emb1, emb2)
+	return embedding.Cosine(emb1, emb2)
 }

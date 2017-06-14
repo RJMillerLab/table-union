@@ -27,6 +27,12 @@ var OutputDir = os.Getenv("OUTPUT_DIR")
 // Environment variable for the Yago database
 var Yago_db = os.Getenv("YAGO_DB")
 
+// Environment variable for domain pairs unionability scores
+var SarmaFilename = os.Getenv("SARMA_SCORES")
+var JaccardFilename = os.Getenv("JACCARD_SCORES")
+var ContainmentFilename = os.Getenv("CONTAINMENT_SCORES")
+var CosineFilename = os.Getenv("COSINE_SCORES")
+
 func CheckEnv() {
 	if OpendataDir == "" || OutputDir == "" || Yago_db == "" {
 		panic("Environment missing")
