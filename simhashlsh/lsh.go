@@ -21,11 +21,10 @@ type hashTableBucket []string
 type keys []string
 
 // For initial bootstrapping
-//type initHashTable map[uint64]keys
 type initHashTable map[string]keys
 
 type bucket struct {
-	hashKey string //uint64
+	hashKey string
 	keys    keys
 }
 
@@ -130,7 +129,6 @@ func optimalKL(numHash int, t float64) (optK, optL int, fp, fn float64) {
 // dim is the number of dimensions of the input points (also the number of dimensions of each hyperplane)
 // l is the number of hash tables, m is the number of hash values in each hash table.
 func NewCosineLSH(dim, numHash int, threshold float64) *CosineLSH {
-	//h := m * l
 	hyperplanes := NewHyperplanes(numHash, dim)
 	k, l, _, _ := optimalKL(numHash, threshold)
 
@@ -163,7 +161,6 @@ func (index *CosineLSH) Add(point []float64, key string) {
 	var wg sync.WaitGroup
 	wg.Add(len(index.initTables))
 	for i := range index.initTables {
-		//go func(ht initHashTable, hk uint64, key string) {
 		go func(ht initHashTable, hk, key string) {
 			if _, exist := ht[hk]; exist {
 				ht[hk] = append(ht[hk], key)
@@ -229,7 +226,6 @@ func (index *CosineLSH) query(point []float64, minK int, done <-chan struct{}) <
 			var wg sync.WaitGroup
 			wg.Add(index.cosineLSHParam.l)
 			for i := 0; i < index.cosineLSHParam.l; i++ {
-				//go func(ht hashTable, hk uint64) {
 				go func(ht hashTable, hk string) {
 					defer wg.Done()
 					k := sort.Search(len(ht), func(x int) bool {
@@ -279,7 +275,6 @@ func (clsh *cosineLSHParam) hash(point []float64) []hashTableKey {
 }
 
 func (index *CosineLSH) toBasicHashTableKeys(keys []hashTableKey) []string { // []uint64 {
-	//basicKeys := make([]uint64, index.cosineLSHParam.l)
 	basicKeys := make([]string, index.cosineLSHParam.l)
 	for i, key := range keys {
 		s := ""
@@ -293,11 +288,6 @@ func (index *CosineLSH) toBasicHashTableKeys(keys []hashTableKey) []string { // 
 				panic("Hash value is not 0 or 1")
 			}
 		}
-		//v, err := strconv.ParseUint(s, 2, 64)
-		//f err != nil {
-		//	panic(err)
-		//}
-		//basicKeys[i] = v
 		basicKeys[i] = s
 	}
 	return basicKeys
