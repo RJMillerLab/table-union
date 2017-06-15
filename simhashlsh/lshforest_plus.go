@@ -5,31 +5,23 @@ import (
 	"sync"
 )
 
-type pair struct {
-	queryIndex   int
-	candidateKey string
+type UnionPair struct {
+	QueryIndex   int
+	CandidateKey string
 }
 
 // Query finds the ids of approximate nearest neighbour candidates,
 // in un-sorted order, given a list of points.
 // Return candidate keys given the query signatures.
-func (index *CosineLSH) QueryPlus(point [][]float64) []pair {
-	result := make([]pair, 0)
-	done := make(chan struct{})
-	for key := range index.queryPlus(point, index.cosineLSHParam.k, done) {
-		result = append(result, key)
-		if len(result) > 50 {
-			return result
-		}
-	}
-	return result
+func (index *CosineLSH) QueryPlus(point [][]float64, done <-chan struct{}) <-chan UnionPair {
+	return index.queryPlus(point, index.cosineLSHParam.k, done)
 }
 
-func (index *CosineLSH) queryPlus(points [][]float64, minK int, done <-chan struct{}) <-chan pair {
-	out := make(chan pair)
+func (index *CosineLSH) queryPlus(points [][]float64, minK int, done <-chan struct{}) <-chan UnionPair {
+	out := make(chan UnionPair)
 	go func() {
 		defer close(out)
-		seens := make(map[pair]bool)
+		seens := make(map[UnionPair]bool)
 		// Generate hash keys
 		Hs := make([][]string, len(points))
 		for i := 0; i < len(points); i++ {
@@ -38,7 +30,7 @@ func (index *CosineLSH) queryPlus(points [][]float64, minK int, done <-chan stru
 		for K := index.cosineLSHParam.k; K >= 0; K-- {
 			prefixSize := K
 			// Query hash tables in parallel
-			keyChan := make(chan pair)
+			keyChan := make(chan UnionPair)
 			var wg sync.WaitGroup
 			wg.Add(index.cosineLSHParam.l * len(points))
 			for i := 0; i < index.cosineLSHParam.l; i++ {
@@ -48,12 +40,12 @@ func (index *CosineLSH) queryPlus(points [][]float64, minK int, done <-chan stru
 						k := sort.Search(len(ht), func(x int) bool {
 							return ht[x].hashKey[:prefixSize] >= hk[:prefixSize]
 						})
-						if ht[k].hashKey[:prefixSize] == hk[:prefixSize] {
+						if k < len(ht) && ht[k].hashKey[:prefixSize] == hk[:prefixSize] {
 							for j := k; j < len(ht) && ht[j].hashKey[:prefixSize] == hk[:prefixSize]; j++ {
 								for _, key := range ht[j].keys {
-									rp := pair{
-										queryIndex:   q,
-										candidateKey: key,
+									rp := UnionPair{
+										QueryIndex:   q,
+										CandidateKey: key,
 									}
 									select {
 									case keyChan <- rp:

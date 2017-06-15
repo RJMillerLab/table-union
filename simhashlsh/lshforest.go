@@ -1,6 +1,7 @@
 package simhashlsh
 
 import (
+	"log"
 	"math"
 	"sort"
 	"sync"
@@ -122,6 +123,7 @@ func optimalKL(numHash int, t float64) (optK, optL int, fp, fn float64) {
 			}
 		}
 	}
+	log.Printf("optK: %d, optL: %d", optK, optL)
 	return
 }
 
@@ -175,6 +177,7 @@ func (index *CosineLSH) Add(point []float64, key string) {
 
 // Makes all the keys added searchable.
 func (index *CosineLSH) Index() {
+	log.Printf("Indexing the columns")
 	var wg sync.WaitGroup
 	wg.Add(len(index.tables))
 	for i := range index.tables {
@@ -197,6 +200,7 @@ func (index *CosineLSH) Index() {
 		}(&(index.tables[i]), &(index.initTables[i]))
 	}
 	wg.Wait()
+	log.Printf("Done indexing")
 }
 
 // Query finds the ids of approximate nearest neighbour candidates,
