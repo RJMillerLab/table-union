@@ -41,7 +41,7 @@ func Test_LSHQuery(t *testing.T) {
 }
 
 func Test_LSHQueryPlus(t *testing.T) {
-	ts := []float64{0.8} //0.3, 0.5, 0.7, 0.9}
+	ts := []float64{0.3, 0.5, 0.7, 0.9}
 	vecs := randomVectors(100, 300, 1.0)
 	for _, t := range ts {
 		log.Printf("Querying with threhsold %f.", t)
@@ -66,12 +66,9 @@ func Test_LSHQueryPlus(t *testing.T) {
 					found += 1
 				}
 			}
-			if len(results) > 10 {
-				log.Printf("number of results: %d", len(results))
-				return
-			}
+			log.Printf("number of results: %d", len(results))
 			if found < 2 {
-				log.Println("found only %d results.", found)
+				log.Printf("found only %d results.", found)
 			}
 		}
 		log.Printf("avg number of returned results for each query %f", avg/float64(len(vecs)))
