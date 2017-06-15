@@ -219,11 +219,11 @@ func (index *CosineLSH) query(point []float64, minK int, done <-chan struct{}) <
 	out := make(chan string)
 	go func() {
 		defer close(out)
+		// Generate hash keys
+		Hs := index.toBasicHashTableKeys(index.hash(point))
 		seens := make(map[string]bool)
 		for K := index.cosineLSHParam.k; K >= minK; K-- {
 			prefixSize := K
-			// Generate hash keys
-			Hs := index.toBasicHashTableKeys(index.hash(point))
 			// Query hash tables in parallel
 			keyChan := make(chan string)
 			var wg sync.WaitGroup
