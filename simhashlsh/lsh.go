@@ -153,7 +153,6 @@ func (f *CosineLSH) Params() (k, l, dim int) {
 }
 
 // Add a key with SimHash signature into the index.
-// The key won't be searchable until Index() is called.
 func (index *CosineLSH) Add(point []float64, key string) {
 	// Apply hash functions
 	Hs := index.toBasicHashTableKeys(index.hash(point))
