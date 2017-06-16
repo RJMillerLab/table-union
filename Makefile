@@ -95,8 +95,8 @@ odclient:
 	OPENDATA_LIST=$(OPENDATA_LIST) \
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
-	#go run cmd/opendataclient/main.go -query /home/ekzhu/WIKI_TABLE/q1/query.csv -result-dir result 
-	go run cmd/opendataclient/main.go -query /home/fnargesian/TABLE_UNION_OUTPUT/domains/open.canada.ca_data_en.jsonl/49fbab13-1a5a-4fed-8ca5-ce6e4d92576d/440423b9-d4ee-427f-ad47-af7a1a630cbe/2.values -result-dir result
+	go run cmd/opendataclient/main.go -query /home/ekzhu/WIKI_TABLE/q1/query.csv -result-dir result 
+	#go run cmd/opendataclient/main.go -query /home/fnargesian/TABLE_UNION_OUTPUT/domains/open.canada.ca_data_en.jsonl/49fbab13-1a5a-4fed-8ca5-ce6e4d92576d/440423b9-d4ee-427f-ad47-af7a1a630cbe/2.values -result-dir result
 
 union_server:
 	OPENDATA_DIR=$(OPENDATA_DIR) \

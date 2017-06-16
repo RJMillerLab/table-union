@@ -15,22 +15,20 @@ import (
 )
 
 type Client struct {
-	ft        *fasttext.FastText
-	host      string
-	cli       *http.Client
-	transFun  func(string) string
-	tokenFun  func(string) []string
-	domainDir string
+	ft       *fasttext.FastText
+	host     string
+	cli      *http.Client
+	transFun func(string) string
+	tokenFun func(string) []string
 }
 
-func NewClient(ft *fasttext.FastText, host, domainDir string) (*Client, error) {
+func NewClient(ft *fasttext.FastText, host string) (*Client, error) {
 	return &Client{
-		ft:        ft,
-		host:      host,
-		cli:       &http.Client{},
-		transFun:  DefaultTransFun,
-		tokenFun:  DefaultTokenFun,
-		domainDir: domainDir,
+		ft:       ft,
+		host:     host,
+		cli:      &http.Client{},
+		transFun: DefaultTransFun,
+		tokenFun: DefaultTokenFun,
 	}, nil
 }
 
@@ -69,18 +67,23 @@ func (c *Client) Query(queryCSVFilename string, k, n int) []QueryResult {
 	defer f.Close()
 	reader := csv.NewReader(f)
 	queryTable, err := datatable.FromCSV(reader)
+	queryHeaders := queryTable.GetRow(0)
 	if err != nil {
 		panic(err)
 	}
 	// Create embeddings
-	vecs := make([][]float64, queryTable.NumCol())
-	for i := range vecs {
+	vecs := make([][]float64, 0)
+	queryTextHeaders := make([]string, 0)
+	for i := 0; i < queryTable.NumCol(); i++ {
 		vec, err := embedding.GetDomainEmbSum(c.ft, c.tokenFun, c.transFun, queryTable.GetColumn(i))
 		if err != nil {
 			log.Printf("Embedding not found for column %d", i)
 			continue
 		}
-		vecs[i] = vec
+		if len(vec) != 0 {
+			vecs = append(vecs, vec)
+			queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
+		}
 	}
 	// Query server
 	results := make([]QueryResult, 0)
@@ -89,8 +92,13 @@ func (c *Client) Query(queryCSVFilename string, k, n int) []QueryResult {
 		log.Printf("No result found.")
 	}
 	for _, cand := range resp.Result {
+		log.Printf("---------------------")
+		log.Printf("Candidate table: %s", cand.TableUnion.CandTableID)
+		log.Printf("%d-unionability socre is: %f", len(cand.TableUnion.Alignment), cand.TableUnion.Kunioability)
+		for s, d := range cand.TableUnion.Alignment {
+			log.Printf("%s -> %s", queryTextHeaders[s], cand.TableUnion.CandHeader[d])
+		}
 		results = append(results, cand)
-		log.Printf("%s", cand.TableID)
 	}
 	return results
 }

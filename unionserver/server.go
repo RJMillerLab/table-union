@@ -25,7 +25,8 @@ type QueryResponse struct {
 }
 
 type QueryResult struct {
-	TableID string `json:"table_id"`
+	TableUnion Union `json:"union"`
+	//	TableID string `json:"table_id"`
 }
 
 func NewServer(ui *UnionIndex) *Server {
@@ -61,7 +62,7 @@ func (s *Server) queryHandler(c *gin.Context) {
 	candidates := s.ui.Query(queryRequest.Vecs, queryRequest.N, queryRequest.K)
 	for cand := range candidates {
 		result = append(result, QueryResult{
-			TableID: cand,
+			TableUnion: cand,
 		})
 	}
 	response := QueryResponse{

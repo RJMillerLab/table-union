@@ -1,0 +1,101 @@
+package unionserver
+
+import (
+	"log"
+	"os"
+
+	"github.com/RJMillerLab/table-union/embedding"
+	"github.com/RJMillerLab/table-union/pqueue"
+)
+
+type Union struct {
+	CandTableID  string
+	CandHeader   []string
+	Alignment    map[int]int // query to candidate table
+	Kunioability float64
+}
+
+type embDomain struct {
+	columnIndex int
+	sumVec      []float64
+}
+
+type edge struct {
+	srcIndex  int
+	destIndex int
+}
+
+func Align(candTableID, domainDir string, query [][]float64, K int) Union {
+	queryDomains := make([]embDomain, 0)
+	candDomains := make([]embDomain, 0)
+	for _, index := range getTextDomains(candTableID, domainDir) {
+		embFilename := getEmbFilename(candTableID, domainDir, index)
+		if _, err := os.Stat(embFilename); os.IsNotExist(err) {
+			log.Printf("Embedding file %s does not exist.", embFilename)
+			continue
+		}
+		vec, err := embedding.ReadVecFromDisk(embFilename, ByteOrder)
+		if err != nil {
+			log.Printf("Error in reading %s from disk.", embFilename)
+			continue
+		}
+		ce := embDomain{
+			columnIndex: index,
+			sumVec:      vec,
+		}
+		candDomains = append(candDomains, ce)
+	}
+
+	for index, vec := range query {
+		ce := embDomain{
+			columnIndex: index,
+			sumVec:      vec,
+		}
+		queryDomains = append(queryDomains, ce)
+	}
+	// computing edge weights and sorting
+	queue := pqueue.NewTopKQueue(len(queryDomains) * len(candDomains))
+	for _, qd := range queryDomains {
+		for _, cd := range candDomains {
+			cosine := embedding.Cosine(cd.sumVec, qd.sumVec)
+			e := edge{
+				srcIndex:  qd.columnIndex,
+				destIndex: cd.columnIndex,
+			}
+			queue.Push(e, -1*cosine)
+		}
+	}
+	// greedy alignment
+	//Union alignment    map[int]int
+	source := make(map[int]int)
+	dest := make(map[int]int)
+	var kUnionability float64
+	for i := queue.Size() - 1; i >= 0; i-- {
+		m, s := queue.Pop()
+		e := m.(edge)
+		if _, ok := source[e.srcIndex]; !ok {
+			if _, ok := dest[e.destIndex]; !ok {
+				source[e.srcIndex] = e.destIndex
+				dest[e.destIndex] = e.srcIndex
+				kUnionability = -1 * s
+				if len(source) == K {
+					u := Union{
+						CandTableID:  candTableID,
+						CandHeader:   getHeaders(candTableID, domainDir),
+						Alignment:    source,
+						Kunioability: kUnionability,
+					}
+					return u
+				}
+			}
+		}
+	}
+	log.Printf("Did not find k-unionability")
+	u := Union{
+		CandTableID:  candTableID,
+		CandHeader:   getHeaders(candTableID, domainDir),
+		Alignment:    source,
+		Kunioability: kUnionability,
+	}
+	return u
+}

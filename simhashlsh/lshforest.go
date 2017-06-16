@@ -177,7 +177,6 @@ func (index *CosineLSH) Add(point []float64, key string) {
 
 // Makes all the keys added searchable.
 func (index *CosineLSH) Index() {
-	log.Printf("Indexing the columns")
 	var wg sync.WaitGroup
 	wg.Add(len(index.tables))
 	for i := range index.tables {
@@ -200,7 +199,6 @@ func (index *CosineLSH) Index() {
 		}(&(index.tables[i]), &(index.initTables[i]))
 	}
 	wg.Wait()
-	log.Printf("Done indexing")
 }
 
 // Query finds the ids of approximate nearest neighbour candidates,

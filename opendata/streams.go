@@ -59,7 +59,6 @@ func StreamFilenames() <-chan string {
 		for scanner.Scan() {
 			parts := strings.SplitN(scanner.Text(), " ", 3)
 			filename := path.Join(parts...)
-			fmt.Println(filename)
 			output <- filename
 		}
 		close(output)
@@ -184,9 +183,7 @@ func makeDomains(filenames <-chan string, out chan *Domain) {
 		}
 
 		out <- headerDomain
-
 		var cells [][]string
-
 		for {
 			row, err := rdr.Read()
 			if err == io.EOF {

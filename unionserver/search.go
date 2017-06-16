@@ -57,9 +57,9 @@ func (index *UnionIndex) Build() error {
 	return nil
 }
 
-func (index *UnionIndex) Query(query [][]float64, N, K int) <-chan string {
+func (index *UnionIndex) Query(query [][]float64, N, K int) <-chan Union {
 	start := time.Now()
-	results := make(chan string)
+	results := make(chan Union)
 	var found int
 	candTables := make(map[string]map[int]bool)
 	var wg sync.WaitGroup
@@ -67,6 +67,7 @@ func (index *UnionIndex) Query(query [][]float64, N, K int) <-chan string {
 	go func() {
 		done := make(chan struct{})
 		defer close(done)
+		aligned := make(map[string]bool)
 		for pair := range index.lsh.QueryPlus(query, done) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			if _, ok := candTables[tableID]; !ok {
@@ -80,10 +81,12 @@ func (index *UnionIndex) Query(query [][]float64, N, K int) <-chan string {
 			}
 
 			if len(candTables[tableID]) == K {
-				results <- tableID
-				found += 1
-				log.Printf("Table %s is the %d-th unionable candidate found after %.4f seconds.", tableID, found, time.Now().Sub(start).Seconds())
-				if found == N {
+				if _, ok := aligned[tableID]; !ok {
+					results <- Align(tableID, index.domainDir, query, K)
+					aligned[tableID] = true
+					log.Printf("Table %s is the %d-th unionable candidate found after %.4f seconds.", tableID, found, time.Now().Sub(start).Seconds())
+				}
+				if len(aligned) == N {
 					log.Printf("Found %d candidates.", found)
 					wg.Done()
 					return

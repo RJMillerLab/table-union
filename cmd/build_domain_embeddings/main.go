@@ -48,5 +48,5 @@ func main() {
 			fmt.Printf("Counted %d domains in %.2f seconds\n", count, GetNow()-start)
 		}
 	}
-	fmt.Printf("Counted %d domains in %.2f seconds\n", count, GetNow()-start)
+	fmt.Printf("Finished counting %d domains in %.2f seconds\n", count, GetNow()-start)
 }

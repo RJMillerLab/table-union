@@ -9,14 +9,12 @@ import (
 )
 
 func main() {
-	var domainDir string
+	//var domainDir string
 	var host string
 	var queryCSVFilename string
 	var n, k int
 	var fastTextSqliteDB string
 	var resultDir string
-	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/domains",
-		"The top-level director for all domain and embedding files")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs")
 	flag.StringVar(&queryCSVFilename, "query", "",
@@ -25,7 +23,7 @@ func main() {
 		"Query result directory")
 	flag.StringVar(&host, "host", "http://localhost:4004", "Server host")
 	flag.IntVar(&n, "n", 10, "Search Parameter: top (n,k) unionable tables")
-	flag.IntVar(&k, "k", 1, "Search Parameter: top (n,k) unionable tables")
+	flag.IntVar(&k, "k", 3, "Search Parameter: top (n,k) unionable tables")
 	flag.Parse()
 
 	if _, err := os.Stat(fastTextSqliteDB); os.IsNotExist(err) {
@@ -33,7 +31,7 @@ func main() {
 	}
 	ft := fasttext.NewFastText(fastTextSqliteDB)
 
-	client, err := unionserver.NewClient(ft, host, domainDir)
+	client, err := unionserver.NewClient(ft, host)
 	if err != nil {
 		panic(err)
 	}
