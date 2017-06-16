@@ -75,14 +75,17 @@ func (c *Client) Query(queryCSVFilename string, k, n int) []QueryResult {
 	vecs := make([][]float64, 0)
 	queryTextHeaders := make([]string, 0)
 	for i := 0; i < queryTable.NumCol(); i++ {
-		vec, err := embedding.GetDomainEmbSum(c.ft, c.tokenFun, c.transFun, queryTable.GetColumn(i))
-		if err != nil {
-			log.Printf("Embedding not found for column %d", i)
-			continue
-		}
-		if len(vec) != 0 {
-			vecs = append(vecs, vec)
-			queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
+		col := queryTable.GetColumn(i)
+		if classifyValues(col) == "text" {
+			vec, err := embedding.GetDomainEmbSum(c.ft, c.tokenFun, c.transFun, col)
+			if err != nil {
+				log.Printf("Embedding not found for column %d", i)
+				continue
+			}
+			if len(vec) != 0 {
+				vecs = append(vecs, vec)
+				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
+			}
 		}
 	}
 	// Query server

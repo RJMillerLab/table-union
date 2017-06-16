@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -95,4 +96,54 @@ func getHeaders(file, domainDir string) (headers []string) {
 		headers = append(headers, scanner.Text())
 	}
 	return
+}
+
+// Classifies an array of strings.  The most dominant choice
+// is the class reported.
+func classifyValues(values []string) string {
+	var counts = make(map[string]int)
+
+	for _, value := range values {
+		var key string
+		switch {
+		case isNumeric(value):
+			key = "numeric"
+		case isText(value):
+			key = "text"
+		}
+		if key != "" {
+			counts[key] += 1
+		}
+	}
+
+	var (
+		maxKey   string
+		maxCount int
+	)
+	for k, v := range counts {
+		if v > maxCount {
+			maxKey = k
+		}
+	}
+	return maxKey
+}
+
+var (
+	patternInteger *regexp.Regexp
+	patternFloat   *regexp.Regexp
+	patternWord    *regexp.Regexp
+)
+
+func init() {
+	patternInteger = regexp.MustCompile(`^\d+$`)
+	patternFloat = regexp.MustCompile(`^\d+\.\d+$`)
+	patternWord = regexp.MustCompile(`[[:alpha:]]{2,}`)
+}
+
+func isNumeric(val string) bool {
+	return patternInteger.MatchString(val) || patternFloat.MatchString(val)
+}
+
+func isText(val string) bool {
+	return patternWord.MatchString(val)
 }
