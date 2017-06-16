@@ -98,8 +98,15 @@ func (c *Client) Query(queryCSVFilename string, k, n int) []QueryResult {
 		log.Printf("---------------------")
 		log.Printf("Candidate table: %s", cand.TableUnion.CandTableID)
 		log.Printf("%d-unionability socre is: %f", len(cand.TableUnion.Alignment), cand.TableUnion.Kunioability)
-		for s, d := range cand.TableUnion.Alignment {
-			log.Printf("%s -> %s", queryTextHeaders[s], cand.TableUnion.CandHeader[d])
+		for s, dmap := range cand.TableUnion.Alignment {
+			var d int
+			var score float64
+			for i, j := range dmap {
+				d = i
+				score = j
+				break
+			}
+			log.Printf("%s -> %s: %f", queryTextHeaders[s], cand.TableUnion.CandHeader[d], score)
 		}
 		results = append(results, cand)
 	}

@@ -60,8 +60,8 @@ func (index *UnionIndex) Build() error {
 func (index *UnionIndex) Query(query [][]float64, N, K int) <-chan Union {
 	start := time.Now()
 	results := make(chan Union)
-	var found int
-	candTables := make(map[string]map[int]bool)
+	partialAlign := make(map[string]map[int]bool)
+	reverseAlign := make(map[string]map[int]bool)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -70,24 +70,29 @@ func (index *UnionIndex) Query(query [][]float64, N, K int) <-chan Union {
 		aligned := make(map[string]bool)
 		for pair := range index.lsh.QueryPlus(query, done) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
-			if _, ok := candTables[tableID]; !ok {
+			if _, ok := partialAlign[tableID]; !ok {
 				cols := make(map[int]bool)
 				cols[columnIndex] = true
-				candTables[tableID] = cols
+				partialAlign[tableID] = cols
 			} else {
-				cols := candTables[tableID]
-				cols[columnIndex] = true
-				candTables[tableID] = cols
+				partialAlign[tableID][columnIndex] = true
+			}
+			if _, ok := reverseAlign[tableID]; !ok {
+				cols := make(map[int]bool)
+				cols[pair.QueryIndex] = true
+				reverseAlign[tableID] = cols
+			} else {
+				reverseAlign[tableID][pair.QueryIndex] = true
 			}
 
-			if len(candTables[tableID]) == K {
+			if len(partialAlign[tableID]) >= K && len(reverseAlign[tableID]) >= K {
 				if _, ok := aligned[tableID]; !ok {
 					results <- Align(tableID, index.domainDir, query, K)
 					aligned[tableID] = true
-					log.Printf("Table %s is the %d-th unionable candidate found after %.4f seconds.", tableID, found, time.Now().Sub(start).Seconds())
+					log.Printf("Table %s is the %d-th unionable candidate found after %.4f seconds.", tableID, len(aligned), time.Now().Sub(start).Seconds())
 				}
 				if len(aligned) == N {
-					log.Printf("Found %d candidates.", found)
+					log.Printf("Found %d candidates.", len(aligned))
 					wg.Done()
 					return
 				}

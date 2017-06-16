@@ -11,7 +11,7 @@ import (
 type Union struct {
 	CandTableID  string
 	CandHeader   []string
-	Alignment    map[int]int // query to candidate table
+	Alignment    map[int]map[int]float64 // query to candidate table
 	Kunioability float64
 }
 
@@ -67,7 +67,7 @@ func Align(candTableID, domainDir string, query [][]float64, K int) Union {
 	}
 	// greedy alignment
 	//Union alignment    map[int]int
-	source := make(map[int]int)
+	source := make(map[int]map[int]float64)
 	dest := make(map[int]int)
 	var kUnionability float64
 	for i := queue.Size() - 1; i >= 0; i-- {
@@ -75,7 +75,9 @@ func Align(candTableID, domainDir string, query [][]float64, K int) Union {
 		e := m.(edge)
 		if _, ok := source[e.srcIndex]; !ok {
 			if _, ok := dest[e.destIndex]; !ok {
-				source[e.srcIndex] = e.destIndex
+				p := make(map[int]float64)
+				p[e.destIndex] = -1 * s
+				source[e.srcIndex] = p
 				dest[e.destIndex] = e.srcIndex
 				kUnionability = -1 * s
 				if len(source) == K {

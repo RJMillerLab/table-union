@@ -26,7 +26,6 @@ type QueryResponse struct {
 
 type QueryResult struct {
 	TableUnion Union `json:"union"`
-	//	TableID string `json:"table_id"`
 }
 
 func NewServer(ui *UnionIndex) *Server {
