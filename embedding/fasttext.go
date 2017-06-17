@@ -56,6 +56,12 @@ func (ft *InMemFastText) GetEmb(word string) ([]float64, error) {
 	return vec, err
 }
 
+// Get the embedding vector of a data value, which is the sum of word embeddings
+func (ft *InMemFastText) GetValueEmb(value string) ([]float64, error) {
+	tokens := tokenize(value, ft.tokenFun, ft.transFun)
+	return ft.getTokenizedValueEmb(tokens)
+}
+
 // Returns the domain embedding by summation given the
 // distinct values and their frequencies
 func (ft *InMemFastText) GetDomainEmbSum(values []string, freqs []int) ([]float64, error) {
