@@ -37,7 +37,7 @@ type FastTextMatch struct {
 	NumUniqueMatches int
 }
 
-func profTable(rows <-chan []string, ft *embedding.InMemFastText) ([]FastTextMatch, error) {
+func profTable(rows <-chan []string, fastTextWords *counter.ConcurrentCounter) ([]FastTextMatch, error) {
 	var nrow, ncol int
 	var valueCounters []*counter.Counter
 	var matchCounters []*counter.Counter
@@ -45,6 +45,8 @@ func profTable(rows <-chan []string, ft *embedding.InMemFastText) ([]FastTextMat
 		if ncol == 0 && valueCounters == nil && matchCounters == nil {
 			// Initialize the counters
 			ncol = len(row)
+			valueCounters = make([]*counter.Counter, ncol)
+			matchCounters = make([]*counter.Counter, ncol)
 			for i := 0; i < ncol; i++ {
 				valueCounters[i] = counter.NewCounter()
 				matchCounters[i] = counter.NewCounter()
@@ -56,8 +58,20 @@ func profTable(rows <-chan []string, ft *embedding.InMemFastText) ([]FastTextMat
 			// Count value
 			valueCounters[i].Update(value)
 			// Count match
-			_, err := ft.GetValueEmb(value)
-			if err == embedding.ErrNoEmbFound {
+			if matchCounters[i].Has(value) {
+				matchCounters[i].Update(value)
+				continue
+			}
+			// If one token has a fasttext match, the value has a match
+			tokens := embedding.Tokenize(value, DefaultTokenFun, DefaultTransFun)
+			found := false
+			for _, token := range tokens {
+				if fastTextWords.Has(token) {
+					found = true
+					break
+				}
+			}
+			if !found {
 				continue
 			}
 			matchCounters[i].Update(value)
@@ -102,14 +116,14 @@ func readCsv(csvFile io.Reader) (<-chan []string, <-chan error) {
 }
 
 // Where we profile the table
-func ProcessTable(datafilename string, ft *embedding.InMemFastText, out chan<- *ProfResult) error {
+func ProcessTable(datafilename string, fastTextWords *counter.ConcurrentCounter, out chan<- *ProfResult) error {
 	datafile, err := os.Open(datafilename)
 	if err != nil {
 		return err
 	}
 	defer datafile.Close()
 	recChan, errc := readCsv(datafile)
-	matches, err := profTable(recChan, ft)
+	matches, err := profTable(recChan, fastTextWords)
 	if err := <-errc; err != nil {
 		return err
 	}
@@ -130,6 +144,7 @@ func SaveProfResult(dbFilename string, results <-chan *ProfResult) error {
 	}
 	defer db.Close()
 	_, err = db.Exec(`
+	DROP TABLE IF EXISTS matchfasttext;
 	CREATE TABLE matchfasttext (
 		datafile TEXT,
 		column_index INTEGER,
@@ -185,12 +200,20 @@ func main() {
 	log.Printf("Using file list from %s", fileListFilename)
 
 	// Loading fasttext database
-	ft, err := embedding.InitInMemoryFastText(fastTextDbFilename, DefaultTokenFun, DefaultTransFun)
+	ft, err := embedding.InitFastText(fastTextDbFilename, DefaultTokenFun, DefaultTransFun)
 	if err != nil {
 		panic(err)
 	}
-	defer ft.Close()
-	log.Printf("Fasttext database loaded from %s", fastTextDbFilename)
+	fastTextWords := counter.NewConcurrentCounter()
+	words, err := ft.GetAllWords()
+	if err != nil {
+		panic(err)
+	}
+	for _, word := range words {
+		fastTextWords.Update(word)
+	}
+	ft.Close()
+	log.Printf("Fasttext words loaded from %s", fastTextDbFilename)
 
 	// Start parallel profiling threads
 	inputChan, errc := readCsv(fileListFile)
@@ -207,7 +230,12 @@ func main() {
 			defer wg.Done()
 			for datafileRec := range inputChan {
 				datafilename := datafileRec[0]
-				err := ProcessTable(datafilename, ft, outChan)
+				// Skipping french dataset files
+				if strings.HasSuffix(datafilename, "-fra.csv") {
+					continue
+				}
+				log.Printf("Processing %s", datafilename)
+				err := ProcessTable(datafilename, fastTextWords, outChan)
 				if err != nil {
 					log.Printf("Error in table %s: %s", datafilename, err.Error())
 					continue

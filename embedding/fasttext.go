@@ -7,14 +7,27 @@ import (
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
-type InMemFastText struct {
+type FastText struct {
 	db       *sql.DB
 	tokenFun func(string) []string
 	transFun func(string) string
 }
 
 // Creates an in-memory FastText using an existing on-disk FastText Sqlite3 database.
-func InitInMemoryFastText(dbFilename string, tokenFun func(string) []string, transFun func(string) string) (*InMemFastText, error) {
+func InitFastText(dbFilename string, tokenFun func(string) []string, transFun func(string) string) (*FastText, error) {
+	db, err := sql.Open("sqlite3", dbFilename)
+	if err != nil {
+		return nil, err
+	}
+	return &FastText{
+		db:       db,
+		tokenFun: tokenFun,
+		transFun: transFun,
+	}, nil
+}
+
+// Creates an in-memory FastText using an existing on-disk FastText Sqlite3 database.
+func InitInMemoryFastText(dbFilename string, tokenFun func(string) []string, transFun func(string) string) (*FastText, error) {
 	db, err := sql.Open("sqlite3", ":memory:")
 	_, err = db.Exec(fmt.Sprintf(`
 	attach database '%s' as disk;
@@ -30,7 +43,7 @@ func InitInMemoryFastText(dbFilename string, tokenFun func(string) []string, tra
 	if err != nil {
 		return nil, err
 	}
-	return &InMemFastText{
+	return &FastText{
 		db:       db,
 		tokenFun: tokenFun,
 		transFun: transFun,
@@ -38,12 +51,34 @@ func InitInMemoryFastText(dbFilename string, tokenFun func(string) []string, tra
 }
 
 // Alaways close the FastText after finishing using it.
-func (ft *InMemFastText) Close() error {
+func (ft *FastText) Close() error {
 	return ft.db.Close()
 }
 
+// Get all words that exist in the database
+func (ft *FastText) GetAllWords() ([]string, error) {
+	var count int
+	if err := ft.db.QueryRow(`SELECT count(word) FROM fasttext;`).Scan(&count); err != nil {
+		return nil, err
+	}
+	words := make([]string, 0, count)
+	rows, err := ft.db.Query(`SELECT word FROM fasttext;`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var word string
+		if err := rows.Scan(&word); err != nil {
+			return words, err
+		}
+		words = append(words, word)
+	}
+	return words, rows.Err()
+}
+
 // Get the embedding vector of a word
-func (ft *InMemFastText) GetEmb(word string) ([]float64, error) {
+func (ft *FastText) GetEmb(word string) ([]float64, error) {
 	var binVec []byte
 	err := ft.db.QueryRow(`SELECT emb FROM fasttext WHERE word=?;`, word).Scan(&binVec)
 	if err == sql.ErrNoRows {
@@ -57,18 +92,18 @@ func (ft *InMemFastText) GetEmb(word string) ([]float64, error) {
 }
 
 // Get the embedding vector of a data value, which is the sum of word embeddings
-func (ft *InMemFastText) GetValueEmb(value string) ([]float64, error) {
-	tokens := tokenize(value, ft.tokenFun, ft.transFun)
+func (ft *FastText) GetValueEmb(value string) ([]float64, error) {
+	tokens := Tokenize(value, ft.tokenFun, ft.transFun)
 	return ft.getTokenizedValueEmb(tokens)
 }
 
 // Returns the domain embedding by summation given the
 // distinct values and their frequencies
-func (ft *InMemFastText) GetDomainEmbSum(values []string, freqs []int) ([]float64, error) {
+func (ft *FastText) GetDomainEmbSum(values []string, freqs []int) ([]float64, error) {
 	var sum []float64
 	for i, value := range values {
 		freq := freqs[i]
-		tokens := tokenize(value, ft.tokenFun, ft.transFun)
+		tokens := Tokenize(value, ft.tokenFun, ft.transFun)
 		vec, err := ft.getTokenizedValueEmb(tokens)
 		if err != nil {
 			continue
@@ -89,7 +124,7 @@ func (ft *InMemFastText) GetDomainEmbSum(values []string, freqs []int) ([]float6
 }
 
 // Returns the embedding vector of a tokenized data value
-func (ft *InMemFastText) getTokenizedValueEmb(tokenizedValue []string) ([]float64, error) {
+func (ft *FastText) getTokenizedValueEmb(tokenizedValue []string) ([]float64, error) {
 	var valueVec []float64
 	var count int
 	for _, token := range tokenizedValue {
@@ -114,7 +149,7 @@ func (ft *InMemFastText) getTokenizedValueEmb(tokenizedValue []string) ([]float6
 }
 
 // Tokenize the value v with tokenization and transformation function
-func tokenize(v string, tokenFun func(string) []string, transFun func(string) string) []string {
+func Tokenize(v string, tokenFun func(string) []string, transFun func(string) string) []string {
 	v = transFun(v)
 	tokens := tokenFun(v)
 	for i, t := range tokens {
