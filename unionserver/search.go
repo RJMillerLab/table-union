@@ -16,6 +16,7 @@ import (
 
 var (
 	ByteOrder = binary.BigEndian
+	batchSize = 2000
 )
 
 type UnionIndex struct {
@@ -64,7 +65,7 @@ func (index *UnionIndex) QueryOrderAll(query [][]float64, N, K int) <-chan Union
 	partialAlign := make(map[string]map[int]bool)
 	reverseAlign := make(map[string]map[int]bool)
 	tableQueues := make(map[string]*pqueue.TopKQueue)
-	aligneQueue := pqueue.NewTopKQueue(2000)
+	aligneQueue := pqueue.NewTopKQueue(batchSize)
 	count := 0
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -77,27 +78,9 @@ func (index *UnionIndex) QueryOrderAll(query [][]float64, N, K int) <-chan Union
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			// discard columns of already aligned tables
 			if _, ok := aligned[tableID]; !ok {
-				// getting the embedding of the candidate column
-				embFilename := getEmbFilename(tableID, index.domainDir, columnIndex)
-				if _, err := os.Stat(embFilename); os.IsNotExist(err) {
-					log.Printf("Embedding file %s does not exist.", embFilename)
-					continue
-				}
-				vec, err := embedding.ReadVecFromDisk(embFilename, ByteOrder)
-				if err != nil {
-					log.Printf("Error in reading %s from disk.", embFilename)
-					continue
-				}
-				// inserting the pair into its corresponding priority queue
-				cosine := embedding.Cosine(vec, query[pair.QueryIndex])
-				e := Pair{
-					QueryColIndex: pair.QueryIndex,
-					CandTableID:   tableID,
-					CandColIndex:  columnIndex,
-					Sim:           cosine,
-				}
-				aligneQueue.Push(e, -1*cosine)
-				if aligneQueue.Size() == 2000 {
+				e := getColumnPair(tableID, index.domainDir, columnIndex, pair.QueryIndex, query)
+				aligneQueue.Push(e, -1*e.Sim)
+				if aligneQueue.Size() == batchSize {
 					entry, cosine := aligneQueue.Pop()
 					pair := entry.(Pair)
 					if _, ok := tableQueues[pair.CandTableID]; !ok {
@@ -140,4 +123,27 @@ func (index *UnionIndex) QueryOrderAll(query [][]float64, N, K int) <-chan Union
 		close(results)
 	}()
 	return results
+}
+
+func getColumnPair(candTableID, domainDir string, candColIndex, queryColIndex int, query [][]float64) Pair {
+	// getting the embedding of the candidate column
+	embFilename := getEmbFilename(candTableID, domainDir, candColIndex)
+	if _, err := os.Stat(embFilename); os.IsNotExist(err) {
+		log.Printf("Embedding file %s does not exist.", embFilename)
+		panic(err)
+	}
+	vec, err := embedding.ReadVecFromDisk(embFilename, ByteOrder)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", embFilename)
+		panic(err)
+	}
+	// inserting the pair into its corresponding priority queue
+	cosine := embedding.Cosine(vec, query[queryColIndex])
+	p := Pair{
+		QueryColIndex: queryColIndex,
+		CandTableID:   candTableID,
+		CandColIndex:  candColIndex,
+		Sim:           cosine,
+	}
+	return p
 }
