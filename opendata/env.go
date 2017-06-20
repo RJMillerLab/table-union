@@ -32,6 +32,13 @@ var SarmaFilename = os.Getenv("SARMA_SCORES")
 var JaccardFilename = os.Getenv("JACCARD_SCORES")
 var ContainmentFilename = os.Getenv("CONTAINMENT_SCORES")
 var CosineFilename = os.Getenv("COSINE_SCORES")
+var ColumnUnionabilityTable = os.Getenv("COLUMN_UNIONABILITY_TABLE")
+var DatasetUnionabilityTable = os.Getenv("DATASET_UNIONABILITY_TABLE")
+var ColumnUnionabilityDB = os.Getenv("COLUMN_UNIONABILITY_DB")
+var DatasetUnionabilityDB = os.Getenv("DATASET_UNIONABILITY_DB")
+var QueryList = os.Getenv("QUERY_LIST")
+var Measure = os.Getenv("MEASURE")
+var Threshold = os.Getenv("THRESHOLD")
 
 func CheckEnv() {
 	if OpendataDir == "" || OutputDir == "" || Yago_db == "" {

@@ -59,7 +59,6 @@ func Init() {
 }
 
 func MkTablePairs(queries, files []string) <-chan *tablePair {
-	// randomize the list of pairs
 	out := make(chan *tablePair)
 	pairs := make([]*tablePair, len(queries)*len(files))
 	go func() {
@@ -75,6 +74,7 @@ func MkTablePairs(queries, files []string) <-chan *tablePair {
 			}
 
 		}
+		// randomize the list of pairs
 		for _, i := range rand.Perm(len(pairs)) {
 			out <- pairs[i]
 		}
