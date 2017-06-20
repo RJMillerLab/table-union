@@ -59,6 +59,7 @@ func newCosineLSHParam(dim, l, k, numHash int, hyperplanes [][]float64) *cosineL
 	}
 }
 
+// CosineLSH is an LSH uses simhash signatures and the cosine similarity measure.
 type CosineLSH struct {
 	// Param type
 	*cosineLSHParam
@@ -80,6 +81,7 @@ func integral(f func(float64) float64, a, b, precision float64) float64 {
 // Probability density function for false positive
 func falsePositive(l, k int) func(float64) float64 {
 	return func(j float64) float64 {
+		j = 1 - (math.Acos(j) / math.Pi)
 		return 1.0 - math.Pow(1.0-math.Pow(j, float64(k)), float64(l))
 	}
 }
@@ -87,6 +89,7 @@ func falsePositive(l, k int) func(float64) float64 {
 // Probability density function for false negative
 func falseNegative(l, k int) func(float64) float64 {
 	return func(j float64) float64 {
+		j = 1 - (math.Acos(j) / math.Pi)
 		return 1.0 - (1.0 - math.Pow(1.0-math.Pow(j, float64(k)), float64(l)))
 	}
 }
