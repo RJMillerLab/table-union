@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/deckarep/golang-set"
 )
 
 var (
@@ -146,4 +148,48 @@ func isNumeric(val string) bool {
 
 func isText(val string) bool {
 	return patternWord.MatchString(val)
+}
+
+func getDomainValues(domainDir, tableID string, columnIndex int) ([]string, error) {
+	p := filepath.Join(domainDir, tableID, fmt.Sprintf("%d.values", columnIndex))
+	file, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	values := make([]string, 0)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		v := scanner.Text()
+		values = append(values, v)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return values, nil
+}
+
+func jaccard(dom1, dom2 []string) float64 {
+	d1set := convertSliceToSet(dom1)
+	d2set := convertSliceToSet(dom2)
+	d1andd2 := d1set.Intersect(d2set).Cardinality()
+	d1ord2 := d1set.Union(d2set).Cardinality()
+	return float64(d1andd2) / float64(d1ord2)
+}
+
+func convertSliceToSet(slice []string) mapset.Set {
+	set := mapset.NewSet()
+	for _, v := range slice {
+		set.Add(strings.ToLower(v))
+	}
+	return set
+}
+
+func index(a []string, s string) int {
+	for i, v := range a {
+		if v == s {
+			return i
+		}
+	}
+	return -1
 }

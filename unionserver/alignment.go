@@ -25,6 +25,13 @@ type edge struct {
 	destIndex int
 }
 
+type Pair struct {
+	CandTableID   string
+	CandColIndex  int
+	QueryColIndex int
+	Sim           float64
+}
+
 func Align(candTableID, domainDir string, query [][]float64, K int) Union {
 	queryDomains := make([]embDomain, 0)
 	candDomains := make([]embDomain, 0)
@@ -45,7 +52,6 @@ func Align(candTableID, domainDir string, query [][]float64, K int) Union {
 		}
 		candDomains = append(candDomains, ce)
 	}
-
 	for index, vec := range query {
 		ce := embDomain{
 			columnIndex: index,
@@ -66,7 +72,7 @@ func Align(candTableID, domainDir string, query [][]float64, K int) Union {
 		}
 	}
 	// greedy alignment
-	//Union alignment    map[int]int
+	//Union alignment
 	source := make(map[int]map[int]float64)
 	dest := make(map[int]int)
 	var kUnionability float64
@@ -93,6 +99,66 @@ func Align(candTableID, domainDir string, query [][]float64, K int) Union {
 		}
 	}
 	log.Printf("Did not find k-unionability")
+	u := Union{
+		CandTableID:  candTableID,
+		CandHeader:   getHeaders(candTableID, domainDir),
+		Alignment:    source,
+		Kunioability: kUnionability,
+	}
+	return u
+}
+
+func AlignEasy(queue *pqueue.TopKQueue, domainDir string, K int) Union {
+	source := make(map[int]map[int]float64)
+	dest := make(map[int]int)
+	for i := 0; i < queue.Size(); i++ {
+		pair, score := queue.Pop()
+		kUnionability := -1.0
+		if i == 0 {
+			kUnionability = score
+		}
+		queryColIndex := pair.(Pair).QueryColIndex
+		candColIndex := pair.(Pair).CandColIndex
+		if _, ok := source[queryColIndex]; !ok {
+			if _, ok := dest[candColIndex]; !ok {
+				p := make(map[int]float64)
+				p[candColIndex] = score
+				source[queryColIndex] = p
+				dest[candColIndex] = queryColIndex
+				if len(source) == K {
+					u := Union{
+						CandTableID:  pair.(Pair).CandTableID,
+						CandHeader:   getHeaders(pair.(Pair).CandTableID, domainDir),
+						Alignment:    source,
+						Kunioability: kUnionability,
+					}
+					return u
+				}
+			}
+		}
+	}
+	log.Printf("Did not find k-unionability")
+	u := Union{
+		Kunioability: -1.0,
+	}
+	return u
+}
+
+func AlignTooEasy(queue *pqueue.TopKQueue, domainDir string) Union {
+	source := make(map[int]map[int]float64)
+	var candTableID string
+	var kUnionability float64
+	K := queue.Size()
+	for i := 0; i < K; i++ {
+		pair, score := queue.Pop()
+		kUnionability = -1 * score
+		candTableID = pair.(Pair).CandTableID
+		queryColIndex := pair.(Pair).QueryColIndex
+		candColIndex := pair.(Pair).CandColIndex
+		p := make(map[int]float64)
+		p[candColIndex] = -1 * score
+		source[queryColIndex] = p
+	}
 	u := Union{
 		CandTableID:  candTableID,
 		CandHeader:   getHeaders(candTableID, domainDir),

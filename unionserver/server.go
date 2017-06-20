@@ -58,7 +58,7 @@ func (s *Server) queryHandler(c *gin.Context) {
 	}
 	// Query index
 	result := make([]QueryResult, 0)
-	candidates := s.ui.Query(queryRequest.Vecs, queryRequest.N, queryRequest.K)
+	candidates := s.ui.QueryOrderAll(queryRequest.Vecs, queryRequest.N, queryRequest.K)
 	for cand := range candidates {
 		result = append(result, QueryResult{
 			TableUnion: cand,

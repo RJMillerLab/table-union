@@ -23,7 +23,7 @@ func main() {
 		"Query result directory")
 	flag.StringVar(&host, "host", "http://localhost:4004", "Server host")
 	flag.IntVar(&n, "n", 10, "Search Parameter: top (n,k) unionable tables")
-	flag.IntVar(&k, "k", 3, "Search Parameter: top (n,k) unionable tables")
+	flag.IntVar(&k, "k", 5, "Search Parameter: top (n,k) unionable tables")
 	flag.Parse()
 
 	if _, err := os.Stat(fastTextSqliteDB); os.IsNotExist(err) {

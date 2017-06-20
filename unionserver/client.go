@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/RJMillerLab/table-union/embedding"
 	"github.com/ekzhu/datatable"
@@ -21,6 +22,10 @@ type Client struct {
 	transFun func(string) string
 	tokenFun func(string) []string
 }
+
+var (
+	domainDir = "/home/fnargesian/TABLE_UNION_OUTPUT/domains"
+)
 
 func NewClient(ft *fasttext.FastText, host string) (*Client, error) {
 	return &Client{
@@ -98,6 +103,7 @@ func (c *Client) Query(queryCSVFilename string, k, n int) []QueryResult {
 		log.Printf("---------------------")
 		log.Printf("Candidate table: %s", cand.TableUnion.CandTableID)
 		log.Printf("%d-unionability socre is: %f", len(cand.TableUnion.Alignment), cand.TableUnion.Kunioability)
+		selfUnion := true
 		for s, dmap := range cand.TableUnion.Alignment {
 			var d int
 			var score float64
@@ -106,7 +112,19 @@ func (c *Client) Query(queryCSVFilename string, k, n int) []QueryResult {
 				score = j
 				break
 			}
+			if strings.ToLower(queryTextHeaders[s]) != strings.ToLower(cand.TableUnion.CandHeader[d]) {
+				selfUnion = false
+			}
 			log.Printf("%s -> %s: %f", queryTextHeaders[s], cand.TableUnion.CandHeader[d], score)
+			values, err := getDomainValues(domainDir, cand.TableUnion.CandTableID, d)
+			if err != nil {
+				panic(err)
+			}
+			jacc := jaccard(queryTable.GetColumn(index(queryHeaders, queryTextHeaders[s])), values)
+			log.Printf("jaccard: %f", jacc)
+		}
+		if selfUnion == true {
+			log.Printf("SELF UNION")
 		}
 		results = append(results, cand)
 	}
