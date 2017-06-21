@@ -104,14 +104,10 @@ func (c *Client) Query(queryCSVFilename string, k, n int) []QueryResult {
 		log.Printf("Candidate table: %s", cand.TableUnion.CandTableID)
 		log.Printf("%d-unionability socre is: %f", len(cand.TableUnion.Alignment), cand.TableUnion.Kunioability)
 		selfUnion := true
-		for s, dmap := range cand.TableUnion.Alignment {
-			var d int
-			var score float64
-			for i, j := range dmap {
-				d = i
-				score = j
-				break
-			}
+		for _, alignedPair := range cand.TableUnion.Alignment {
+			d := alignedPair.CandColIndex
+			s := alignedPair.QueryColIndex
+			score := alignedPair.Sim
 			if strings.ToLower(queryTextHeaders[s]) != strings.ToLower(cand.TableUnion.CandHeader[d]) {
 				selfUnion = false
 			}

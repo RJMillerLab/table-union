@@ -126,8 +126,8 @@ func (a alignment) processPairs(pairQueue *pqueue.TopKQueue, out chan<- []Pair) 
 		a.tableQueues[pair.CandTableID].Push(pair, pair.Sim)
 		// When we get k unique column alignments for a candidate table
 		if a.tableQueues[pair.CandTableID].Size() == a.k {
-			out <- a.get(pair.CandTableID)
 			a.completedTables.Update(pair.CandTableID)
+			out <- a.get(pair.CandTableID)
 		}
 		// Check if we are done
 		if a.completedTables.Unique() == a.n {
@@ -147,7 +147,6 @@ func (index *UnionIndex) QueryOrderAll(query [][]float64, N, K int) <-chan []Pai
 		done := make(chan struct{})
 		defer close(done)
 		for pair := range index.lsh.QueryPlus(query, done) {
-			count++
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			// discard columns of already aligned tables
 			if alignment.hasCompleted(tableID) {

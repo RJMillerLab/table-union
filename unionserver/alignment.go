@@ -1,20 +1,5 @@
 package unionserver
 
-import (
-	"log"
-	"os"
-
-	"github.com/RJMillerLab/table-union/embedding"
-	"github.com/RJMillerLab/table-union/pqueue"
-)
-
-type Union struct {
-	CandTableID  string
-	CandHeader   []string
-	Alignment    map[int]map[int]float64 // query to candidate table
-	Kunioability float64
-}
-
 type embDomain struct {
 	columnIndex int
 	sumVec      []float64
@@ -32,6 +17,7 @@ type Pair struct {
 	Sim           float64
 }
 
+/*
 func Align(candTableID, domainDir string, query [][]float64, K int) Union {
 	queryDomains := make([]embDomain, 0)
 	candDomains := make([]embDomain, 0)
@@ -167,3 +153,4 @@ func AlignTooEasy(queue *pqueue.TopKQueue, domainDir string) Union {
 	}
 	return u
 }
+*/

@@ -28,6 +28,13 @@ type QueryResult struct {
 	TableUnion Union `json:"union"`
 }
 
+type Union struct {
+	CandTableID  string
+	CandHeader   []string
+	Alignment    []Pair // query to candidate table
+	Kunioability float64
+}
+
 func NewServer(ui *UnionIndex) *Server {
 	s := &Server{
 		ui:     ui,
@@ -58,10 +65,17 @@ func (s *Server) queryHandler(c *gin.Context) {
 	}
 	// Query index
 	result := make([]QueryResult, 0)
-	candidates := s.ui.QueryOrderAll(queryRequest.Vecs, queryRequest.N, queryRequest.K)
-	for cand := range candidates {
+	queryResults := s.ui.QueryOrderAll(queryRequest.Vecs, queryRequest.N, queryRequest.K)
+	for unionableTablePairs := range queryResults {
+		union := Union{
+			CandTableID:  unionableTablePairs[0].CandTableID,
+			CandHeader:   getHeaders(unionableTablePairs[0].CandTableID, s.ui.domainDir),
+			Alignment:    unionableTablePairs,
+			Kunioability: unionableTablePairs[len(unionableTablePairs)-1].Sim,
+		}
+
 		result = append(result, QueryResult{
-			TableUnion: cand,
+			TableUnion: union,
 		})
 	}
 	response := QueryResponse{
