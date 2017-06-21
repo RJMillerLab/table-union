@@ -40,3 +40,14 @@ func (pq *TopKQueue) Push(value interface{}, priority float64) {
 	}
 	pq.PQueue.Push(value, priority)
 }
+
+func (pq *TopKQueue) Descending() (values []interface{}, priorities []float64) {
+	values = make([]interface{}, pq.Size())
+	priorities = make([]float64, pq.Size())
+	for i := len(values) - 1; i >= 0; i-- {
+		v, p := pq.Pop()
+		values[i] = v
+		priorities[i] = p
+	}
+	return
+}

@@ -4,8 +4,8 @@ import (
 	"encoding/binary"
 	"log"
 	"os"
-	"sync"
 
+	"github.com/ekzhu/counter"
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/RJMillerLab/table-union/embedding"
@@ -58,69 +58,115 @@ func (index *UnionIndex) Build() error {
 	return nil
 }
 
-func (index *UnionIndex) QueryOrderAll(query [][]float64, N, K int) <-chan Union {
+type alignment struct {
+	completedTables *counter.Counter
+	partialAlign    map[string](*counter.Counter)
+	reverseAlign    map[string](*counter.Counter)
+	tableQueues     map[string](*pqueue.TopKQueue)
+	k               int
+	n               int
+}
+
+func initAlignment(K, N int) alignment {
+	return alignment{
+		completedTables: counter.NewCounter(),
+		partialAlign:    make(map[string](*counter.Counter)),
+		reverseAlign:    make(map[string](*counter.Counter)),
+		tableQueues:     make(map[string]*pqueue.TopKQueue),
+		k:               K,
+		n:               N,
+	}
+}
+
+func (a alignment) hasCompleted(tableID string) bool {
+	return a.completedTables.Has(tableID)
+}
+
+func (a alignment) hasPartialTable(tableID string) bool {
+	_, has := a.partialAlign[tableID]
+	return has
+}
+
+func (a alignment) hasSeenBetter(pair Pair) bool {
+	if !a.hasPartialTable(pair.CandTableID) {
+		return false
+	}
+	return a.partialAlign[pair.CandTableID].Has(pair.CandColIndex) &&
+		a.reverseAlign[pair.CandTableID].Has(pair.QueryColIndex)
+}
+
+// Produces an alignment
+func (a alignment) get(candidateTableID string) []Pair {
+	if !a.hasCompleted(candidateTableID) {
+		panic("This table has not been completed")
+	}
+	ps, _ := a.tableQueues[candidateTableID].Descending()
+	pairs := make([]Pair, len(ps))
+	for i := range pairs {
+		pairs[i] = ps[i].(Pair)
+	}
+	return pairs
+}
+
+func (a alignment) processPairs(pairQueue *pqueue.TopKQueue, out chan<- []Pair) bool {
+	pairs, _ := pairQueue.Descending()
+	for i := range pairs {
+		pair := pairs[i].(Pair)
+		if !a.hasPartialTable(pair.CandTableID) {
+			a.tableQueues[pair.CandTableID] = pqueue.NewTopKQueue(a.k)
+			a.partialAlign[pair.CandTableID] = counter.NewCounter()
+			a.reverseAlign[pair.CandTableID] = counter.NewCounter()
+		}
+		if a.hasSeenBetter(pair) {
+			// because we are using priority queue
+			continue
+		}
+		a.partialAlign[pair.CandTableID].Update(pair.CandColIndex)
+		a.reverseAlign[pair.CandTableID].Update(pair.QueryColIndex)
+		a.tableQueues[pair.CandTableID].Push(pair, pair.Sim)
+		// When we get k unique column alignments for a candidate table
+		if a.tableQueues[pair.CandTableID].Size() == a.k {
+			out <- a.get(pair.CandTableID)
+			a.completedTables.Update(pair.CandTableID)
+		}
+		// Check if we are done
+		if a.completedTables.Unique() == a.n {
+			return true
+		}
+	}
+	return a.completedTables.Unique() == a.n
+}
+
+func (index *UnionIndex) QueryOrderAll(query [][]float64, N, K int) <-chan []Pair {
 	log.Printf("Started querying the index with %d columns.", len(query))
-	//start := time.Now()
-	results := make(chan Union)
-	partialAlign := make(map[string]map[int]bool)
-	reverseAlign := make(map[string]map[int]bool)
-	tableQueues := make(map[string]*pqueue.TopKQueue)
-	aligneQueue := pqueue.NewTopKQueue(batchSize)
-	count := 0
-	var wg sync.WaitGroup
-	wg.Add(1)
+	results := make(chan []Pair)
 	go func() {
+		defer close(results)
+		alignment := initAlignment(K, N)
+		batch := pqueue.NewTopKQueue(batchSize)
 		done := make(chan struct{})
 		defer close(done)
-		aligned := make(map[string]bool)
 		for pair := range index.lsh.QueryPlus(query, done) {
-			count += 1
+			count++
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			// discard columns of already aligned tables
-			if _, ok := aligned[tableID]; !ok {
-				e := getColumnPair(tableID, index.domainDir, columnIndex, pair.QueryIndex, query)
-				aligneQueue.Push(e, -1*e.Sim)
-				if aligneQueue.Size() == batchSize {
-					entry, cosine := aligneQueue.Pop()
-					pair := entry.(Pair)
-					if _, ok := tableQueues[pair.CandTableID]; !ok {
-						pq := pqueue.NewTopKQueue(K)
-						pq.Push(pair, cosine)
-						tableQueues[pair.CandTableID] = pq
-						cols1 := make(map[int]bool)
-						cols1[pair.CandColIndex] = true
-						partialAlign[pair.CandTableID] = cols1
-						cols2 := make(map[int]bool)
-						cols2[pair.QueryColIndex] = true
-						reverseAlign[pair.CandTableID] = cols2
-					} else {
-						if _, ok := partialAlign[pair.CandTableID][pair.CandColIndex]; !ok {
-							if _, ok := reverseAlign[pair.CandTableID][pair.QueryColIndex]; !ok {
-								partialAlign[pair.CandTableID][pair.CandColIndex] = true
-								reverseAlign[pair.CandTableID][pair.QueryColIndex] = true
-								pq := tableQueues[pair.CandTableID]
-								pq.Push(pair, cosine)
-								tableQueues[pair.CandTableID] = pq
-								if tableQueues[pair.CandTableID].Size() == K {
-									aligned[pair.CandTableID] = true
-									results <- AlignTooEasy(tableQueues[pair.CandTableID], index.domainDir)
-									if len(aligned) == N {
-										log.Printf("Number of received pairs is %d", count)
-										wg.Done()
-										return
-									}
-								}
-							}
-						}
-					}
-				}
+			if alignment.hasCompleted(tableID) {
+				continue
+			}
+			e := getColumnPair(tableID, index.domainDir, columnIndex, pair.QueryIndex, query)
+			batch.Push(e, e.Sim)
+			if batch.Size() < batchSize {
+				continue
+			}
+			// Process the batch
+			if finished := alignment.processPairs(batch, results); finished {
+				return
 			}
 		}
-		wg.Done()
-	}()
-	go func() {
-		wg.Wait()
-		close(results)
+		// Don't forget remaining pairs in the queue
+		if !batch.Empty() {
+			alignment.processPairs(batch, results)
+		}
 	}()
 	return results
 }
