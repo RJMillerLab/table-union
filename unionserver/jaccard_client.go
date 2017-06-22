@@ -10,34 +10,29 @@ import (
 	"os"
 	"strings"
 
-	"github.com/RJMillerLab/table-union/embedding"
+	"github.com/RJMillerLab/table-union/opendata"
 	"github.com/ekzhu/datatable"
-	fasttext "github.com/ekzhu/go-fasttext"
 )
 
-var (
-	domainDir = "/home/fnargesian/TABLE_UNION_OUTPUT/domains"
-)
-
-type Client struct {
-	ft       *fasttext.FastText
+type JaccardClient struct {
 	host     string
 	cli      *http.Client
 	transFun func(string) string
 	tokenFun func(string) []string
+	numHash  int
 }
 
-func NewClient(ft *fasttext.FastText, host string) (*Client, error) {
-	return &Client{
-		ft:       ft,
+func NewJaccardClient(host string, numHash int) (*JaccardClient, error) {
+	return &JaccardClient{
 		host:     host,
 		cli:      &http.Client{},
 		transFun: DefaultTransFun,
 		tokenFun: DefaultTokenFun,
+		numHash:  numHash,
 	}, nil
 }
 
-func (c *Client) mkReq(queryRequest QueryRequest) QueryResponse {
+func (c *JaccardClient) mkReq(queryRequest JaccardQueryRequest) QueryResponse {
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(&queryRequest); err != nil {
 		panic(err)
@@ -64,7 +59,7 @@ func (c *Client) mkReq(queryRequest QueryRequest) QueryResponse {
 	return queryResponse
 }
 
-func (c *Client) QueryAndPreviewResults(queryCSVFilename string, k, n int) []QueryResult {
+func (c *JaccardClient) QueryAndPreviewResults(queryCSVFilename string, k, n int) []QueryResult {
 	results := make([]QueryResult, 0)
 	f, err := os.Open(queryCSVFilename)
 	if err != nil {
@@ -77,17 +72,13 @@ func (c *Client) QueryAndPreviewResults(queryCSVFilename string, k, n int) []Que
 	if err != nil {
 		panic(err)
 	}
-	// Create embeddings
-	vecs := make([][]float64, 0)
+	// Create minhash
+	vecs := make([][]uint64, 0)
 	queryTextHeaders := make([]string, 0)
 	for i := 0; i < queryTable.NumCol(); i++ {
 		col := queryTable.GetColumn(i)
 		if classifyValues(col) == "text" {
-			vec, err := embedding.GetDomainEmbSum(c.ft, c.tokenFun, c.transFun, col)
-			if err != nil {
-				log.Printf("Embedding not found for column %d", i)
-				continue
-			}
+			vec := opendata.GetDomainMinhash(c.tokenFun, c.transFun, col, c.numHash)
 			if len(vec) != 0 {
 				vecs = append(vecs, vec)
 				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
@@ -99,7 +90,7 @@ func (c *Client) QueryAndPreviewResults(queryCSVFilename string, k, n int) []Que
 		return results
 	}
 	// Query server
-	resp := c.mkReq(QueryRequest{Vecs: vecs, K: k, N: n})
+	resp := c.mkReq(JaccardQueryRequest{Vecs: vecs, K: k, N: n})
 	// Output results
 	if resp.Result == nil || len(resp.Result) == 0 {
 		log.Printf("No result found.")
@@ -117,12 +108,6 @@ func (c *Client) QueryAndPreviewResults(queryCSVFilename string, k, n int) []Que
 				selfUnion = false
 			}
 			log.Printf("%s -> %s: %f", queryTextHeaders[s], cand.TableUnion.CandHeader[d], score)
-			values, err := getDomainValues(domainDir, cand.TableUnion.CandTableID, d)
-			if err != nil {
-				panic(err)
-			}
-			jacc := jaccard(queryTable.GetColumn(index(queryHeaders, queryTextHeaders[s])), values)
-			log.Printf("jaccard: %f", jacc)
 		}
 		if selfUnion == true {
 			log.Printf("SELF UNION")
@@ -132,7 +117,7 @@ func (c *Client) QueryAndPreviewResults(queryCSVFilename string, k, n int) []Que
 	return results
 }
 
-func (c *Client) Query(queryCSVFilename string, k, n int) []QueryResult {
+func (c *JaccardClient) Query(queryCSVFilename string, k, n int) []QueryResult {
 	results := make([]QueryResult, 0)
 	f, err := os.Open(queryCSVFilename)
 	if err != nil {
@@ -145,17 +130,13 @@ func (c *Client) Query(queryCSVFilename string, k, n int) []QueryResult {
 	if err != nil {
 		panic(err)
 	}
-	// Create embeddings
-	vecs := make([][]float64, 0)
+	// Create minhash
+	vecs := make([][]uint64, 0)
 	queryTextHeaders := make([]string, 0)
 	for i := 0; i < queryTable.NumCol(); i++ {
 		col := queryTable.GetColumn(i)
 		if classifyValues(col) == "text" {
-			vec, err := embedding.GetDomainEmbSum(c.ft, c.tokenFun, c.transFun, col)
-			if err != nil {
-				log.Printf("Embedding not found for column %d", i)
-				continue
-			}
+			vec := opendata.GetDomainMinhash(c.tokenFun, c.transFun, col, c.numHash)
 			if len(vec) != 0 {
 				vecs = append(vecs, vec)
 				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
@@ -164,16 +145,16 @@ func (c *Client) Query(queryCSVFilename string, k, n int) []QueryResult {
 	}
 	if len(vecs) < k {
 		log.Printf("The query has too few text columns for %d-unionability.", k)
-		k = len(vecs)
+		return results
 	}
 	// Query server
-	resp := c.mkReq(QueryRequest{Vecs: vecs, K: k, N: n})
-	// Process results
+	resp := c.mkReq(JaccardQueryRequest{Vecs: vecs, K: k, N: n})
+	// Output results
 	if resp.Result == nil || len(resp.Result) == 0 {
 		log.Printf("No result found.")
 	}
-	for _, result := range resp.Result {
-		results = append(results, result)
+	for _, cand := range resp.Result {
+		results = append(results, cand)
 	}
 	return results
 }

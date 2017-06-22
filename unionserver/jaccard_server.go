@@ -10,37 +10,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Server struct {
-	ui     *UnionIndex
-	jui    *JaccardUnionIndex
+type JaccardServer struct {
+	ui     *JaccardUnionIndex
 	router *gin.Engine
 }
 
-type QueryRequest struct {
-	Vecs [][]float64 `json:"table"`
-	K    int         `json:"k"`
-	N    int         `json:"n"`
+type JaccardQueryRequest struct {
+	Vecs [][]uint64 `json:"table"`
+	K    int        `json:"k"`
+	N    int        `json:"n"`
 }
 
-type QueryResponse struct {
-	Result []QueryResult `json:"result"`
-}
-
-type QueryResult struct {
-	TableUnion Union `json:"union"`
-}
-
-type Union struct {
-	QueryTableID string
-	CandTableID  string
-	CandHeader   []string
-	Alignment    []Pair // query to candidate table
-	Kunioability float64
-	Duration     time.Duration
-}
-
-func NewServer(ui *UnionIndex) *Server {
-	s := &Server{
+func NewJaccardServer(ui *JaccardUnionIndex) *JaccardServer {
+	s := &JaccardServer{
 		ui:     ui,
 		router: gin.Default(),
 	}
@@ -48,21 +30,21 @@ func NewServer(ui *UnionIndex) *Server {
 	return s
 }
 
-func (s *Server) Run(port string) error {
+func (s *JaccardServer) Run(port string) error {
 	return s.router.Run(":" + port)
 }
 
-func (s *Server) Close() error {
+func (s *JaccardServer) Close() error {
 	return nil
 }
 
-func (s *Server) queryHandler(c *gin.Context) {
+func (s *JaccardServer) queryHandler(c *gin.Context) {
 	body, err := ioutil.ReadAll(io.LimitReader(c.Request.Body, 1048576))
 	if err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	var queryRequest QueryRequest
+	var queryRequest JaccardQueryRequest
 	if err := json.Unmarshal(body, &queryRequest); err != nil {
 		c.AbortWithStatus(http.StatusUnprocessableEntity)
 		return

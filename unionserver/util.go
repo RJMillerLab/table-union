@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode"
 
+	minhashlsh "github.com/RJMillerLab/table-union/minhash-lsh"
 	"github.com/deckarep/golang-set"
 )
 
@@ -22,6 +23,7 @@ var (
 		return strings.ToLower(strings.TrimFunc(strings.TrimSpace(s), unicode.IsPunct))
 	}
 	DefaultTokenFun = func(s string) []string { return strings.Split(s, " ") }
+	seed            = 1
 )
 
 func parseFilename(domainDir, filename string) (tableID string, columnIndex int) {
@@ -57,6 +59,12 @@ func fromColumnID(columnID string) (tableID string, columnIndex int) {
 func getEmbFilename(tableID, domainDir string, index int) string {
 	fullpath := path.Join(domainDir, tableID)
 	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "ft-sum"))
+	return fullpath
+}
+
+func getMinhashFilename(tableID, domainDir string, index int) string {
+	fullpath := path.Join(domainDir, tableID)
+	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "minhash"))
 	return fullpath
 }
 
@@ -177,6 +185,16 @@ func jaccard(dom1, dom2 []string) float64 {
 	return float64(d1andd2) / float64(d1ord2)
 }
 
+func estimatedJaccard(query, candidate []uint64) float64 {
+	intersection := 0
+	for i := 0; i < len(query); i++ {
+		if query[i] == candidate[i] {
+			intersection += 1
+		}
+	}
+	return float64(intersection) / float64(len(query))
+}
+
 func convertSliceToSet(slice []string) mapset.Set {
 	set := mapset.NewSet()
 	for _, v := range slice {
@@ -192,4 +210,38 @@ func index(a []string, s string) int {
 		}
 	}
 	return -1
+}
+
+func getDomainMinhash(tokenFun func(string) []string, transFun func(string) string, column []string, numHash int) []uint64 {
+	values := tokenizedValues(column, tokenFun, transFun)
+	mh := minhashlsh.NewMinhash(seed, numHash)
+
+	for tokens := range values {
+		for _, word := range tokens {
+			mh.Push([]byte(word))
+		}
+	}
+	return mh.Signature()
+}
+
+// Produce a channel of values (tokenized)
+func tokenizedValues(values []string, tokenFun func(string) []string, transFun func(string) string) chan []string {
+	out := make(chan []string)
+	go func() {
+		for _, v := range values {
+			v = transFun(v)
+			// Tokenize
+			tokens := tokenFun(v)
+			if len(tokens) > 5 {
+				// Skip text values
+				continue
+			}
+			for i, t := range tokens {
+				tokens[i] = transFun(t)
+			}
+			out <- tokens
+		}
+		close(out)
+	}()
+	return out
 }

@@ -91,7 +91,7 @@ func (a alignment) hasSeenBetter(pair Pair) bool {
 	if !a.hasPartialTable(pair.CandTableID) {
 		return false
 	}
-	return a.partialAlign[pair.CandTableID].Has(pair.CandColIndex) &&
+	return a.partialAlign[pair.CandTableID].Has(pair.CandColIndex) ||
 		a.reverseAlign[pair.CandTableID].Has(pair.QueryColIndex)
 }
 
