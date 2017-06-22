@@ -55,7 +55,7 @@ func main() {
 		}
 		close(alignments)
 	}()
-	progress := experiment.DoSaveAlignments(alignments, "simhash_jaccard", experimentsDB, 1)
+	progress := experiment.DoSaveAlignments(alignments, "minhash_jaccard", experimentsDB, 1)
 
 	total := experiment.ProgressCounter{}
 	for n := range progress {
