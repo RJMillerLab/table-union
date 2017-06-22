@@ -101,7 +101,7 @@ func probFalseNegative(l, k int, t, precision float64) float64 {
 
 // Compute the cummulative probability of false positive given threshold t
 func probFalsePositive(l, k int, t, precision float64) float64 {
-	return integral(falsePositive(l, k), 0, t, precision)
+	return integral(falsePositive(l, k), -1.0, t, precision)
 }
 
 // optimalKL returns the optimal K and L for Jaccard similarity search,
