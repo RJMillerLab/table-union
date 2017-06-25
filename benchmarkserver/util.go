@@ -1,4 +1,4 @@
-package unionserver
+package benchmarkserver
 
 import (
 	"bufio"

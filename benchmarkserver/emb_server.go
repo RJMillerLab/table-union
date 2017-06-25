@@ -1,11 +1,11 @@
-package unionserver
+package benchmarkserver
 
 import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,12 +31,16 @@ type QueryResult struct {
 }
 
 type Union struct {
-	QueryTableID string
-	CandTableID  string
-	CandHeader   []string
-	Alignment    []Pair // query to candidate column mapping
-	Kunioability float64
-	Duration     time.Duration
+	QueryTableID    string
+	CandTableID     string
+	CandHeader      []string
+	Alignment       []Pair // query to candidate table
+	QueryTextHeader []string
+	QueryHeader     []string
+	Kunioability    float64
+	K               int
+	N               int
+	Duration        float64
 }
 
 func NewServer(ui *UnionIndex) *Server {
@@ -45,6 +49,7 @@ func NewServer(ui *UnionIndex) *Server {
 		router: gin.Default(),
 	}
 	s.router.POST("/query", s.queryHandler)
+	log.Printf("New emb server for experiments.")
 	return s
 }
 
@@ -68,25 +73,27 @@ func (s *Server) queryHandler(c *gin.Context) {
 		return
 	}
 	// Query index
-	result := make([]QueryResult, 0)
-	start := time.Now()
+	searchResults := make([]QueryResult, 0)
+	//start := time.Now()
 	queryResults := s.ui.QueryOrderAll(queryRequest.Vecs, queryRequest.N, queryRequest.K)
-	dur := time.Since(start)
-	for unionableTablePairs := range queryResults {
+	//dur := time.Since(start)
+	for result := range queryResults {
 		union := Union{
-			CandTableID:  unionableTablePairs[0].CandTableID,
-			CandHeader:   getHeaders(unionableTablePairs[0].CandTableID, s.ui.domainDir),
-			Alignment:    unionableTablePairs,
-			Kunioability: unionableTablePairs[len(unionableTablePairs)-1].Sim,
-			Duration:     dur,
+			CandTableID:  result.CandidateTableID,
+			CandHeader:   getHeaders(result.CandidateTableID, s.ui.domainDir),
+			Alignment:    result.Alignment,
+			Kunioability: result.Alignment[len(result.Alignment)-1].Sim,
+			K:            result.K,
+			N:            result.N,
+			Duration:     result.Duration,
 		}
 
-		result = append(result, QueryResult{
+		searchResults = append(searchResults, QueryResult{
 			TableUnion: union,
 		})
 	}
 	response := QueryResponse{
-		Result: result,
+		Result: searchResults,
 	}
 	c.JSON(http.StatusOK, response)
 }
