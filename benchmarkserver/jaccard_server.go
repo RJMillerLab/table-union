@@ -61,6 +61,8 @@ func (s *JaccardServer) queryHandler(c *gin.Context) {
 			CandHeader:   getHeaders(result.CandidateTableID, s.ui.domainDir),
 			Alignment:    result.Alignment,
 			Kunioability: result.Alignment[len(result.Alignment)-1].Sim,
+			K:            result.K,
+			N:            result.N,
 			Duration:     result.Duration,
 		}
 

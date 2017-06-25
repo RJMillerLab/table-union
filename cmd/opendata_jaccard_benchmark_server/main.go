@@ -16,7 +16,7 @@ func main() {
 		"The top-level director for all domain and embedding files")
 	flag.StringVar(&port, "port", "4003", "Server port")
 	flag.IntVar(&numHash, "h", 256, "LSH Parameter: number of hash functions")
-	flag.Float64Var(&threshold, "t", 0.8, "Search Parameter: k-unionability threshold")
+	flag.Float64Var(&threshold, "t", 0.6, "Search Parameter: k-unionability threshold")
 	flag.Parse()
 	// Build Search Index
 	ui := benchmarkserver.NewJaccardUnionIndex(domainDir, minhashlsh.NewMinhashLSH32(numHash, threshold), numHash)

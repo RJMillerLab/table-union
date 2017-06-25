@@ -89,7 +89,7 @@ func (c *JaccardClient) Query(queryCSVFilename string, k, n int) []QueryResult {
 	}
 	if len(vecs) < k {
 		log.Printf("The query has too few text columns for %d-unionability.", k)
-		return results
+		k = len(vecs)
 	}
 	// Query server
 	resp := c.mkReq(JaccardQueryRequest{Vecs: vecs, K: k, N: n})
@@ -99,7 +99,7 @@ func (c *JaccardClient) Query(queryCSVFilename string, k, n int) []QueryResult {
 	}
 	for _, result := range resp.Result {
 		result.TableUnion.QueryTextHeader = queryTextHeaders
-		result.TableUnion.QueryTextHeader = queryHeaders
+		result.TableUnion.QueryHeader = queryHeaders
 		// Retrive header index
 		for i, pair := range result.TableUnion.Alignment {
 			pair.QueryColIndex = textToAllHeaders[pair.QueryColIndex]
