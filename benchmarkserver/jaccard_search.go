@@ -54,7 +54,7 @@ func (index *JaccardUnionIndex) Build() error {
 	return nil
 }
 
-func (index *JaccardUnionIndex) QueryOrderAll(query [][]uint64, maxN, K int) <-chan SearchResult {
+func (index *JaccardUnionIndex) QueryOrderAll(query [][]uint64, N, K int) <-chan SearchResult {
 	log.Printf("Started querying the minhash index with %d columns.", len(query))
 	results := make(chan SearchResult)
 	querySigs := make([]minhashlsh.Signature, len(query))
@@ -64,7 +64,7 @@ func (index *JaccardUnionIndex) QueryOrderAll(query [][]uint64, maxN, K int) <-c
 		for i := 0; i < len(query); i++ {
 			querySigs[i] = minhashlsh.Signature(query[i])
 		}
-		alignment := initAlignment(K, maxN)
+		alignment := initAlignment(K, N)
 		batch := pqueue.NewTopKQueue(batchSize)
 		done := make(chan struct{})
 		defer close(done)

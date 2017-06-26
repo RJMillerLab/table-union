@@ -57,13 +57,14 @@ func (s *JaccardServer) queryHandler(c *gin.Context) {
 	//dur := time.Since(start)
 	for result := range queryResults {
 		union := Union{
-			CandTableID:  result.CandidateTableID,
-			CandHeader:   getHeaders(result.CandidateTableID, s.ui.domainDir),
-			Alignment:    result.Alignment,
-			Kunioability: result.Alignment[len(result.Alignment)-1].Sim,
-			K:            result.K,
-			N:            result.N,
-			Duration:     result.Duration,
+			CandTableID:    result.CandidateTableID,
+			CandHeader:     getHeaders(result.CandidateTableID, s.ui.domainDir),
+			CandTextHeader: getTextHeaders(result.CandidateTableID, s.ui.domainDir),
+			Alignment:      result.Alignment,
+			Kunioability:   result.Alignment[len(result.Alignment)-1].Sim,
+			K:              result.K,
+			N:              result.N,
+			Duration:       result.Duration,
 		}
 
 		searchResults = append(searchResults, QueryResult{

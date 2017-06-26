@@ -59,6 +59,111 @@ func (c *JaccardClient) mkReq(queryRequest JaccardQueryRequest) QueryResponse {
 	return queryResponse
 }
 
+func (c *JaccardClient) QueryWithFixedK(queryCSVFilename string, k, maxN int) []QueryResult {
+	results := make([]QueryResult, 0)
+	f, err := os.Open(queryCSVFilename)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	reader := csv.NewReader(f)
+	queryTable, err := datatable.FromCSV(reader)
+	queryHeaders := queryTable.GetRow(0)
+	if err != nil {
+		panic(err)
+	}
+	// Create minhash
+	textToAllHeaders := make(map[int]int)
+	vecs := make([][]uint64, 0)
+	queryTextHeaders := make([]string, 0)
+	for i := 0; i < queryTable.NumCol(); i++ {
+		col := queryTable.GetColumn(i)
+		if classifyValues(col) == "text" {
+			vec := opendata.GetDomainMinhash(c.tokenFun, c.transFun, col, c.numHash)
+			if len(vec) != 0 {
+				vecs = append(vecs, vec)
+				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
+				textToAllHeaders[len(queryTextHeaders)-1] = i
+			}
+		}
+	}
+	if len(vecs) < k {
+		log.Printf("The query has too few text columns for %d-unionability.", k)
+		k = len(vecs)
+	}
+	// Query server
+	resp := c.mkReq(JaccardQueryRequest{Vecs: vecs, K: k, N: maxN})
+	// Process results
+	if resp.Result == nil || len(resp.Result) == 0 {
+		log.Printf("No result found.")
+	}
+	for _, result := range resp.Result {
+		result.TableUnion.QueryHeader = queryHeaders
+		result.TableUnion.QueryTextHeader = queryTextHeaders
+		// Retrive header index
+		for i, pair := range result.TableUnion.Alignment {
+			pair.QueryColIndex = textToAllHeaders[pair.QueryColIndex]
+			result.TableUnion.Alignment[i] = pair
+		}
+		results = append(results, result)
+	}
+	return results
+}
+
+func (c *JaccardClient) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryResult {
+	results := make([]QueryResult, 0)
+	f, err := os.Open(queryCSVFilename)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	reader := csv.NewReader(f)
+	queryTable, err := datatable.FromCSV(reader)
+	queryHeaders := queryTable.GetRow(0)
+	if err != nil {
+		panic(err)
+	}
+	// Create minhash
+	textToAllHeaders := make(map[int]int)
+	vecs := make([][]uint64, 0)
+	queryTextHeaders := make([]string, 0)
+	for i := 0; i < queryTable.NumCol(); i++ {
+		col := queryTable.GetColumn(i)
+		if classifyValues(col) == "text" {
+			vec := opendata.GetDomainMinhash(c.tokenFun, c.transFun, col, c.numHash)
+			if len(vec) != 0 {
+				vecs = append(vecs, vec)
+				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
+				textToAllHeaders[len(queryTextHeaders)-1] = i
+			}
+		}
+	}
+	if len(vecs) < minK {
+		log.Printf("The query has too few text columns for %d-unionability.", minK)
+		minK = len(vecs)
+	}
+	// Query server
+	for kp := minK; kp < len(vecs); kp++ {
+		resp := c.mkReq(JaccardQueryRequest{Vecs: vecs, K: kp, N: n})
+		// Process results
+		if resp.Result == nil || len(resp.Result) == 0 {
+			log.Printf("No result found.")
+		}
+		for _, result := range resp.Result {
+			result.TableUnion.QueryHeader = queryHeaders
+			result.TableUnion.QueryTextHeader = queryTextHeaders
+			// Retrive header index
+			for i, pair := range result.TableUnion.Alignment {
+				pair.QueryColIndex = textToAllHeaders[pair.QueryColIndex]
+				result.TableUnion.Alignment[i] = pair
+			}
+			results = append(results, result)
+		}
+	}
+	return results
+}
+
+/*
 func (c *JaccardClient) Query(queryCSVFilename string, k, n int) []QueryResult {
 	results := make([]QueryResult, 0)
 	f, err := os.Open(queryCSVFilename)
@@ -109,3 +214,4 @@ func (c *JaccardClient) Query(queryCSVFilename string, k, n int) []QueryResult {
 	}
 	return results
 }
+*/

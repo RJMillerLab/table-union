@@ -73,18 +73,18 @@ type alignment struct {
 	reverseAlign    map[string](*counter.Counter)
 	tableQueues     map[string](*pqueue.TopKQueue)
 	k               int
-	maxN            int
+	n               int
 	startTime       time.Time
 }
 
-func initAlignment(K, maxN int) alignment {
+func initAlignment(K, N int) alignment {
 	return alignment{
 		completedTables: counter.NewCounter(),
 		partialAlign:    make(map[string](*counter.Counter)),
 		reverseAlign:    make(map[string](*counter.Counter)),
 		tableQueues:     make(map[string]*pqueue.TopKQueue),
 		k:               K,
-		maxN:            maxN,
+		n:               N,
 		startTime:       time.Now(),
 	}
 }
@@ -148,19 +148,19 @@ func (a alignment) processPairs(pairQueue *pqueue.TopKQueue, out chan<- SearchRe
 			out <- result
 		}
 		// Check if we are done
-		if a.completedTables.Unique() == a.maxN {
+		if a.completedTables.Unique() == a.n {
 			return true
 		}
 	}
-	return a.completedTables.Unique() == a.maxN
+	return a.completedTables.Unique() == a.n
 }
 
-func (index *UnionIndex) QueryOrderAll(query [][]float64, maxN, K int) <-chan SearchResult {
+func (index *UnionIndex) QueryOrderAll(query [][]float64, N, K int) <-chan SearchResult {
 	log.Printf("Started querying the index with %d columns.", len(query))
 	results := make(chan SearchResult)
 	go func() {
 		defer close(results)
-		alignment := initAlignment(K, maxN)
+		alignment := initAlignment(K, N)
 		batch := pqueue.NewTopKQueue(batchSize)
 		done := make(chan struct{})
 		defer close(done)

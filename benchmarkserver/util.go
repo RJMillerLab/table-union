@@ -108,6 +108,16 @@ func getHeaders(file, domainDir string) (headers []string) {
 	return
 }
 
+func getTextHeaders(file, domainDir string) []string {
+	textHeaderIndices := getTextDomains(file, domainDir)
+	headers := getHeaders(file, domainDir)
+	textHeaders := make([]string, 0)
+	for _, i := range textHeaderIndices {
+		textHeaders = append(textHeaders, headers[i])
+	}
+	return textHeaders
+}
+
 // Classifies an array of strings.  The most dominant choice
 // is the class reported.
 func classifyValues(values []string) string {
