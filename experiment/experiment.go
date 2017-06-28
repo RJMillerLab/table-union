@@ -255,7 +255,7 @@ func readColumnPairs() <-chan columnPair {
 
 func DoComputeAndSaveExpansion() {
 	columnPairs := readColumnPairs()
-	expansions := computeUnionPairExpansion(columnPairs, 3)
+	expansions := computeUnionPairExpansion(columnPairs, 45)
 	progress := saveExpansion(expansions)
 	i := 0
 	total := ProgressCounter{}
