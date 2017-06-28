@@ -218,7 +218,7 @@ func selfUnion(pair columnPair) bool {
 
 func readColumnPairs() <-chan columnPair {
 	log.Printf("started reading column pairs.")
-	out := make(chan columnPair, 10000)
+	out := make(chan columnPair, 100)
 	go func() {
 		db2, err := sql.Open("sqlite3", ExperimentDB)
 		if err != nil {
