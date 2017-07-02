@@ -1,10 +1,11 @@
 # Set the variables
 OUTPUT_DIR = /home/fnargesian/TABLE_UNION_OUTPUT
 OPENDATA_LIST = $(OUTPUT_DIR)/opencanada-en.list
-QUERY_LIST = $(OUTPUT_DIR)/cod_queries.list
-#QUERY_LIST = $(OUTPUT_DIR)/debug.list
+QUERY_LIST = $(OUTPUT_DIR)/cod_queries2.list
+QUERY_LIST = $(OUTPUT_DIR)/debug.list
 #OPENDATA_LIST = $(OUTPUT_DIR)/debug.list
 #QUERY_LIST = $(OUTPUT_DIR)/small.query
+QUERY_LIST = $(OUTPUT_DIR)/active_queries.list
 OPENDATA_DIR = /home/ekzhu/OPENDATA/resource-2016-12-15-csv-only
 COLUMN_UNIONABILITY_TABLE = col_scores
 DATASET_UNIONABILITY_TABLE = dataset_scores
@@ -13,6 +14,21 @@ COLUMN_UNIONABILITY_DB = $(OUTPUT_DIR)/column_unionability.sqlite
 DATASET_UNIONABILITY_DB = $(OUTPUT_DIR)/dataset_unionability.sqlite
 THRESHOLD=0
 YAGO_DB = /home/kenpu/TABLE_UNION_OUTPUT/yago.sqlite3.0
+EXPERIMENT_DB = /home/fnargesian/TABLE_UNION_OUTPUT/experiments-fixedn.sqlite
+EXPERIMENT_DB2 = /home/fnargesian/TABLE_UNION_OUTPUT/jaccard-experiments-fixedn.sqlite
+EXPERIMENT_TABLE = fixedn_scores
+EXPERIMENT_TABLE2 = fixedn_scores
+EXPANSION_DB = /home/fnargesian/TABLE_UNION_OUTPUT/emb-expansion.sqlite
+EXPANSION_DB2 = /home/fnargesian/TABLE_UNION_OUTPUT/jaccard-expansion.sqlite 
+EXPANSION_TABLE = emb_scores
+EXPANSION_TABLE2 = jaccard_scores
+SHARED_DB = /home/fnargesian/TABLE_UNION_OUTPUT/union.db
+SHARED_TABLE = all_scores
+ANNOTATION_DB = /home/fnargesian/TABLE_UNION_OUTPUT/annotation.sqlite
+SUBJECT_ANNOTATION_TABLE = subject_labels
+ALL_ANNOTATION_TABLE = all_labels
+SARMA_TABLE = sarma_results
+SARMA_DB = /home/fnargesian/TABLE_UNION_OUTPUT/sarma.sqlite
 
 now: step4
 
@@ -75,7 +91,6 @@ step6:
 	OPENDATA_LIST=$(OPENDATA_LIST) \
 	YAGO_DB=$(YAGO_DB) \
 	OUTPUT_DIR=$(OUTPUT_DIR) \
-	SARMA_SCORES=$(SARMA_SCORES) \
 	JACCARD_SCORES=$(JACCARD_SCORES) \
 	CONTAINMENT_SCORES=$(CONTAINMENT_SCORES) \
 	COSINE_SCORES=$(COSINE_SCORES) \
@@ -130,7 +145,27 @@ step7:
 	QUERY_LIST=$(QUERY_LIST) \
 	go run cmd/benchmark_unionability/main.go
 
+step8:
+	OPENDATA_DIR=$(OPENDATA_DIR) \
+	OPENDATA_LIST=$(OPENDATA_LIST) \
+	OUTPUT_DIR=$(OUTPUT_DIR) \
+	QUERY_LIST=$(QUERY_LIST) \
+	ANNOTATION_DB=$(ANNOTATION_DB) \
+	SUBJECT_ANNOTATION_TABLE=$(SUBJECT_ANNOTATION_TABLE) \
+	ALL_ANNOTATION_TABLE=$(ALL_ANNOTATION_TABLE) \
+	go run cmd/annotate_subject_columns/main.go
 
+benchmark_sarma:
+	OPENDATA_DIR=$(OPENDATA_DIR) \
+	OPENDATA_LIST=$(OPENDATA_LIST) \
+	OUTPUT_DIR=$(OUTPUT_DIR) \
+	QUERY_LIST=$(QUERY_LIST) \
+	ANNOTATION_DB=$(ANNOTATION_DB) \
+	SUBJECT_ANNOTATION_TABLE=$(SUBJECT_ANNOTATION_TABLE) \
+	ALL_ANNOTATION_TABLE=$(ALL_ANNOTATION_TABLE) \
+	SARMA_DB=$(SARMA_DB) \
+	SARMA_TABLE=$(SARMA_TABLE) \
+	go run cmd/benchmark_sarma/main.go
 
 count_domains:
 	OPENDATA_DIR=$(OPENDATA_DIR) \
@@ -191,6 +226,20 @@ jaccard_client:
 	go run cmd/unionclient/main.go -query /home/ekzhu/OPENDATA/resource-2016-12-15-csv-only/open.canada.ca_data_en.jsonl/b75af755-b08b-4235-b259-41856217c652/8f369ac9-ce02-43bf-bc57-2a67c3402e1f____2/Fiche_Technique-20161026.txt -result-dir result
 	#go run cmd/unionclient/main.go -query /home/fnargesian/OPENDATA/queries/NSERC_GRT_FYR2011_AWARD.csv -result-dir result
 	#go run cmd/jaccardclient/main.go -query /home/ekzhu/OPENDATA/resource-2016-12-15-csv-only/open.canada.ca_data_en.jsonl/c1b0f627-8c29-427c-ab73-33968ad9176e/252f152f-a97a-435d-a15d-14c70de139fc -result-dir result
+
+expansion:
+	EXPERIMENT_DB=$(EXPERIMENT_DB) \
+	EXPERIMENT_TABLE=$(EXPERIMENT_TABLE) \
+	EXPERIMENT_DB2=$(EXPERIMENT_DB2) \
+	EXPERIMENT_TABLE2=$(EXPERIMENT_TABLE2) \
+	EXPANSION_DB=$(EXPANSION_DB) \
+	EXPANSION_TABLE=$(EXPANSION_TABLE) \
+	EXPANSION_DB2=$(EXPANSION_DB2) \
+	EXPANSION_TABLE2=$(EXPANSION_TABLE2) \
+	SHARED_DB=$(SHARED_DB) \
+	SHARED_TABLE=$(SHARED_TABLE) \
+	OPENDATA_DIR=$(OPENDATA_DIR) \
+	go run cmd/compute_union_expansion/main.go
 
 output/opendata.list:
 	cd python; python build-opendata-index.py

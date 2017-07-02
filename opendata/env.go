@@ -39,9 +39,14 @@ var DatasetUnionabilityDB = os.Getenv("DATASET_UNIONABILITY_DB")
 var QueryList = os.Getenv("QUERY_LIST")
 var Measure = os.Getenv("MEASURE")
 var Threshold = os.Getenv("THRESHOLD")
+var AnnotationDB = os.Getenv("ANNOTATION_DB")
+var SubjectAnnotationTable = os.Getenv("SUBJECT_ANNOTATION_TABLE")
+var AllAnnotationTable = os.Getenv("ALL_ANNOTATION_TABLE")
+var SarmaTable = os.Getenv("SARMA_TABLE")
+var SarmaDB = os.Getenv("SARMA_DB")
 
 func CheckEnv() {
-	if OpendataDir == "" || OutputDir == "" || Yago_db == "" {
+	if QueryList == "" {
 		panic("Environment missing")
 	}
 }
