@@ -305,7 +305,7 @@ func computeSchemaConsistency(queryFilename, candidateFilename string, queryText
 			matchingScore := computeLabelsFuzzyJaccard(queryFilename, qtc, candidateFilename, ctc)
 			if matchingScore != 0.0 {
 				valueConsistency := computeValueConsistency(queryFilename, candidateFilename, iqtc, ictc)
-				if valueConsistency >= 0.5 {
+				if valueConsistency >= 0.8 {
 					log.Printf("valueConsistency: %f", valueConsistency)
 					p := pair{
 						queryColIndex:     qtc,
@@ -578,9 +578,9 @@ func computeValueConsistency(queryTable, candidateTable string, queryColumnIndex
 			for vp := range makeDomainValuePairs(queryTable, candidateTable, queryColumnIndex, candidateColumnIndex) {
 				d := dice(vp.value1, vp.value2)
 				valueConsistency += d
-				if d > 0.0 {
-					numPairs += 1
-				}
+				//if d > 0.0 {
+				numPairs += 1
+				//}
 			}
 			wg.Done()
 		}()
@@ -649,6 +649,8 @@ func tokenizeAnnotation(annotation string) []string {
 }
 
 func dice(a, b string) (coefficient float64) {
+	a = strings.ToLower(a)
+	b = strings.ToLower(b)
 	bigrams := map[string]int{}
 	denom := 0.0
 	for i := 0; i < len(a)-1; i++ {
