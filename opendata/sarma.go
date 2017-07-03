@@ -302,16 +302,18 @@ func computeSchemaConsistency(queryFilename, candidateFilename string, queryText
 	// for each pair of columns read labels, tokenize and compute fuzzy jaccard
 	for iqtc, qtc := range queryTextColumns {
 		for ictc, ctc := range candidateTextColumns {
-			valueConsistency := computeValueConsistency(queryFilename, candidateFilename, iqtc, ictc)
-			if valueConsistency < 0.8 {
-				continue
-			}
 			matchingScore := computeLabelsFuzzyJaccard(queryFilename, qtc, candidateFilename, ctc)
-			p := pair{
-				queryColIndex:     qtc,
-				candidateColIndex: ctc,
+			if matchingScore != 0.0 {
+				valueConsistency := computeValueConsistency(queryFilename, candidateFilename, iqtc, ictc)
+				if valueConsistency >= 0.5 {
+					log.Printf("valueConsistency: %f", valueConsistency)
+					p := pair{
+						queryColIndex:     qtc,
+						candidateColIndex: ctc,
+					}
+					schemaMapping.Push(p, matchingScore)
+				}
 			}
-			schemaMapping.Push(p, matchingScore)
 		}
 	}
 	// mapping weight
@@ -468,7 +470,9 @@ func computeSarmaUnionabilityScores(queryFilename, candidateFilename string, que
 	ece := computeEntityConsistencyAndExpansion(queryFilename, candidateFilename, queryTextColumns, candidateTextColumns)
 	sc := computeSchemaConsistency(queryFilename, candidateFilename, queryTextColumns, candidateTextColumns)
 	sarma := ece * sc
-	log.Printf("ece: %f * sc: %f = sarma: %f", ece, sc, sarma)
+	if sarma != 0.0 {
+		log.Printf("ece: %f * sc: %f = sarma: %f", ece, sc, sarma)
+	}
 	return ece, sc
 }
 
@@ -565,7 +569,6 @@ func findSarmaUnionableTables(queryTable string, out chan *sarmaResult) {
 }
 
 func computeValueConsistency(queryTable, candidateTable string, queryColumnIndex, candidateColumnIndex int) float64 {
-	return 1.0
 	valueConsistency := 0.0
 	numPairs := 0
 	wg := &sync.WaitGroup{}
@@ -573,13 +576,19 @@ func computeValueConsistency(queryTable, candidateTable string, queryColumnIndex
 	for i := 0; i < 3; i++ {
 		go func() {
 			for vp := range makeDomainValuePairs(queryTable, candidateTable, queryColumnIndex, candidateColumnIndex) {
-				numPairs += 1
-				valueConsistency += dice(vp.value1, vp.value2)
+				d := dice(vp.value1, vp.value2)
+				valueConsistency += d
+				if d > 0.0 {
+					numPairs += 1
+				}
 			}
 			wg.Done()
 		}()
 	}
 	wg.Wait()
+	if numPairs == 0.0 {
+		return 0.0
+	}
 	return valueConsistency / float64(numPairs)
 }
 
@@ -652,5 +661,5 @@ func dice(a, b string) (coefficient float64) {
 		}
 		denom++
 	}
-	return coefficient / denom
+	return 2 * coefficient / denom
 }

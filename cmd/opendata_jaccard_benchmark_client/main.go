@@ -33,11 +33,13 @@ func main() {
 	flag.IntVar(&n, "n", 10, "Search Parameter: top (n,k) unionable tables")
 	flag.StringVar(&host, "host", "http://localhost:4003", "Server host")
 	flag.StringVar(&port, "port", "4003", "Server port")
-	flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/jaccard-experiments-fixedn.sqlite", "experiments DB")
+	//flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/jaccard-experiments-fixedn.sqlite", "experiments DB")
+	flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/jaccard-experiments.sqlite", "experiments DB")
 	flag.StringVar(&opendataDir, "opendate-dir", "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only", "The    directory of open data tables.")
 	flag.IntVar(&fanout, "fanout", 6, "Number threads querying the server in parallel.")
 	flag.StringVar(&experimentType, "type", "fixedn", "The type of experiments: fixed k or fixed n.")
 	flag.Parse()
+	log.Printf("query list: emb_or_ont.queries")
 	// Create client
 	client, err := benchmarkserver.NewJaccardClient(host, numHash)
 	if err != nil {
@@ -73,7 +75,7 @@ func main() {
 		wg.Wait()
 		close(alignments)
 	}()
-	progress := experiment.DoSaveAlignments(alignments, "minhash_jaccard_"+experimentType, experimentsDB, 1)
+	progress := experiment.DoSaveAlignments(alignments, "jaccard_"+experimentType, experimentsDB, 1)
 
 	total := experiment.ProgressCounter{}
 	for n := range progress {

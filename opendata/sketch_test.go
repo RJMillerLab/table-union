@@ -1,12 +1,6 @@
 package opendata
 
-import (
-	"log"
-	"testing"
-
-	minhashlsh "github.com/ekzhu/minhash-lsh"
-)
-
+/*
 func Test_MinhashSerialization(t *testing.T) {
 	seed = 1
 	numHash = 256
@@ -37,3 +31,4 @@ func Test_MinhashSerialization(t *testing.T) {
 		}
 	}
 }
+*/
