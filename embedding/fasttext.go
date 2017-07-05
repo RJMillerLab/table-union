@@ -15,7 +15,7 @@ type FastText struct {
 
 // Creates an in-memory FastText using an existing on-disk FastText Sqlite3 database.
 func InitFastText(dbFilename string, tokenFun func(string) []string, transFun func(string) string) (*FastText, error) {
-	db, err := sql.Open("sqlite3", dbFilename)
+	db, err := sql.Open("sqlite3", dbFilename+"?cache=shared")
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +28,7 @@ func InitFastText(dbFilename string, tokenFun func(string) []string, transFun fu
 
 // Creates an in-memory FastText using an existing on-disk FastText Sqlite3 database.
 func InitInMemoryFastText(dbFilename string, tokenFun func(string) []string, transFun func(string) string) (*FastText, error) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite3", "file::memory:?cache=shared")
 	_, err = db.Exec(fmt.Sprintf(`
 	attach database '%s' as disk;
 	`, dbFilename))
