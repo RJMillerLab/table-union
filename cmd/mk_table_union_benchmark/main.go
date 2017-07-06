@@ -15,14 +15,14 @@ import (
 
 var (
 	databases = [][]string{
-		// []string{"/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db", "canada"},
+		[]string{"/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db", "canada"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/catalog.data.gov.jsonl.db", "us"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db", "uk"},
-		[]string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
+		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
 	}
 	numBenchmarkTablePerRaw = 10
-	fastTextMinNumCol       = 3
-	fasttextMinPct          = 0.5
+	fastTextMinNumCol       = 5
+	fasttextMinPct          = 0.8
 	maxNumRowBeforeGiveUp   = 100
 )
 
@@ -100,7 +100,7 @@ func main() {
 
 	// Init FastText
 	log.Printf("Loading FastText database from %s...", fastTextDatabaseFilename)
-	ft, err := embedding.InitFastText(fastTextDatabaseFilename,
+	ft, err := embedding.InitInMemoryFastText(fastTextDatabaseFilename,
 		func(s string) []string {
 			return strings.Split(s, " ")
 		},
@@ -112,13 +112,13 @@ func main() {
 	}
 
 	// Select tables to be used as the source tables
-	log.Print("Selecting tabels that have values map to FastText...")
+	log.Print("Selecting tables that have values map to FastText...")
 	selected := make([]tableStat, 0)
 	for _, stat := range stats {
 		if len(selected) == numRawTableToSelect {
 			break
 		}
-		log.Printf("Scanning table %s.%s (%d rows, %d columns) for FastText matches...",
+		log.Printf("Scanning table %s.%s (%d rows, %d columns)...",
 			stat.info.Database, stat.info.Name, stat.nrow, stat.ncol)
 		err = od.ReadTable(stat.info.Database, stat.info.Name, func(rows *sql.Rows) error {
 			headers, err := rows.Columns()
@@ -183,14 +183,11 @@ func main() {
 				n++
 			}
 		}
-		log.Printf("%s.%s has %d columns with more than %.2f% FastText matches",
+		log.Printf("%s.%s has %d columns with more than %.2f% matches",
 			stat.info.Database, stat.info.Name, n, fasttextMinPct)
 		if n >= fastTextMinNumCol {
 			selected = append(selected, stat)
 		}
-	}
-	for _, stat := range selected {
-		log.Printf("Selected %s.%s: %s", stat.info.Database, stat.info.Name, stat.colStats)
 	}
 
 	// Generating tablets
