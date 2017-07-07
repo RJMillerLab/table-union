@@ -11,7 +11,7 @@ func main() {
 	start := GetNow()
 	InitSarma()
 	filenames := StreamFilenames()
-	annotations := AnnotateDomainsFromEntityFiles(filenames, 20)
+	annotations := AnnotateDomainsFromEntityFiles(filenames, 30)
 	progress := DoSaveAnnotations(annotations)
 	total := ProgressCounter{}
 	for n := range progress {

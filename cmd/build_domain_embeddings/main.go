@@ -38,8 +38,15 @@ func main() {
 			fmt.Printf("Error in building embedding for %s - %d: %s\n", vf.Filename, vf.Index, err.Error())
 			continue
 		}
-		vecFilename := filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.ft-sum", vf.Filename, vf.Index))
+		//vecFilename := filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.ft-sum", vf.Filename, vf.Index))
+		vecFilename := filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.ft-mean", vf.Filename, vf.Index))
 		if err := embedding.WriteVecToDisk(vec, binary.BigEndian, vecFilename); err != nil {
+			panic(err)
+		}
+		// calculating covar
+		covar := ft.GetDomainCovariance(vf.Values, vf.Freq)
+		vecFilename = filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.ft-covar", vf.Filename, vf.Index))
+		if err := embedding.WriteVecToDisk(covar, binary.BigEndian, vecFilename); err != nil {
 			panic(err)
 		}
 		fmt.Printf("query %d values in time = %.2f seconds\n", len(vf.Values), GetNow()-s)

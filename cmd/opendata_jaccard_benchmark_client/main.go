@@ -28,18 +28,17 @@ func main() {
 	flag.IntVar(&numHash, "h", 256, "LSH Parameter: number of hash functions")
 	flag.StringVar(&queryDir, "query-dir", "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only",
 		"The directory of query files")
-	flag.Float64Var(&threshold, "t", 0.8, "Search Parameter: k-unionability threshold")
+	flag.Float64Var(&threshold, "t", 0.5, "Search Parameter: k-unionability threshold")
 	flag.IntVar(&k, "k", 3, "Search Parameter: top (n,k) unionable tables")
 	flag.IntVar(&n, "n", 10, "Search Parameter: top (n,k) unionable tables")
-	flag.StringVar(&host, "host", "http://localhost:4003", "Server host")
-	flag.StringVar(&port, "port", "4003", "Server port")
+	flag.StringVar(&host, "host", "http://localhost:4008", "Server host")
+	flag.StringVar(&port, "port", "4005", "Server port")
 	//flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/jaccard-experiments-fixedn.sqlite", "experiments DB")
 	flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/jaccard-experiments.sqlite", "experiments DB")
 	flag.StringVar(&opendataDir, "opendate-dir", "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only", "The    directory of open data tables.")
 	flag.IntVar(&fanout, "fanout", 6, "Number threads querying the server in parallel.")
 	flag.StringVar(&experimentType, "type", "fixedn", "The type of experiments: fixed k or fixed n.")
 	flag.Parse()
-	log.Printf("query list: emb_or_ont.queries")
 	// Create client
 	client, err := benchmarkserver.NewJaccardClient(host, numHash)
 	if err != nil {

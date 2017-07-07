@@ -72,6 +72,13 @@ type Annotation struct {
 	Entities map[string]bool
 }
 
+// The section of a domain that
+// is not covered with ontology
+type NoAnnotation struct {
+	Domain             *Domain
+	NotAnnotatedValues map[string]bool
+}
+
 func DoAnnotateDomainSegment(domain *Domain, lookup map[string]map[string]bool, counts map[string]int) *Annotation {
 	// The set of entities found
 	annotation := make(map[string]bool)
@@ -85,6 +92,25 @@ func DoAnnotateDomainSegment(domain *Domain, lookup map[string]map[string]bool, 
 	}
 
 	return &Annotation{domain, annotation}
+}
+
+func DoFindNotAnnotatedDomainSegment(domain *Domain, lookup map[string]map[string]bool, counts map[string]int) *NoAnnotation {
+	// The set of entities found
+	noAnnotation := make(map[string]bool)
+
+	// Get the unique values
+	uniqueValues := unique(domain.Values)
+	// updating domain cardinality
+	domain.Cardinality = len(uniqueValues)
+	for _, value := range uniqueValues {
+		words := getWords(value)
+		foundEntities := findEntities(words, lookup, counts)
+		if len(foundEntities) == 0 {
+			noAnnotation[value] = true
+		}
+	}
+
+	return &NoAnnotation{domain, noAnnotation}
 }
 
 func main() {
