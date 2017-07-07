@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	fasttext "github.com/ekzhu/go-fasttext"
+	"github.com/gonum/matrix/mat64"
+	"github.com/gonum/stat"
 )
 
 type FastText struct {
@@ -121,6 +123,72 @@ func (ft *FastText) GetDomainEmbSum(values []string, freqs []int) ([]float64, er
 		return nil, ErrNoEmbFound
 	}
 	return sum, nil
+}
+
+// Returns the mean of domain embedding matrix
+func (ft *FastText) GetDomainEmbMean(values []string, freqs []int) ([]float64, error) {
+	var sum []float64
+	ftValuesNum := 0
+	for i, value := range values {
+		freq := freqs[i]
+		tokens := Tokenize(value, ft.tokenFun, ft.transFun)
+		vec, err := ft.getTokenizedValueEmb(tokens)
+		if err != nil {
+			continue
+		}
+		ftValuesNum += freq
+		for j, x := range vec {
+			vec[j] = x * float64(freq)
+		}
+		if sum == nil {
+			sum = vec
+		} else {
+			add(sum, vec)
+		}
+	}
+	if sum == nil {
+		return nil, ErrNoEmbFound
+	}
+	mean := multVector(sum, 1.0/float64(ftValuesNum))
+	return mean, nil
+}
+
+// Returns the covariance matrix of the domain
+func (ft *FastText) GetDomainCovariance(values []string, freqs []int) []float64 {
+	embs := make([]float64, 0)
+	ftValuesNum := 0
+	for i, value := range values {
+		tokens := Tokenize(value, ft.tokenFun, ft.transFun)
+		vec, err := ft.getTokenizedValueEmb(tokens)
+		if err != nil {
+			continue
+		}
+		ftValuesNum += freqs[i]
+		for f := 0; f < freqs[i]; f += 1 {
+			embs = append(embs, vec...)
+		}
+	}
+	// computing covariance
+	matrix := mat64.NewDense(ftValuesNum, 300, embs)
+	cov := stat.CovarianceMatrix(nil, matrix, nil)
+	return flattenMatrix(cov)
+}
+
+func multVector(v []float64, s float64) []float64 {
+	sv := make([]float64, len(v))
+	for i := 0; i < len(v); i++ {
+		sv[i] = v[i] / s
+	}
+	return sv
+}
+
+func flattenMatrix(a mat64.Matrix) []float64 {
+	r, _ := a.Dims()
+	f := make([]float64, 0)
+	for i := 0; i < r; i++ {
+		f = append(f, mat64.Row(nil, i, a)...)
+	}
+	return f
 }
 
 // Returns the embedding vector of a tokenized data value
