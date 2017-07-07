@@ -10,52 +10,55 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type JaccardServer struct {
+type OntologyJaccardServer struct {
 	ui     *JaccardUnionIndex
+	oi     *JaccardUnionIndex
 	router *gin.Engine
 }
 
-type JaccardQueryRequest struct {
-	Vecs        [][]uint64 `json:"table"`
-	K           int        `json:"k"`
-	N           int        `json:"n"`
-	Cardinality []int      `json:"cardinality"`
+type OntologyJaccardQueryRequest struct {
+	Vecs             [][]uint64 `json:"table"`
+	OntVecs          [][]uint64 `json:"onttable"`
+	K                int        `json:"k"`
+	N                int        `json:"n"`
+	OntCardinality   []int      `json:"ontcard"`
+	NoOntCardinality []int      `json:"noontcard"`
 }
 
-func NewJaccardServer(ui *JaccardUnionIndex) *JaccardServer {
-	s := &JaccardServer{
+func NewOntologyJaccardServer(ui *JaccardUnionIndex, oi *JaccardUnionIndex) *OntologyJaccardServer {
+	s := &OntologyJaccardServer{
 		ui:     ui,
+		oi:     oi,
 		router: gin.Default(),
 	}
 	s.router.POST("/query", s.queryHandler)
-	log.Printf("New jaccard server for experiments.")
+	log.Printf("New ontlogy jaccard server for experiments.")
 	return s
 }
 
-func (s *JaccardServer) Run(port string) error {
+func (s *OntologyJaccardServer) Run(port string) error {
 	return s.router.Run(":" + port)
 }
 
-func (s *JaccardServer) Close() error {
+func (s *OntologyJaccardServer) Close() error {
 	return nil
 }
 
-func (s *JaccardServer) queryHandler(c *gin.Context) {
+func (s *OntologyJaccardServer) queryHandler(c *gin.Context) {
 	body, err := ioutil.ReadAll(io.LimitReader(c.Request.Body, 1048576))
 	if err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	var queryRequest JaccardQueryRequest
+	var queryRequest OntologyJaccardQueryRequest
 	if err := json.Unmarshal(body, &queryRequest); err != nil {
 		c.AbortWithStatus(http.StatusUnprocessableEntity)
-		log.Printf("abort query.")
 		return
 	}
 	// Query index
 	searchResults := make([]QueryResult, 0)
 	//start := time.Now()
-	queryResults := s.ui.QueryOrderAll(queryRequest.Vecs, queryRequest.N, queryRequest.K, queryRequest.Cardinality)
+	queryResults := s.OntQueryOrderAll(queryRequest.Vecs, queryRequest.OntVecs, queryRequest.N, queryRequest.K)
 	//dur := time.Since(start)
 	for result := range queryResults {
 		union := Union{
@@ -73,7 +76,6 @@ func (s *JaccardServer) queryHandler(c *gin.Context) {
 			TableUnion: union,
 		})
 	}
-	log.Printf("len(response): %d", len(searchResults))
 	response := QueryResponse{
 		Result: searchResults,
 	}

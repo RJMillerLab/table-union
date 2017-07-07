@@ -2,11 +2,15 @@ package benchmarkserver
 
 import (
 	"encoding/binary"
+	"fmt"
 	"log"
+	"math"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/ekzhu/counter"
+	"github.com/gonum/matrix/mat64"
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/RJMillerLab/table-union/embedding"
@@ -49,6 +53,7 @@ func (index *UnionIndex) Build() error {
 	count := 0
 	for file := range embfilenames {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
+			log.Printf("%s not found.", file)
 			continue
 		}
 		count += 1
@@ -188,9 +193,6 @@ func (index *UnionIndex) QueryOrderAll(query [][]float64, N, K int) <-chan Searc
 	return results
 }
 
-//func FindAll(query [][]float64) <-chan SearchResult {
-//}
-
 func getColumnPair(candTableID, domainDir string, candColIndex, queryColIndex int, query [][]float64) Pair {
 	// getting the embedding of the candidate column
 	embFilename := getEmbFilename(candTableID, domainDir, candColIndex)
@@ -212,4 +214,84 @@ func getColumnPair(candTableID, domainDir string, candColIndex, queryColIndex in
 		Sim:           cosine,
 	}
 	return p
+}
+
+func getColumnPairPlus(candTableID, domainDir string, candColIndex, queryColIndex int, queryMean [][]float64, queryCovar [][]float64, queryCardinality int) Pair {
+	// getting the embedding of the candidate column
+	meanFilename := filepath.Join(domainDir, "domains", fmt.Sprintf("%s/%d.ft-mean", candTableID, candColIndex))
+	if _, err := os.Stat(meanFilename); os.IsNotExist(err) {
+		log.Printf("Mean embedding file %s does not exist.", meanFilename)
+		panic(err)
+	}
+	mean, err := embedding.ReadVecFromDisk(meanFilename, ByteOrder)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", meanFilename)
+		panic(err)
+	}
+	// reading covariance matrix
+	covarFilename := filepath.Join(domainDir, "domains", fmt.Sprintf("%s/%d.ft-covar", candTableID, candColIndex))
+	if _, err := os.Stat(covarFilename); os.IsNotExist(err) {
+		log.Printf("Embedding file %s does not exist.", covarFilename)
+		panic(err)
+	}
+	covar, err := embedding.ReadVecFromDisk(covarFilename, ByteOrder)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", covarFilename)
+		panic(err)
+	}
+	card := getDomainCardinality(candTableID, domainDir, candColIndex)
+	// inserting the pair into its corresponding priority queue
+	hotelling := getHotellingScore(mean, queryMean[queryColIndex], covar, queryCovar[queryColIndex], card, queryCardinality)
+	p := Pair{
+		QueryColIndex: queryColIndex,
+		CandTableID:   candTableID,
+		CandColIndex:  candColIndex,
+		Sim:           hotelling,
+	}
+	return p
+}
+
+func getHotellingScore(m1, m2 []float64, cv1, cv2 []float64, card1, card2 int) float64 {
+	dim := int(math.Sqrt(float64(len(cv1))))
+	cvd1 := mat64.NewDense(dim, dim, cv1)
+	cvd2 := mat64.NewDense(dim, dim, cv2)
+	t1 := mat64.NewDense(0, 0, nil)
+	t2 := mat64.NewDense(0, 0, nil)
+	t1.Scale(float64(card1-1)/float64(card1+card2-2), cvd1)
+	t2.Scale(float64(card2-1)/float64(card1+card2-2), cvd2)
+	t3 := mat64.NewDense(0, 0, nil)
+	t3.Add(t1, t2)
+	sigmaHat := mat64.NewDense(0, 0, nil)
+	sigmaHat.Scale((1.0/float64(card1))+(1/float64(card2)), t3)
+	sigmaHatInverse := mat64.NewDense(0, 0, nil)
+	sigmaHatInverse.Inverse(sigmaHat)
+	md1 := mat64.NewDense(1, dim, m1)
+	md2 := mat64.NewDense(1, dim, m2)
+	d1 := mat64.NewDense(0, 0, nil)
+	//s2 := mat64.NewDense(0, 0, nil)
+	d1.Sub(md1, md2)
+	//s2.Sub(md2, md1)
+	p1 := mat64.NewDense(0, 0, nil)
+	r, c := sigmaHatInverse.Dims()
+	log.Printf("sigma hat: %d %d", r, c)
+	r, c = d1.Dims()
+	log.Printf("d1: %d %d", r, c)
+	p1.Mul(sigmaHatInverse, d1.T())
+	r, c = p1.Dims()
+	log.Printf("p1: %d %d", r, c)
+	hotelling := mat64.NewDense(0, 0, nil)
+	r, c = d1.Dims()
+	log.Printf("d1: %d %d", r, c)
+	hotelling.MulElem(p1.T(), d1)
+	//l1 := mat64.NewDense(0, 0, nil)
+	//hotelling := mat64.NewDense(0, 0, nil)
+	//r, c := s1.Dims()
+	//log.Printf("s1: r and c %d %d", r, c)
+	//r, c = s2.Dims()
+	//log.Printf("s2: r and c %d %d", r, c)
+	//r, c = sigmaHatInverse.Dims()
+	//log.Printf("sigmahat inv: %d %d", r, c)
+	//l1.Mul(s1, sigmaHatInverse)
+	//hotelling.Mul(l1, s2.T())
+	return hotelling.At(0, 0)
 }

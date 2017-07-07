@@ -160,7 +160,7 @@ func (c *Client) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryRe
 		resp := c.mkReq(QueryRequest{Vecs: vecs, K: kp, N: n})
 		// Process results
 		if resp.Result == nil || len(resp.Result) == 0 {
-			log.Printf("No result found.")
+			log.Printf("No result found for %s.", queryCSVFilename)
 		}
 		for _, result := range resp.Result {
 			result.TableUnion.QueryHeader = queryHeaders

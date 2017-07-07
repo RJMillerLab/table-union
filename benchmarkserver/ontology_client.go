@@ -1,38 +1,53 @@
 package benchmarkserver
 
 import (
+	"bufio"
 	"bytes"
+	"database/sql"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/RJMillerLab/table-union/opendata"
 	"github.com/ekzhu/datatable"
 )
 
-type JaccardClient struct {
-	host     string
-	cli      *http.Client
-	transFun func(string) string
-	tokenFun func(string) []string
-	numHash  int
+var (
+	yagoDB             = "/home/kenpu/TABLE_UNION_OUTPUT/yago.sqlite3.0"
+	wordEntityFilename = "/home/kenpu/TABLE_UNION_OUTPUT/word-entity.txt"
+)
+
+type OntologyJaccardClient struct {
+	host         string
+	cli          *http.Client
+	transFun     func(string) string
+	tokenFun     func(string) []string
+	numHash      int
+	entityLookup map[string]map[string]bool
+	entityCounts map[string]int
 }
 
-func NewJaccardClient(host string, numHash int) (*JaccardClient, error) {
+func NewOntologyJaccardClient(host string, numHash int) (*OntologyJaccardClient, error) {
 	log.Printf("New jaccard client for experiments.")
-	return &JaccardClient{
-		host:     host,
-		cli:      &http.Client{},
-		transFun: DefaultTransFun,
-		tokenFun: DefaultTokenFun,
-		numHash:  numHash,
+	lookup := loadEntityWords(wordEntityFilename)
+	counts := loadEntityWordCount(yagoDB)
+	return &OntologyJaccardClient{
+		host:         host,
+		cli:          &http.Client{},
+		transFun:     DefaultTransFun,
+		tokenFun:     DefaultTokenFun,
+		numHash:      numHash,
+		entityLookup: lookup,
+		entityCounts: counts,
 	}, nil
 }
 
-func (c *JaccardClient) mkReq(queryRequest JaccardQueryRequest) QueryResponse {
+func (c *OntologyJaccardClient) mkReq(queryRequest OntologyJaccardQueryRequest) QueryResponse {
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(&queryRequest); err != nil {
 		panic(err)
@@ -54,12 +69,12 @@ func (c *JaccardClient) mkReq(queryRequest JaccardQueryRequest) QueryResponse {
 	var queryResponse QueryResponse
 	if err := json.Unmarshal(queryResponseData, &queryResponse); err != nil {
 		log.Printf("No response found")
-		//panic(err)
+		panic(err)
 	}
 	return queryResponse
 }
 
-func (c *JaccardClient) QueryWithFixedK(queryCSVFilename string, k, maxN int) []QueryResult {
+func (c *OntologyJaccardClient) QueryWithFixedK(queryCSVFilename string, k, maxN int) []QueryResult {
 	results := make([]QueryResult, 0)
 	f, err := os.Open(queryCSVFilename)
 	if err != nil {
@@ -75,15 +90,21 @@ func (c *JaccardClient) QueryWithFixedK(queryCSVFilename string, k, maxN int) []
 	// Create minhash
 	textToAllHeaders := make(map[int]int)
 	vecs := make([][]uint64, 0)
+	ontVecs := make([][]uint64, 0)
+	ontCards := make([]int, 0)
+	noOntCards := make([]int, 0)
 	queryTextHeaders := make([]string, 0)
 	for i := 0; i < queryTable.NumCol(); i++ {
 		col := queryTable.GetColumn(i)
 		if classifyValues(col) == "text" {
-			vec := opendata.GetDomainMinhash(c.tokenFun, c.transFun, col, c.numHash)
-			if len(vec) != 0 {
+			ontVec, vec, ontCard, noOntCard, _ := opendata.GetOntDomain(col, c.numHash, c.entityLookup, c.entityCounts, c.transFun, c.tokenFun)
+			if len(vec) != 0 && len(ontVec) != 0 {
 				vecs = append(vecs, vec)
 				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
 				textToAllHeaders[len(queryTextHeaders)-1] = i
+				ontVecs = append(ontVecs, ontVec)
+				ontCards = append(ontCards, ontCard)
+				noOntCards = append(noOntCards, noOntCard)
 			}
 		}
 	}
@@ -92,7 +113,7 @@ func (c *JaccardClient) QueryWithFixedK(queryCSVFilename string, k, maxN int) []
 		k = len(vecs)
 	}
 	// Query server
-	resp := c.mkReq(JaccardQueryRequest{Vecs: vecs, K: k, N: maxN})
+	resp := c.mkReq(OntologyJaccardQueryRequest{Vecs: vecs, OntVecs: ontVecs, K: k, N: maxN, OntCardinality: ontCards, NoOntCardinality: noOntCards})
 	// Process results
 	if resp.Result == nil || len(resp.Result) == 0 {
 		log.Printf("No result found.")
@@ -110,7 +131,7 @@ func (c *JaccardClient) QueryWithFixedK(queryCSVFilename string, k, maxN int) []
 	return results
 }
 
-func (c *JaccardClient) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryResult {
+func (c *OntologyJaccardClient) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryResult {
 	results := make([]QueryResult, 0)
 	f, err := os.Open(queryCSVFilename)
 	if err != nil {
@@ -126,17 +147,21 @@ func (c *JaccardClient) QueryWithFixedN(queryCSVFilename string, minK, n int) []
 	// Create minhash
 	textToAllHeaders := make(map[int]int)
 	vecs := make([][]uint64, 0)
-	cardinality := make([]int, 0)
+	ontVecs := make([][]uint64, 0)
+	ontCards := make([]int, 0)
+	noOntCards := make([]int, 0)
 	queryTextHeaders := make([]string, 0)
 	for i := 0; i < queryTable.NumCol(); i++ {
 		col := queryTable.GetColumn(i)
 		if classifyValues(col) == "text" {
-			vec := opendata.GetDomainMinhash(c.tokenFun, c.transFun, col, c.numHash)
-			if len(vec) != 0 {
+			ontVec, vec, ontCard, noOntCard, _ := opendata.GetOntDomain(col, c.numHash, c.entityLookup, c.entityCounts, c.transFun, c.tokenFun)
+			if len(vec) != 0 && len(ontVec) != 0 {
 				vecs = append(vecs, vec)
 				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
 				textToAllHeaders[len(queryTextHeaders)-1] = i
-				cardinality = append(cardinality, getCardinality(col))
+				ontVecs = append(ontVecs, ontVec)
+				ontCards = append(ontCards, ontCard)
+				noOntCards = append(noOntCards, noOntCard)
 			}
 		}
 	}
@@ -146,7 +171,7 @@ func (c *JaccardClient) QueryWithFixedN(queryCSVFilename string, minK, n int) []
 	}
 	// Query server
 	for kp := minK; kp < len(vecs); kp++ {
-		resp := c.mkReq(JaccardQueryRequest{Vecs: vecs, K: kp, N: n, Cardinality: cardinality})
+		resp := c.mkReq(OntologyJaccardQueryRequest{Vecs: vecs, OntVecs: ontVecs, K: kp, N: n, OntCardinality: ontCards, NoOntCardinality: noOntCards})
 		// Process results
 		if resp.Result == nil || len(resp.Result) == 0 {
 			log.Printf("No result found.")
@@ -165,55 +190,57 @@ func (c *JaccardClient) QueryWithFixedN(queryCSVFilename string, minK, n int) []
 	return results
 }
 
-/*
-func (c *JaccardClient) Query(queryCSVFilename string, k, n int) []QueryResult {
-	results := make([]QueryResult, 0)
-	f, err := os.Open(queryCSVFilename)
+func loadEntityWords(wordEntityFilename string) map[string]map[string]bool {
+	lookup := make(map[string]map[string]bool)
+	f, err := os.Open(wordEntityFilename)
 	if err != nil {
 		panic(err)
 	}
 	defer f.Close()
-	reader := csv.NewReader(f)
-	queryTable, err := datatable.FromCSV(reader)
-	queryHeaders := queryTable.GetRow(0)
+	scanner := bufio.NewScanner(f)
+	i := 0
+
+	for scanner.Scan() {
+		parts := strings.SplitN(scanner.Text(), "|", 2)
+		word, entity := parts[0], parts[1]
+		if _, ok := lookup[word]; !ok {
+			lookup[word] = make(map[string]bool)
+		}
+		lookup[word][entity] = true
+		i += 1
+		if i%100000 == 0 {
+			log.Printf("LoadEntityWords: %d.", i)
+		}
+	}
+	return lookup
+}
+
+func loadEntityWordCount(yagoDB string) map[string]int {
+	counts := make(map[string]int)
+	db, err := sql.Open("sqlite3", yagoDB)
 	if err != nil {
 		panic(err)
 	}
-	// Create minhash
-	textToAllHeaders := make(map[int]int)
-	vecs := make([][]uint64, 0)
-	queryTextHeaders := make([]string, 0)
-	for i := 0; i < queryTable.NumCol(); i++ {
-		col := queryTable.GetColumn(i)
-		if classifyValues(col) == "text" {
-			vec := opendata.GetDomainMinhash(c.tokenFun, c.transFun, col, c.numHash)
-			if len(vec) != 0 {
-				vecs = append(vecs, vec)
-				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
-				textToAllHeaders[len(queryTextHeaders)-1] = i
-			}
+	defer db.Close()
+
+	rows, err := db.Query(`select entity, words_count from words_count`)
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	i := 0
+	for rows.Next() {
+		var ent string
+		var count int
+		if err = rows.Scan(&ent, &count); err != nil {
+			panic(err)
+		}
+		counts[ent] = count
+		i += 1
+		if i%100000 == 0 {
+			fmt.Printf("LoadEntityWordCount: %d\n", i)
 		}
 	}
-	if len(vecs) < k {
-		log.Printf("The query has too few text columns for %d-unionability.", k)
-		k = len(vecs)
-	}
-	// Query server
-	resp := c.mkReq(JaccardQueryRequest{Vecs: vecs, K: k, N: n})
-	// Output results
-	if resp.Result == nil || len(resp.Result) == 0 {
-		log.Printf("No result found.")
-	}
-	for _, result := range resp.Result {
-		result.TableUnion.QueryTextHeader = queryTextHeaders
-		result.TableUnion.QueryHeader = queryHeaders
-		// Retrive header index
-		for i, pair := range result.TableUnion.Alignment {
-			pair.QueryColIndex = textToAllHeaders[pair.QueryColIndex]
-			result.TableUnion.Alignment[i] = pair
-		}
-		results = append(results, result)
-	}
-	return results
+	return counts
 }
-*/

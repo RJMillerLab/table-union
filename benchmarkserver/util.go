@@ -13,6 +13,7 @@ import (
 
 	minhashlsh "github.com/RJMillerLab/table-union/minhashlsh"
 	"github.com/deckarep/golang-set"
+	"github.com/ekzhu/counter"
 )
 
 var (
@@ -65,6 +66,66 @@ func getEmbFilename(tableID, domainDir string, index int) string {
 func getMinhashFilename(tableID, domainDir string, index int) string {
 	fullpath := path.Join(domainDir, tableID)
 	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "minhash"))
+	return fullpath
+}
+
+func getOntDomainCardinality(tableID, domainDir string, index int) (int, int) {
+	cardpath := path.Join(domainDir, tableID)
+	cardpath = path.Join(cardpath, fmt.Sprintf("%d.%s", index, "ont-card"))
+	f, err := os.Open(cardpath)
+	defer f.Close()
+	if err != nil {
+		return 0.0, 0.0
+	}
+	card := 0
+	ocard := 0
+	scanner := bufio.NewScanner(f)
+	lineIndex := 0
+	for scanner.Scan() {
+		if lineIndex == 0 {
+			c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
+			if err == nil {
+				card = c
+			}
+			lineIndex += 1
+		}
+		if lineIndex == 1 {
+			c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
+			if err == nil {
+				ocard = c
+			}
+			lineIndex += 1
+		}
+	}
+	return card, ocard
+}
+
+func getDomainCardinality(tableID, domainDir string, index int) int {
+	cardpath := path.Join(domainDir, tableID)
+	cardpath = path.Join(cardpath, fmt.Sprintf("%d.%s", index, "card"))
+	f, err := os.Open(cardpath)
+	defer f.Close()
+	if err != nil {
+		return 0.0
+	}
+	card := 0
+	scanner := bufio.NewScanner(f)
+	lineIndex := 0
+	for scanner.Scan() {
+		if lineIndex == 0 {
+			c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
+			if err == nil {
+				card = c
+			}
+			lineIndex += 1
+		}
+	}
+	return card
+}
+
+func getOntMinhashFilename(tableID, domainDir string, index int) string {
+	fullpath := path.Join(domainDir, tableID)
+	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "ont-minhash-l1"))
 	return fullpath
 }
 
@@ -195,7 +256,7 @@ func jaccard(dom1, dom2 []string) float64 {
 	return float64(d1andd2) / float64(d1ord2)
 }
 
-func estimatedJaccard(query, candidate []uint64) float64 {
+func estimateJaccard(query, candidate []uint64) float64 {
 	intersection := 0
 	for i := 0; i < len(query); i++ {
 		if query[i] == candidate[i] {
@@ -254,4 +315,12 @@ func tokenizedValues(values []string, tokenFun func(string) []string, transFun f
 		close(out)
 	}()
 	return out
+}
+
+func getCardinality(column []string) int {
+	counter := counter.NewCounter()
+	for _, value := range column {
+		counter.Update(value)
+	}
+	return counter.Unique()
 }
