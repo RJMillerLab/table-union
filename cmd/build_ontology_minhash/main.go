@@ -11,7 +11,7 @@ func main() {
 	start := GetNow()
 	filenames := StreamFilenames()
 	sketches := DoOntologyMinhashFromDB(10, filenames)
-	progress := DoSaveDomainSketches(10, sketches)
+	progress := DoSaveDomainSketches(10, sketches, "ont-minhash-l1")
 	total := ProgressCounter{}
 	for n := range progress {
 		total.Values += n.Values

@@ -10,8 +10,8 @@ func main() {
 	CheckEnv()
 	start := GetNow()
 	filenames := StreamFilenames()
-	sketches := DoMinhashDomainsFromFiles(10, filenames)
-	progress := DoSaveDomainSketches(10, sketches)
+	sketches := DoMinhashDomainsFromFiles(10, filenames, "values")
+	progress := DoSaveDomainSketches(10, sketches, "minhash")
 	total := ProgressCounter{}
 	for n := range progress {
 		total.Values += n.Values

@@ -21,7 +21,7 @@ func main() {
 		"Query CSV file")
 	flag.StringVar(&resultDir, "result-dir", "",
 		"Query result directory")
-	flag.StringVar(&host, "host", "http://localhost:4004", "Server host")
+	flag.StringVar(&host, "host", "http://localhost:4006", "Server host")
 	flag.IntVar(&n, "n", 10, "Search Parameter: top (n,k) unionable tables")
 	flag.IntVar(&k, "k", 5, "Search Parameter: top (n,k) unionable tables")
 	flag.Parse()
