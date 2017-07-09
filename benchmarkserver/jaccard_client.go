@@ -13,6 +13,10 @@ import (
 	"github.com/ekzhu/datatable"
 )
 
+var (
+	ks = []int{2, 4, 6, 8, 10}
+)
+
 type JaccardClient struct {
 	host     string
 	cli      *http.Client
@@ -145,7 +149,9 @@ func (c *JaccardClient) QueryWithFixedN(queryCSVFilename string, minK, n int) []
 		minK = len(vecs)
 	}
 	// Query server
-	for kp := minK; kp < len(vecs); kp++ {
+	//mK := int(math.Min(float64(maxK), float64(len(vecs))))
+	//for kp := minK; kp < mK; kp++ {
+	for _, kp := range ks {
 		resp := c.mkReq(JaccardQueryRequest{Vecs: vecs, K: kp, N: n, Cardinality: cardinality})
 		// Process results
 		if resp.Result == nil || len(resp.Result) == 0 {

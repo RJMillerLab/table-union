@@ -12,14 +12,15 @@ import (
 
 type Server struct {
 	ui     *UnionIndex
-	jui    *JaccardUnionIndex
 	router *gin.Engine
 }
 
 type QueryRequest struct {
-	Vecs [][]float64 `json:"table"`
-	K    int         `json:"k"`
-	N    int         `json:"n"`
+	Vecs   [][]float64 `json:"table"`
+	Covars [][]float64 `json:"covarianc_table"`
+	K      int         `json:"k"`
+	N      int         `json:"n"`
+	Cards  []int       `json:"card"`
 }
 
 type QueryResponse struct {
@@ -76,7 +77,7 @@ func (s *Server) queryHandler(c *gin.Context) {
 	// Query index
 	searchResults := make([]QueryResult, 0)
 	//start := time.Now()
-	queryResults := s.ui.QueryOrderAll(queryRequest.Vecs, queryRequest.N, queryRequest.K)
+	queryResults := s.ui.QueryOrderAll(queryRequest.Vecs, queryRequest.Covars, queryRequest.N, queryRequest.K, queryRequest.Cards)
 	//dur := time.Since(start)
 	for result := range queryResults {
 		union := Union{

@@ -11,8 +11,16 @@ type edge struct {
 }
 
 type Pair struct {
-	CandTableID   string
-	CandColIndex  int
-	QueryColIndex int
-	Sim           float64
+	CandTableID     string
+	CandColIndex    int
+	QueryColIndex   int
+	Jaccard         float64
+	JaccardProb     float64
+	OntologyJaccard float64
+	OntologyProb    float64
+	Cosine          float64
+	CosineProb      float64
+	F               float64
+	T2              float64
+	Sim             float64
 }

@@ -110,11 +110,14 @@ func getColumnPairJaccardPlus(candTableID, domainDir string, candColIndex, query
 	jaccard := estimateJaccard(vec, query[queryColIndex])
 	nA := getDomainCardinality(candTableID, domainDir, candColIndex)
 	nB := queryCardinality
+	sig := sameDomainProb(jaccard, nA, nB)
 	p := Pair{
 		QueryColIndex: queryColIndex,
 		CandTableID:   candTableID,
 		CandColIndex:  candColIndex,
-		Sim:           sameDomainProb(jaccard, nA, nB),
+		Jaccard:       jaccard,
+		JaccardProb:   sig,
+		Sim:           sig,
 	}
 	return p
 }
@@ -137,6 +140,7 @@ func getColumnPairJaccard(candTableID, domainDir string, candColIndex, queryColI
 		QueryColIndex: queryColIndex,
 		CandTableID:   candTableID,
 		CandColIndex:  candColIndex,
+		Jaccard:       jaccard,
 		Sim:           jaccard,
 	}
 	return p
@@ -145,6 +149,9 @@ func getColumnPairJaccard(candTableID, domainDir string, candColIndex, queryColI
 func sameDomainProbPlus(estimatedJaccard float64, nA, nB int) float64 {
 	N := nA + nB
 	k := int(math.Floor((estimatedJaccard * float64(N)) / (1.0 + estimatedJaccard)))
+	if k > nA {
+		log.Printf("invalid intersection")
+	}
 	F_k_A_B := 0.0
 	for i := 1; i <= k; i++ {
 		F_k_A_B += hyperGeometricProb(i, nA, nB, N)
@@ -158,11 +165,15 @@ func sameDomainProbPlus(estimatedJaccard float64, nA, nB int) float64 {
 func sameDomainProb(estimatedJaccard float64, nA, nB int) float64 {
 	N := nA + nB
 	k := int(math.Floor((estimatedJaccard * float64(N)) / (1.0 + estimatedJaccard)))
+	if k > nA || k > nB {
+		//log.Printf("invalid intersection")
+		k = int(math.Min(float64(nA), float64(nB)))
+	}
 	F_k_A_B := 0.0
-	for i := 1; i <= k; i++ {
+	for i := 0; i <= k; i++ {
 		F_k_A_B += math.Exp(logHyperGeometricProb(i, nA, nB, N))
 	}
-	if F_k_A_B > 1.0 {
+	if F_k_A_B > 2.0 {
 		log.Printf("jaccard: %f, intersection: %d, querySize: %d, candSize: %d, D: %d, significance: %f", estimatedJaccard, k, nA, nB, N, F_k_A_B)
 	}
 	return F_k_A_B
@@ -175,7 +186,6 @@ func hyperGeometricProb(k, K, n, N int) float64 {
 
 func logHyperGeometricProb(k, K, n, N int) float64 {
 	hgp := logCombination(K, k) + logCombination(N-K, n-k) - logCombination(N, n)
-	log.Printf("hgp: %f", hgp)
 	return hgp
 }
 
@@ -198,7 +208,8 @@ func combination(np, kp int) int64 {
 func logCombination(m, n int) float64 {
 	a := 0.0
 	b := 0.0
-	for i := n; i <= (m + 1); i++ {
+	//for i := n + 1; i < (m + 1); i++ {
+	for i := n + 1; i < m+1; i++ {
 		a += math.Log(float64(i))
 	}
 	for i := 1; i < (m - n + 1); i++ {

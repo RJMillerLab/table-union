@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -119,6 +118,7 @@ func (c *OntologyJaccardClient) QueryWithFixedK(queryCSVFilename string, k, maxN
 		log.Printf("No result found.")
 	}
 	for _, result := range resp.Result {
+		log.Printf("result in client")
 		result.TableUnion.QueryHeader = queryHeaders
 		result.TableUnion.QueryTextHeader = queryTextHeaders
 		// Retrive header index
@@ -170,7 +170,10 @@ func (c *OntologyJaccardClient) QueryWithFixedN(queryCSVFilename string, minK, n
 		minK = len(vecs)
 	}
 	// Query server
-	for kp := minK; kp < len(vecs); kp++ {
+	//mK := int(math.Min(float64(maxK), float64(len(vecs))))
+	//for kp := minK; kp < mK; kp++ {
+	//for kp := minK; kp < len(vecs); kp++ {
+	for _, kp := range ks {
 		resp := c.mkReq(OntologyJaccardQueryRequest{Vecs: vecs, OntVecs: ontVecs, K: kp, N: n, OntCardinality: ontCards, NoOntCardinality: noOntCards})
 		// Process results
 		if resp.Result == nil || len(resp.Result) == 0 {
@@ -239,7 +242,7 @@ func loadEntityWordCount(yagoDB string) map[string]int {
 		counts[ent] = count
 		i += 1
 		if i%100000 == 0 {
-			fmt.Printf("LoadEntityWordCount: %d\n", i)
+			log.Printf("LoadEntityWordCount: %d\n", i)
 		}
 	}
 	return counts

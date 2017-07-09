@@ -139,7 +139,7 @@ func (a alignment) processPairs(pairQueue *pqueue.TopKQueue, out chan<- SearchRe
 		}
 		a.partialAlign[pair.CandTableID].Update(pair.CandColIndex)
 		a.reverseAlign[pair.CandTableID].Update(pair.QueryColIndex)
-		a.tableQueues[pair.CandTableID].Push(pair, pair.Sim)
+		a.tableQueues[pair.CandTableID].Push(pair, pair.T2)
 		// When we get k unique column alignments for a candidate table
 		if a.tableQueues[pair.CandTableID].Size() == a.k {
 			a.completedTables.Update(pair.CandTableID)
@@ -160,7 +160,7 @@ func (a alignment) processPairs(pairQueue *pqueue.TopKQueue, out chan<- SearchRe
 	return a.completedTables.Unique() == a.n
 }
 
-func (index *UnionIndex) QueryOrderAll(query [][]float64, N, K int) <-chan SearchResult {
+func (index *UnionIndex) QueryOrderAll(query, queryCovar [][]float64, N, K int, queryCardinality []int) <-chan SearchResult {
 	log.Printf("Started querying the index with %d columns.", len(query))
 	results := make(chan SearchResult)
 	go func() {
@@ -175,8 +175,10 @@ func (index *UnionIndex) QueryOrderAll(query [][]float64, N, K int) <-chan Searc
 			if alignment.hasCompleted(tableID) {
 				continue
 			}
-			e := getColumnPair(tableID, index.domainDir, columnIndex, pair.QueryIndex, query)
-			batch.Push(e, e.Sim)
+			//e := getColumnPairPlus(tableID, index.domainDir, columnIndex, pair.QueryIndex, query[pair.QueryIndex], queryCovar[pair.QueryIndex], queryCardinality[pair.QueryIndex])
+			e := getColumnPair(tableID, index.domainDir, columnIndex, pair.QueryIndex, query[pair.QueryIndex])
+			//batch.Push(e, e.T2)
+			batch.Push(e, e.Cosine)
 			if batch.Size() < batchSize {
 				continue
 			}
@@ -193,9 +195,11 @@ func (index *UnionIndex) QueryOrderAll(query [][]float64, N, K int) <-chan Searc
 	return results
 }
 
-func getColumnPair(candTableID, domainDir string, candColIndex, queryColIndex int, query [][]float64) Pair {
+func getColumnPair(candTableID, domainDir string, candColIndex, queryColIndex int, query []float64) Pair {
 	// getting the embedding of the candidate column
-	embFilename := getEmbFilename(candTableID, domainDir, candColIndex)
+	//embFilename := getEmbFilename(candTableID, domainDir, candColIndex)
+	embFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-sum", candTableID, candColIndex))
+	//embFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-mean", candTableID, candColIndex))
 	if _, err := os.Stat(embFilename); os.IsNotExist(err) {
 		log.Printf("Embedding file %s does not exist.", embFilename)
 		panic(err)
@@ -206,19 +210,20 @@ func getColumnPair(candTableID, domainDir string, candColIndex, queryColIndex in
 		panic(err)
 	}
 	// inserting the pair into its corresponding priority queue
-	cosine := embedding.Cosine(vec, query[queryColIndex])
+	cosine := embedding.Cosine(vec, query)
 	p := Pair{
 		QueryColIndex: queryColIndex,
 		CandTableID:   candTableID,
 		CandColIndex:  candColIndex,
+		Cosine:        cosine,
 		Sim:           cosine,
 	}
 	return p
 }
 
-func getColumnPairPlus(candTableID, domainDir string, candColIndex, queryColIndex int, queryMean [][]float64, queryCovar [][]float64, queryCardinality int) Pair {
+func getColumnPairPlus(candTableID, domainDir string, candColIndex, queryColIndex int, queryMean, queryCovar []float64, queryCardinality int) Pair {
 	// getting the embedding of the candidate column
-	meanFilename := filepath.Join(domainDir, "domains", fmt.Sprintf("%s/%d.ft-mean", candTableID, candColIndex))
+	meanFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-mean", candTableID, candColIndex))
 	if _, err := os.Stat(meanFilename); os.IsNotExist(err) {
 		log.Printf("Mean embedding file %s does not exist.", meanFilename)
 		panic(err)
@@ -229,7 +234,7 @@ func getColumnPairPlus(candTableID, domainDir string, candColIndex, queryColInde
 		panic(err)
 	}
 	// reading covariance matrix
-	covarFilename := filepath.Join(domainDir, "domains", fmt.Sprintf("%s/%d.ft-covar", candTableID, candColIndex))
+	covarFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-covar", candTableID, candColIndex))
 	if _, err := os.Stat(covarFilename); os.IsNotExist(err) {
 		log.Printf("Embedding file %s does not exist.", covarFilename)
 		panic(err)
@@ -240,58 +245,69 @@ func getColumnPairPlus(candTableID, domainDir string, candColIndex, queryColInde
 		panic(err)
 	}
 	card := getDomainCardinality(candTableID, domainDir, candColIndex)
+	cosine := embedding.Cosine(mean, queryMean)
 	// inserting the pair into its corresponding priority queue
-	hotelling := getHotellingScore(mean, queryMean[queryColIndex], covar, queryCovar[queryColIndex], card, queryCardinality)
+	ht2, f := getT2Statistics(mean, queryMean, covar, queryCovar, card, queryCardinality)
+	if math.IsNaN(ht2) || math.IsNaN(f) || math.IsInf(ht2, 0) || math.IsInf(f, 0) {
+		ht2 = 1000
+		f = 1000
+	}
 	p := Pair{
 		QueryColIndex: queryColIndex,
 		CandTableID:   candTableID,
 		CandColIndex:  candColIndex,
-		Sim:           hotelling,
+		Cosine:        cosine,
+		T2:            ht2,
+		F:             f,
+		Sim:           ht2,
 	}
 	return p
 }
 
-func getHotellingScore(m1, m2 []float64, cv1, cv2 []float64, card1, card2 int) float64 {
-	dim := int(math.Sqrt(float64(len(cv1))))
-	cvd1 := mat64.NewDense(dim, dim, cv1)
-	cvd2 := mat64.NewDense(dim, dim, cv2)
+func getT2Statistics(m1, m2 []float64, cv1, cv2 []float64, card1, card2 int) (float64, float64) {
+	//dim := int(math.Sqrt(float64(len(cv1))))
+	dim := len(cv1)
+	cvd1 := mat64.NewDense(dim, dim, getCovarMatrix(cv1))
+	cvd2 := mat64.NewDense(dim, dim, getCovarMatrix(cv2))
 	t1 := mat64.NewDense(0, 0, nil)
 	t2 := mat64.NewDense(0, 0, nil)
-	t1.Scale(float64(card1-1)/float64(card1+card2-2), cvd1)
-	t2.Scale(float64(card2-1)/float64(card1+card2-2), cvd2)
+	t1.Scale(float64(card1-1), cvd1)
+	t2.Scale(float64(card2-1), cvd2)
 	t3 := mat64.NewDense(0, 0, nil)
 	t3.Add(t1, t2)
-	sigmaHat := mat64.NewDense(0, 0, nil)
-	sigmaHat.Scale((1.0/float64(card1))+(1/float64(card2)), t3)
-	sigmaHatInverse := mat64.NewDense(0, 0, nil)
-	sigmaHatInverse.Inverse(sigmaHat)
+	t4 := mat64.NewDense(0, 0, nil)
+	t4.Scale(1.0/float64(card1+card2-2), t3)
+	pooledCovar := mat64.NewDense(0, 0, nil)
+	pooledCovar.Scale((1.0/float64(card1) + 1.0/float64(card2)), t4)
+	pcInverse := mat64.NewDense(0, 0, nil)
+	pcInverse.Inverse(pooledCovar)
 	md1 := mat64.NewDense(1, dim, m1)
 	md2 := mat64.NewDense(1, dim, m2)
-	d1 := mat64.NewDense(0, 0, nil)
-	//s2 := mat64.NewDense(0, 0, nil)
-	d1.Sub(md1, md2)
-	//s2.Sub(md2, md1)
+	meanDiff := mat64.NewDense(0, 0, nil)
+	meanDiff.Sub(md1, md2)
 	p1 := mat64.NewDense(0, 0, nil)
-	r, c := sigmaHatInverse.Dims()
-	log.Printf("sigma hat: %d %d", r, c)
-	r, c = d1.Dims()
-	log.Printf("d1: %d %d", r, c)
-	p1.Mul(sigmaHatInverse, d1.T())
-	r, c = p1.Dims()
-	log.Printf("p1: %d %d", r, c)
-	hotelling := mat64.NewDense(0, 0, nil)
-	r, c = d1.Dims()
-	log.Printf("d1: %d %d", r, c)
-	hotelling.MulElem(p1.T(), d1)
-	//l1 := mat64.NewDense(0, 0, nil)
-	//hotelling := mat64.NewDense(0, 0, nil)
-	//r, c := s1.Dims()
-	//log.Printf("s1: r and c %d %d", r, c)
-	//r, c = s2.Dims()
-	//log.Printf("s2: r and c %d %d", r, c)
-	//r, c = sigmaHatInverse.Dims()
-	//log.Printf("sigmahat inv: %d %d", r, c)
-	//l1.Mul(s1, sigmaHatInverse)
-	//hotelling.Mul(l1, s2.T())
-	return hotelling.At(0, 0)
+	p1.Mul(meanDiff, pcInverse)
+	ht2 := mat64.NewDense(0, 0, nil)
+	ht2.Mul(p1, meanDiff.T())
+	T2 := ht2.At(0, 0)
+	// Computing F-distribution
+	p := len(m1)
+	n := card1 + card2 - 1
+	f := (float64(n-p) / math.Abs(float64(p*(n-1)))) * T2
+	return T2, f
+}
+
+func getCovarMatrix(variance []float64) []float64 {
+	dim := len(variance)
+	covariance := make([]float64, dim*dim)
+	for i := 0; i < len(variance); i++ {
+		for j := 0; j < len(variance); j++ {
+			if i == j {
+				covariance[i*dim+j] = variance[i]
+				continue
+			}
+			covariance[i*dim+j] = 0.0
+		}
+	}
+	return covariance
 }
