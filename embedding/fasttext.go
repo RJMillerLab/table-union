@@ -3,6 +3,7 @@ package embedding
 import (
 	"database/sql"
 	"fmt"
+	"log"
 
 	fasttext "github.com/ekzhu/go-fasttext"
 	"github.com/gonum/matrix/mat64"
@@ -155,6 +156,7 @@ func (ft *FastText) GetDomainEmbMean(values []string, freqs []int) ([]float64, e
 
 // Returns the covariance matrix of the domain
 func (ft *FastText) GetDomainCovariance(values []string, freqs []int) []float64 {
+	log.Printf("starting computing covar.")
 	embs := make([]float64, 0)
 	ftValuesNum := 0
 	for i, value := range values {
@@ -168,10 +170,53 @@ func (ft *FastText) GetDomainCovariance(values []string, freqs []int) []float64 
 			embs = append(embs, vec...)
 		}
 	}
+	log.Printf("len(embs): %d", len(embs))
 	// computing covariance
 	matrix := mat64.NewDense(ftValuesNum, 300, embs)
 	cov := stat.CovarianceMatrix(nil, matrix, nil)
+	log.Printf("done computing covar.")
 	return flattenMatrix(cov)
+}
+
+// Returns the mean of domain embedding matrix
+func (ft *FastText) GetDomainEmbMeanCovar(values []string, freqs []int) ([]float64, []float64, error) {
+	var embs [][]float64
+	var sum []float64
+	ftValuesNum := 0
+	for i, value := range values {
+		freq := freqs[i]
+		tokens := Tokenize(value, ft.tokenFun, ft.transFun)
+		vec, err := ft.getTokenizedValueEmb(tokens)
+		if err != nil {
+			continue
+		}
+		ftValuesNum += freq
+		for j, x := range vec {
+			vec[j] = x * float64(freq)
+		}
+		embs = append(embs, vec)
+		if sum == nil {
+			sum = vec
+		} else {
+			add(sum, vec)
+		}
+	}
+	if sum == nil {
+		return nil, nil, ErrNoEmbFound
+	}
+	mean := multVector(sum, 1.0/float64(ftValuesNum))
+	// calculating covar
+	covar := make([]float64, len(mean))
+	covarSum := make([]float64, len(mean))
+	for _, emb := range embs {
+		for i, e := range emb {
+			covarSum[i] += ((e - mean[i]) * (e - mean[i]))
+		}
+	}
+	for i, _ := range mean {
+		covar[i] = covarSum[i] / float64(len(embs)-1)
+	}
+	return mean, covar, nil
 }
 
 func multVector(v []float64, s float64) []float64 {

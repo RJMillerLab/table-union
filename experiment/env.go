@@ -15,9 +15,15 @@ const MIN_DOMSIZE = 5
 var OpendataDir = os.Getenv("OPENDATA_DIR")
 
 var ExperimentDB = os.Getenv("EXPERIMENT_DB")
+var ExperimentDB2 = os.Getenv("EXPERIMENT_DB2")
 var ExperimentTable = os.Getenv("EXPERIMENT_TABLE")
+var ExperimentTable2 = os.Getenv("EXPERIMENT_TABLE2")
 var ExpansionDB = os.Getenv("EXPANSION_DB")
 var ExpansionTable = os.Getenv("EXPANSION_TABLE")
+var ExpansionDB2 = os.Getenv("EXPANSION_DB2")
+var ExpansionTable2 = os.Getenv("EXPANSION_TABLE2")
+var SharedDB = os.Getenv("SHARED_DB")
+var SharedTable = os.Getenv("SHARED_TABLE")
 
 func CheckEnv() {
 	if ExperimentDB == "" || ExperimentTable == "" || ExpansionDB == "" || ExpansionTable == "" {

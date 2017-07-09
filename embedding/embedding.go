@@ -64,6 +64,42 @@ func GetDomainEmbSum(ft *fasttext.FastText, tokenFun func(string) []string, tran
 	return vec, nil
 }
 
+// Returns the mean of domain embedding matrix
+func GetDomainEmbMeanCovar(ft *fasttext.FastText, tokenFun func(string) []string, transFun func(string) string, column []string) ([]float64, []float64, error) {
+	values := TokenizedValues(column, tokenFun, transFun)
+	var embs [][]float64
+	var sum []float64
+	ftValuesNum := 0
+	for tokens := range values {
+		vec, err := GetValueEmb(ft, tokens)
+		if err != nil {
+			continue
+		}
+		embs = append(embs, vec)
+		if sum == nil {
+			sum = vec
+		} else {
+			add(sum, vec)
+		}
+	}
+	if sum == nil {
+		return nil, nil, ErrNoEmbFound
+	}
+	mean := multVector(sum, 1.0/float64(ftValuesNum))
+	// calculating covar
+	covar := make([]float64, len(mean))
+	covarSum := make([]float64, len(mean))
+	for _, emb := range embs {
+		for i, e := range emb {
+			covarSum[i] += ((e - mean[i]) * (e - mean[i]))
+		}
+	}
+	for i, _ := range mean {
+		covar[i] = covarSum[i] / float64(len(embs)-1)
+	}
+	return mean, covar, nil
+}
+
 func GetDomainEmb(ft *fasttext.FastText, tokenFun func(string) []string, transFun func(string) string, column []string, kfirst int) (*mat64.Dense, error) {
 	values := TokenizedValues(column, tokenFun, transFun)
 	var data []float64

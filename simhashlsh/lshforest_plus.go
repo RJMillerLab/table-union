@@ -1,6 +1,7 @@
 package simhashlsh
 
 import (
+	"log"
 	"sort"
 	"sync"
 )
@@ -15,7 +16,6 @@ type UnionPair struct {
 // Return candidate keys given the query signatures.
 func (index *CosineLSH) QueryPlus(point [][]float64, done <-chan struct{}) <-chan UnionPair {
 	return index.queryPlusPlus(point, done)
-	//return index.queryPlus(point, done)
 }
 
 func (index *CosineLSH) queryPlus(points [][]float64, done <-chan struct{}) <-chan UnionPair {
@@ -28,7 +28,7 @@ func (index *CosineLSH) queryPlus(points [][]float64, done <-chan struct{}) <-ch
 		for i := 0; i < len(points); i++ {
 			Hs[i] = index.toBasicHashTableKeys(index.hash(points[i]))
 		}
-		for K := index.cosineLSHParam.k; K >= 0; K-- {
+		for K := index.cosineLSHParam.k; K > 0; K-- {
 			prefixSize := K
 			// Query hash tables in parallel
 			keyChan := make(chan UnionPair)
@@ -105,6 +105,7 @@ func (index *CosineLSH) queryPlusPlus(points [][]float64, done <-chan struct{}) 
 }
 
 func (index *CosineLSH) probe(Hs [][]string, prefixSize int, done <-chan struct{}) <-chan UnionPair {
+	log.Printf("prefix is now %d", prefixSize)
 	out := make(chan UnionPair)
 	var wg sync.WaitGroup
 	wg.Add(index.cosineLSHParam.l * len(Hs))

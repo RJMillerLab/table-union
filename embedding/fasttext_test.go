@@ -1,6 +1,10 @@
 package embedding
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/gonum/matrix/mat64"
+)
 
 func Test_InMemFastText(t *testing.T) {
 	ft, err := InitInMemoryFastText("./fasttext-small.db", func(v string) []string {
@@ -23,5 +27,12 @@ func Test_InMemFastText(t *testing.T) {
 		t.Error(err)
 	} else {
 		t.Log(vec)
+	}
+}
+
+func Test_flattenMatrix(t *testing.T) {
+	m := mat64.NewDense(3, 3, []float64{8, 1, 6, 3, 5, 7, 4, 9, 2})
+	if len(flattenMatrix(m)) != 9 {
+		t.Fail()
 	}
 }

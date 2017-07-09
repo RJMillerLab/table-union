@@ -2,7 +2,6 @@ package minhashlsh
 
 import (
 	"encoding/binary"
-	"log"
 	"math"
 	"sort"
 	"sync"
@@ -253,7 +252,6 @@ func (f *MinhashLSH) query(sigs []Signature, done <-chan struct{}) <-chan UnionP
 
 //func (f *MinhashLSH) query(sig Signature, minK int, done <-chan struct{}) <-chan string {
 func (f *MinhashLSH) probe(Hs [][]string, prefixSize int, done <-chan struct{}) <-chan UnionPair {
-	log.Printf("simhash prefix is now %d", prefixSize)
 	out := make(chan UnionPair)
 	var wg sync.WaitGroup
 	wg.Add(f.l * len(Hs))

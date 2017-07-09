@@ -96,7 +96,8 @@ func DoSaveAlignments(alignments <-chan benchmarkserver.Union, measure, experime
 	return progress
 }
 
-func saveExpansion(expansions <-chan columnExpansion) <-chan ProgressCounter {
+/*
+func saveExpansionPlus(expansions <-chan columnExpansion) <-chan ProgressCounter {
 	out := make(chan ProgressCounter)
 	db1, err := sql.Open("sqlite3", ExpansionDB)
 	if err != nil {
@@ -120,7 +121,7 @@ func saveExpansion(expansions <-chan columnExpansion) <-chan ProgressCounter {
 			k int,
 			n int,
 			query_domain_size int,
-			candidate_domain_size int, 
+			candidate_domain_size int,
 			expansion_size int,
 			duration real);`, ExpansionTable, ExpansionTable))
 	if err != nil {
@@ -177,6 +178,7 @@ func saveExpansion(expansions <-chan columnExpansion) <-chan ProgressCounter {
 	}()
 	return out
 }
+*/
 
 func computeUnionPairExpansion(columnPairs <-chan columnPair, fanout int) <-chan columnExpansion {
 	out := make(chan columnExpansion)
@@ -255,7 +257,7 @@ func readColumnPairs() <-chan columnPair {
 
 func DoComputeAndSaveExpansion() {
 	columnPairs := readColumnPairs()
-	expansions := computeUnionPairExpansion(columnPairs, 45)
+	expansions := computeUnionPairExpansion(columnPairs, 5)
 	progress := saveExpansion(expansions)
 	i := 0
 	total := ProgressCounter{}
@@ -273,4 +275,34 @@ func DoComputeAndSaveExpansion() {
 	}
 	fmt.Printf("Computed and saved the expansion of %d unionable columns in %.2f seconds\n", total.Values, GetNow()-start)
 	log.Printf("Done computing and saving expansion!")
+}
+
+func saveExpansion(expansions <-chan columnExpansion) <-chan ProgressCounter {
+	out := make(chan ProgressCounter)
+	db, err := sql.Open("sqlite3", ExpansionDB)
+	if err != nil {
+		panic(err)
+	}
+	// Create table
+	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s(query_table text,  candidate_table text, query_col_index int,candidate_col_index int,query_domain_size int, candidate_domain_size int, expansion_size int);`, ExpansionTable, ExpansionTable))
+	if err != nil {
+		panic(err)
+	}
+	// Prepare insert stmt
+	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(query_table, candidate_table, query_col_index, candidate_col_index, query_domain_size, candidate_domain_size, expansion_size) values(?, ?, ?, ?, ?, ?, ?);`, ExpansionTable))
+	if err != nil {
+		panic(err)
+	}
+	go func() {
+		for expansion := range expansions {
+			_, err = stmt.Exec(expansion.columns.queryTable, expansion.columns.candidateTable, expansion.columns.queryColIndex, expansion.columns.candidateColIndex, expansion.col1NumUniqueValues, expansion.col2NumUniqueValues, expansion.numUniqueValuesAdded)
+			if err != nil {
+				panic(err)
+			}
+			out <- ProgressCounter{1}
+		}
+		db.Close()
+		close(out)
+	}()
+	return out
 }
