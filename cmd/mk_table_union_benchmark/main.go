@@ -11,6 +11,7 @@ import (
 
 	opendata "github.com/RJMillerLab/go-opendata"
 	"github.com/RJMillerLab/table-union/embedding"
+	"github.com/daviddengcn/go-algs/ed"
 	"github.com/ekzhu/counter"
 )
 
@@ -19,30 +20,38 @@ var (
 		[]string{"/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db", "canada"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/catalog.data.gov.jsonl.db", "us"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db", "uk"},
-		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
+		//		[]string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
 	}
-	numBenchmarkTablePerRaw = 10
-	fastTextMinNumCol       = 3
-	fasttextMinPct          = 0.8
-	maxNumRowBeforeGiveUp   = 10000
-	maxSrcTableNumRow       = 1000000
-	statTablename           = "dataset_profile"
+	numBenchmarkTablePerRaw               = 10
+	fastTextMinNumCol                     = 3
+	fasttextMinPct                        = 0.8
+	maxSrcTableNumRow                     = 100000
+	statTablename                         = "dataset_profile"
+	maxNumDistinctBeforeGiveUp            = 100
+	maxNumCharPerValue                    = 256
+	minEditDistanceBetweenSelectedColumns = 5
 )
 
 type tableStat struct {
 	*opendata.TableStat
 	colStats []columnStat
+	columns  []string
 }
 
 type columnStat struct {
-	nmapped int
+	distinctCount int
+	nmapped       int
+}
+
+func (stat tableStat) isFastTextCol(i int) bool {
+	pct := float64(stat.colStats[i].nmapped) / float64(stat.colStats[i].distinctCount)
+	return pct >= fasttextMinPct
 }
 
 func (stat tableStat) countNumFastTextCols() int {
 	var n int
 	for i := range stat.colStats {
-		pct := float64(stat.colStats[i].nmapped) / float64(stat.NumRow)
-		if pct >= fasttextMinPct {
+		if stat.isFastTextCol(i) {
 			n++
 		}
 	}
@@ -133,7 +142,17 @@ func main() {
 			break
 		}
 		// Use the local wrapper
-		stat := tableStat{&stats[s], nil}
+		stat := tableStat{&stats[s], nil, nil}
+		if stat.NumRow > maxSrcTableNumRow {
+			log.Printf("Skipping table %s.%s as max number of rows exceeded",
+				stat.Database, stat.Name)
+			continue
+		}
+		if stat.NumCol < fastTextMinNumCol {
+			log.Printf("Skipping table %s.%s as to few columns",
+				stat.Database, stat.Name)
+			continue
+		}
 		if selectedPackages.Has(stat.MetadataId) {
 			log.Printf("Skipping table %s.%s as a sibling table was selected",
 				stat.Database, stat.Name)
@@ -141,54 +160,67 @@ func main() {
 		}
 		log.Printf("Scanning table %s.%s (%d rows, %d columns)...",
 			stat.Database, stat.Name, stat.NumRow, stat.NumCol)
-		err = od.ReadTable(stat.Database, stat.Name, func(rows *sql.Rows) error {
-			// Figuring out how many columns and what are their types
-			headers, err := rows.Columns()
-			if err != nil {
-				return err
+		// Get the column names and their types
+		columns, colTypes, err := od.GetColumns(stat.Database, stat.Name)
+		if err != nil {
+			panic(err)
+		}
+		stat.columns = columns
+		stat.colStats = make([]columnStat, len(columns))
+		// Check if we have seen very similar column names
+		var similarTable *tableStat
+		for j := range selected {
+			d := ed.EditDistanceF(len(columns), len(selected[j].columns),
+				func(iA, iB int) int {
+					return ed.Ternary(strings.ToLower(columns[iA]) == strings.ToLower(selected[j].columns[iB]), 0, 1)
+				},
+				ed.ConstCost(1), ed.ConstCost(1))
+			if d < minEditDistanceBetweenSelectedColumns {
+				similarTable = &selected[j]
+				break
 			}
-			stat.colStats = make([]columnStat, len(headers))
-			colTypes, err := rows.ColumnTypes()
-			if err != nil {
-				return err
+		}
+		if similarTable != nil {
+			log.Printf("Skipping table %s.%s as having similar columns as %s.%s",
+				stat.Database, stat.Name, similarTable.Database, similarTable.Name)
+			continue
+		}
+		// Find out the text columns, so we are just looking at those
+		textCols := make([]int, 0)
+		for i, colType := range colTypes {
+			if colType.DatabaseTypeName() == "TEXT" {
+				textCols = append(textCols, i)
 			}
-			// Find out the text columns, so we are just looking at those
-			textCols := make([]int, 0)
-			for i, colType := range colTypes {
-				if colType.DatabaseTypeName() == "TEXT" {
-					textCols = append(textCols, i)
-				}
-			}
-			// Scan the table on the text columns
-			values := make([]sql.NullString, len(headers))
-			ptrs := make([]interface{}, len(headers))
-			for i := range ptrs {
-				ptrs[i] = &values[i]
-			}
-			var currRowIndex int
-			for rows.Next() {
-				if err := rows.Scan(ptrs...); err != nil {
-					panic(err)
-				}
-				for _, i := range textCols {
-					if !values[i].Valid {
+		}
+		// Collecting column stats for each text column
+		for _, i := range textCols {
+			column := columns[i]
+			err = od.ReadColumnDistinct(stat.Database, stat.Name, column, func(rows *sql.Rows) error {
+				var value sql.NullString
+				var count int
+				for rows.Next() {
+					if err := rows.Scan(&value); err != nil {
+						return err
+					}
+					if !value.Valid {
 						continue
 					}
-					if _, err := ft.GetValueEmb(values[i].String); err == nil {
+					count++
+					if count == maxNumDistinctBeforeGiveUp && !stat.isFastTextCol(i) {
+						break
+					}
+					if len(value.String) > maxNumCharPerValue {
+						continue
+					}
+					if _, err := ft.GetValueEmb(value.String); err == nil {
 						stat.colStats[i].nmapped++
 					}
 				}
-				currRowIndex++
-				if currRowIndex == maxNumRowBeforeGiveUp && stat.countNumFastTextCols() == 0 {
-					log.Printf("Found no FastText matches after scanning %d rows",
-						maxNumRowBeforeGiveUp)
-					break
-				}
+				return nil
+			})
+			if err != nil {
+				panic(err)
 			}
-			return nil
-		})
-		if err != nil {
-			panic(err)
 		}
 		// Count number of columns meeting the criteria
 		n := stat.countNumFastTextCols()
@@ -197,6 +229,9 @@ func main() {
 				stat.Database, stat.Name, n, fasttextMinPct*100.0)
 			selected = append(selected, stat)
 			selectedPackages.Update(stat.MetadataId)
+		} else {
+			log.Printf("Skipped %s.%s as requirement not satisfied",
+				stat.Database, stat.Name)
 		}
 	}
 
