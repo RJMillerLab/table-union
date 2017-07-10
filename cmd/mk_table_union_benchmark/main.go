@@ -11,6 +11,7 @@ import (
 
 	opendata "github.com/RJMillerLab/go-opendata"
 	"github.com/RJMillerLab/table-union/embedding"
+	"github.com/ekzhu/counter"
 )
 
 var (
@@ -21,20 +22,31 @@ var (
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
 	}
 	numBenchmarkTablePerRaw = 10
-	fastTextMinNumCol       = 5
+	fastTextMinNumCol       = 3
 	fasttextMinPct          = 0.8
-	maxNumRowBeforeGiveUp   = 100
+	maxNumRowBeforeGiveUp   = 10000
+	maxSrcTableNumRow       = 1000000
+	statTablename           = "dataset_profile"
 )
 
 type tableStat struct {
-	info     *opendata.TableInfo
-	nrow     int
-	ncol     int
+	*opendata.TableStat
 	colStats []columnStat
 }
 
 type columnStat struct {
 	nmapped int
+}
+
+func (stat tableStat) countNumFastTextCols() int {
+	var n int
+	for i := range stat.colStats {
+		pct := float64(stat.colStats[i].nmapped) / float64(stat.NumRow)
+		if pct >= fasttextMinPct {
+			n++
+		}
+	}
+	return n
 }
 
 func main() {
@@ -53,6 +65,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	// Cleaning cached tables
+	log.Print("Cleaning previously generated tables...")
+	cached, err := od.CachedTables()
+	for _, name := range cached {
+		if name == statTablename {
+			continue
+		}
+		if err := od.DropCachedTable(name); err != nil {
+			panic(err)
+		}
+	}
+
 	// Attaching databases
 	for _, database := range databases {
 		log.Printf("Attach database %s as %s", database[0], database[1])
@@ -61,44 +85,33 @@ func main() {
 		}
 	}
 
-	// Get table infos
-	log.Print("Getting Open Data table infos...")
-	tables, err := od.GetTableInfos("")
+	// Compute table stats if it hasn't been done before
+	if !od.CacheExists(statTablename) {
+		log.Print("Computing table stats...")
+		if err := od.Analyze("", statTablename); err != nil {
+			panic(err)
+		}
+	}
+
+	// Get the table stats
+	log.Print("Loading table stats...")
+	stats, err := od.GetTableStats(statTablename)
 	if err != nil {
 		panic(err)
 	}
-	log.Printf("Found %d tables", len(tables))
-
-	// Compute table stats
-	log.Print("Computing table stats...")
-	stats := make([]tableStat, len(tables))
-	for i := range stats {
-		nrow, err := od.CountRows(tables[i].Database, tables[i].Name)
-		if err != nil {
-			panic(err)
-		}
-		ncol, err := od.CountCols(tables[i].Database, tables[i].Name)
-		if err != nil {
-			panic(err)
-		}
-		stats[i] = tableStat{
-			info: &tables[i],
-			ncol: ncol,
-			nrow: nrow,
-		}
-	}
+	log.Printf("Found %d tables", len(stats))
 
 	// Sort the tables first by the number of rows and then by the number of columns
 	// in descending order.
 	log.Print("Sorting the table stats by nrow...")
 	sort.Slice(stats, func(i, j int) bool {
-		if stats[i].nrow == stats[j].nrow {
-			return stats[i].ncol > stats[j].ncol
+		if stats[i].NumRow == stats[j].NumRow {
+			return stats[i].NumCol > stats[j].NumCol
 		}
-		return stats[i].nrow > stats[j].nrow
+		return stats[i].NumRow > stats[j].NumRow
 	})
 
-	// Init FastText
+	// Init FastText word set
 	log.Printf("Loading FastText database from %s...", fastTextDatabaseFilename)
 	ft, err := embedding.InitInMemoryFastText(fastTextDatabaseFilename,
 		func(s string) []string {
@@ -114,28 +127,39 @@ func main() {
 	// Select tables to be used as the source tables
 	log.Print("Selecting tables that have values map to FastText...")
 	selected := make([]tableStat, 0)
-	for _, stat := range stats {
+	selectedPackages := counter.NewCounter()
+	for s := range stats {
 		if len(selected) == numRawTableToSelect {
 			break
 		}
+		// Use the local wrapper
+		stat := tableStat{&stats[s], nil}
+		if selectedPackages.Has(stat.MetadataId) {
+			log.Printf("Skipping table %s.%s as a sibling table was selected",
+				stat.Database, stat.Name)
+			continue
+		}
 		log.Printf("Scanning table %s.%s (%d rows, %d columns)...",
-			stat.info.Database, stat.info.Name, stat.nrow, stat.ncol)
-		err = od.ReadTable(stat.info.Database, stat.info.Name, func(rows *sql.Rows) error {
+			stat.Database, stat.Name, stat.NumRow, stat.NumCol)
+		err = od.ReadTable(stat.Database, stat.Name, func(rows *sql.Rows) error {
+			// Figuring out how many columns and what are their types
 			headers, err := rows.Columns()
 			if err != nil {
 				return err
 			}
+			stat.colStats = make([]columnStat, len(headers))
 			colTypes, err := rows.ColumnTypes()
 			if err != nil {
 				return err
 			}
+			// Find out the text columns, so we are just looking at those
 			textCols := make([]int, 0)
 			for i, colType := range colTypes {
 				if colType.DatabaseTypeName() == "TEXT" {
 					textCols = append(textCols, i)
 				}
 			}
-			colStats := make([]columnStat, len(headers))
+			// Scan the table on the text columns
 			values := make([]sql.NullString, len(headers))
 			ptrs := make([]interface{}, len(headers))
 			for i := range ptrs {
@@ -151,56 +175,42 @@ func main() {
 						continue
 					}
 					if _, err := ft.GetValueEmb(values[i].String); err == nil {
-						colStats[i].nmapped++
+						stat.colStats[i].nmapped++
 					}
 				}
 				currRowIndex++
-				// If no FastText matches found at this point, give up scanning
-				// further for this table.
-				if currRowIndex == maxNumRowBeforeGiveUp {
-					var sum int
-					for i := range colStats {
-						sum += colStats[i].nmapped
-					}
-					if sum == 0 {
-						log.Printf("Found no FastText matches after scanning %d rows",
-							maxNumRowBeforeGiveUp)
-						break
-					}
+				if currRowIndex == maxNumRowBeforeGiveUp && stat.countNumFastTextCols() == 0 {
+					log.Printf("Found no FastText matches after scanning %d rows",
+						maxNumRowBeforeGiveUp)
+					break
 				}
 			}
-			stat.colStats = colStats
 			return nil
 		})
 		if err != nil {
 			panic(err)
 		}
 		// Count number of columns meeting the criteria
-		var n int
-		for i := range stat.colStats {
-			pct := float64(stat.colStats[i].nmapped) / float64(stat.nrow)
-			if pct >= fasttextMinPct {
-				n++
-			}
-		}
-		log.Printf("%s.%s has %d columns with more than %.2f% matches",
-			stat.info.Database, stat.info.Name, n, fasttextMinPct)
+		n := stat.countNumFastTextCols()
 		if n >= fastTextMinNumCol {
+			log.Printf("Selected %s.%s has %d columns with more than %.0f%% matches",
+				stat.Database, stat.Name, n, fasttextMinPct*100.0)
 			selected = append(selected, stat)
+			selectedPackages.Update(stat.MetadataId)
 		}
 	}
 
 	// Generating tablets
 	log.Print("Generating benchmark tables from selected source tables...")
 	for _, stat := range selected {
-		limit := stat.nrow / numBenchmarkTablePerRaw
+		limit := stat.NumRow / numBenchmarkTablePerRaw
 		if limit == 0 {
 			panic("Getting limit = 0")
 		}
 		for i := 0; i < numBenchmarkTablePerRaw; i++ {
 			offset := limit * i
-			tablename := fmt.Sprintf("%s____%s____%d", stat.info.Database, stat.info.Name, i)
-			if err := od.LoadTableLimit(stat.info.Database, stat.info.Name, tablename, offset, limit); err != nil {
+			tablename := fmt.Sprintf("%s____%s____%d", stat.Database, stat.Name, i)
+			if err := od.LoadTableLimit(stat.Database, stat.Name, tablename, offset, limit); err != nil {
 				panic(err)
 			}
 		}
