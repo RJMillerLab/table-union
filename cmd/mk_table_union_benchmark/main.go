@@ -17,10 +17,11 @@ import (
 
 var (
 	databases = [][]string{
-		[]string{"/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db", "canada"},
+		// []string{"/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db", "canada"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/catalog.data.gov.jsonl.db", "us"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db", "uk"},
-		//		[]string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
+		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
+		[]string{"/home/ekzhu/OPENDATA/2017-06-05/datahub.io.jsonl.db", "datahub"},
 	}
 	numBenchmarkTablePerRaw               = 10
 	fastTextMinNumCol                     = 3
@@ -193,6 +194,7 @@ func main() {
 			}
 		}
 		// Collecting column stats for each text column
+		var readErr error
 		for _, i := range textCols {
 			column := columns[i]
 			err = od.ReadColumnDistinct(stat.Database, stat.Name, column, func(rows *sql.Rows) error {
@@ -219,8 +221,14 @@ func main() {
 				return nil
 			})
 			if err != nil {
-				panic(err)
+				readErr = err
+				break
 			}
+		}
+		if readErr != nil {
+			log.Printf("Skipped %s.%s as error: %s",
+				stat.Database, stat.Name, readErr.Error())
+			continue
 		}
 		// Count number of columns meeting the criteria
 		n := stat.countNumFastTextCols()
