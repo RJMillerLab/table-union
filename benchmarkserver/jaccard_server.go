@@ -54,9 +54,7 @@ func (s *JaccardServer) queryHandler(c *gin.Context) {
 	}
 	// Query index
 	searchResults := make([]QueryResult, 0)
-	//start := time.Now()
 	queryResults := s.ui.QueryOrderAll(queryRequest.Vecs, queryRequest.N, queryRequest.K, queryRequest.Cardinality)
-	//dur := time.Since(start)
 	for result := range queryResults {
 		union := Union{
 			CandTableID:    result.CandidateTableID,

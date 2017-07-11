@@ -112,12 +112,12 @@ func getColumnPairJaccardPlus(candTableID, domainDir string, candColIndex, query
 	nB := queryCardinality
 	sig := sameDomainProb(jaccard, nA, nB)
 	p := Pair{
-		QueryColIndex: queryColIndex,
-		CandTableID:   candTableID,
-		CandColIndex:  candColIndex,
-		Jaccard:       jaccard,
-		JaccardProb:   sig,
-		Sim:           sig,
+		QueryColIndex:  queryColIndex,
+		CandTableID:    candTableID,
+		CandColIndex:   candColIndex,
+		Jaccard:        jaccard,
+		Hypergeometric: sig,
+		Sim:            sig,
 	}
 	return p
 }
@@ -166,7 +166,6 @@ func sameDomainProb(estimatedJaccard float64, nA, nB int) float64 {
 	N := nA + nB
 	k := int(math.Floor((estimatedJaccard * float64(N)) / (1.0 + estimatedJaccard)))
 	if k > nA || k > nB {
-		//log.Printf("invalid intersection")
 		k = int(math.Min(float64(nA), float64(nB)))
 	}
 	F_k_A_B := 0.0

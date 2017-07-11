@@ -3,6 +3,7 @@ package benchmarkserver
 import (
 	"log"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -18,8 +19,10 @@ func (index *JaccardUnionIndex) OntBuild() error {
 	log.Printf("ont build")
 	domainfilenames := opendata.StreamFilenames()
 	minhashFilenames := opendata.StreamMinhashVectors(10, "ont-minhash-l1", domainfilenames)
+	//minhashFilenames := opendata.StreamMinhashVectors(10, "ont-minhash-l2", domainfilenames)
 	count := 0
 	for file := range minhashFilenames {
+		log.Printf("insert: %s", file)
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			//		log.Printf("Minhash file does not exist: %s", file)
 			continue
@@ -47,6 +50,7 @@ func (index *JaccardUnionIndex) NoOntBuild() error {
 	minhashFilenames := opendata.StreamMinhashVectors(10, "noann-minhash", domainfilenames)
 	count := 0
 	for file := range minhashFilenames {
+		log.Printf("no ont insert: %s", file)
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			//log.Printf("Minhash file does not exist: %s", file)
 			continue
@@ -68,11 +72,12 @@ func (index *JaccardUnionIndex) NoOntBuild() error {
 	return nil
 }
 
-func (server *OntologyJaccardServer) OntQueryOrderAll(query, ontQuery [][]uint64, N, K int, queryCard, ontQueryCard []int) <-chan SearchResult {
+func (server *OntologyJaccardServer) OntQueryOrderAll(noOntQuery, ontQuery, query [][]uint64, N, K int, noOntQueryCard, ontQueryCard, queryCard []int) <-chan SearchResult {
 	log.Printf("Started querying the minhash index with %d columns.", len(query))
 	results := make(chan SearchResult)
 	querySigs := make([]minhashlsh.Signature, len(query))
 	ontQuerySigs := make([]minhashlsh.Signature, len(ontQuery))
+	noOntQuerySigs := make([]minhashlsh.Signature, len(noOntQuery))
 	// cast the type of query columns to Signature
 	for i := 0; i < len(query); i++ {
 		querySigs[i] = minhashlsh.Signature(query[i])
@@ -80,99 +85,70 @@ func (server *OntologyJaccardServer) OntQueryOrderAll(query, ontQuery [][]uint64
 	for i := 0; i < len(ontQuery); i++ {
 		ontQuerySigs[i] = minhashlsh.Signature(ontQuery[i])
 	}
+	for i := 0; i < len(noOntQuery); i++ {
+		noOntQuerySigs[i] = minhashlsh.Signature(noOntQuery[i])
+	}
 	alignment := initAlignment(K, N)
-	batchPairs := make(map[Pair]bool)
-	batch := pqueue.NewTopKQueue(batchSize)
-	oBatch := pqueue.NewTopKQueue(batchSize)
+	reduceQueue := pqueue.NewTopKQueue(batchSize)
+	reduceBatch := make(chan Pair)
+	done1 := make(chan struct{})
+	done2 := make(chan struct{})
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
-		done := make(chan struct{})
-		defer close(done)
-		for pair := range server.ui.lsh.QueryPlus(querySigs, done) {
+		for pair := range server.ui.lsh.QueryPlus(querySigs, done1) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
-			// discard columns of already aligned tables
-			if alignment.hasCompleted(tableID) {
-				continue
+			e := getColumnPairOntJaccardPlus(tableID, server.ui.domainDir, columnIndex, pair.QueryIndex, server.ui.numHash, query[pair.QueryIndex], ontQuery[pair.QueryIndex], noOntQuery[pair.QueryIndex], queryCard[pair.QueryIndex], ontQueryCard[pair.QueryIndex], noOntQueryCard[pair.QueryIndex])
+			if e.Sim != 0.0 {
+				reduceBatch <- e
 			}
-			e := getColumnPairOntJaccardPlus(tableID, server.ui.domainDir, columnIndex, pair.QueryIndex, server.ui.numHash, query, ontQuery, queryCard[pair.QueryIndex], ontQueryCard[pair.QueryIndex])
-			if _, ok := batchPairs[e]; !ok {
-				if e.Sim != 0.0 {
-					batchPairs[e] = true
-					batch.Push(e, e.Sim)
-				}
-			}
-			if (batch.Size() + oBatch.Size()) < batchSize {
-				continue
-			}
-			batchPairs = make(map[Pair]bool)
-			// Process the batch
-			if finished := alignment.processPairsPlus(batch, oBatch, results); finished {
-				wg.Done()
-				return
-			}
-		}
-		// Don't forget remaining pairs in the queue
-		if !batch.Empty() || !oBatch.Empty() {
-			alignment.processPairsPlus(batch, oBatch, results)
 		}
 		wg.Done()
 	}()
 	go func() {
-		done := make(chan struct{})
-		defer close(done)
-		for pair := range server.oi.lsh.QueryPlus(ontQuerySigs, done) {
+		for pair := range server.oi.lsh.QueryPlus(ontQuerySigs, done2) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
-			// discard columns of already aligned tables
-			if alignment.hasCompleted(tableID) {
-				continue
+			e := getColumnPairOntJaccardPlus(tableID, server.ui.domainDir, columnIndex, pair.QueryIndex, server.ui.numHash, query[pair.QueryIndex], ontQuery[pair.QueryIndex], noOntQuery[pair.QueryIndex], queryCard[pair.QueryIndex], ontQueryCard[pair.QueryIndex], noOntQueryCard[pair.QueryIndex])
+			if e.Sim != 0.0 {
+				reduceBatch <- e
 			}
-			e := getColumnPairOntJaccardPlus(tableID, server.oi.domainDir, columnIndex, pair.QueryIndex, server.oi.numHash, query, ontQuery, queryCard[pair.QueryIndex], ontQueryCard[pair.QueryIndex])
-			if _, ok := batchPairs[e]; !ok {
-				if e.Sim != 0.0 {
-					batchPairs[e] = true
-					oBatch.Push(e, e.Sim)
-				}
-			}
-			if (batch.Size() + oBatch.Size()) < batchSize {
-				continue
-			}
-			batchPairs = make(map[Pair]bool)
-			// Process the batch
-			if finished := alignment.processPairsPlus(batch, oBatch, results); finished {
-				wg.Done()
-				return
-			}
-		}
-		// Don't forget remaining pairs in the queue
-		if !batch.Empty() || !oBatch.Empty() {
-			alignment.processPairsPlus(batch, oBatch, results)
 		}
 		wg.Done()
 	}()
+	wwg := &sync.WaitGroup{}
+	wwg.Add(1)
+	go func() {
+		for pair := range reduceBatch {
+			if alignment.hasCompleted(pair.CandTableID) {
+				continue
+			}
+			reduceQueue.Push(pair, pair.Sim)
+			if reduceQueue.Size() == batchSize {
+				if finished := alignment.processPairsPlus(reduceQueue, results); finished {
+					close(done1)
+					close(done2)
+				}
+				reduceQueue = pqueue.NewTopKQueue(batchSize)
+			}
+		}
+		wwg.Done()
+	}()
+	go func() {
+		wwg.Wait()
+		log.Printf("done with the index go routines")
+		close(results)
+	}()
+
 	go func() {
 		wg.Wait()
-		log.Printf("done with the query")
-		close(results)
+		log.Printf("done with processing the reduce batch")
+		close(reduceBatch)
 	}()
 
 	return results
 }
 
-func (a alignment) processPairsPlus(pairQueue, ontPairQueue *pqueue.TopKQueue, out chan<- SearchResult) bool {
-	reduceQueue := pqueue.NewTopKQueue(pairQueue.Size() + ontPairQueue.Size())
-	if pairQueue.Size() != 0 {
-		for !pairQueue.Empty() {
-			p, s := pairQueue.Pop()
-			reduceQueue.Push(p, s)
-		}
-	}
-	if ontPairQueue.Size() != 0 {
-		for !ontPairQueue.Empty() {
-			p, s := ontPairQueue.Pop()
-			reduceQueue.Push(p, s)
-		}
-	}
+func (a alignment) processPairsPlus(reduceQueue *pqueue.TopKQueue, out chan<- SearchResult) bool {
 	pairs, _ := reduceQueue.Descending()
 	for i := range pairs {
 		pair := pairs[i].(Pair)
@@ -185,12 +161,11 @@ func (a alignment) processPairsPlus(pairQueue, ontPairQueue *pqueue.TopKQueue, o
 			// because we are using priority queue
 			continue
 		}
-		a.partialAlign[pair.CandTableID].Update(pair.CandColIndex)
-		a.reverseAlign[pair.CandTableID].Update(pair.QueryColIndex)
+		a.partialAlign[pair.CandTableID].Update(strconv.Itoa(pair.CandColIndex))
+		a.reverseAlign[pair.CandTableID].Update(strconv.Itoa(pair.QueryColIndex))
 		a.tableQueues[pair.CandTableID].Push(pair, pair.Sim)
 		// When we get k unique column alignments for a candidate table
 		if a.tableQueues[pair.CandTableID].Size() == a.k {
-			log.Printf("align")
 			a.completedTables.Update(pair.CandTableID)
 			result := SearchResult{
 				CandidateTableID: pair.CandTableID,
@@ -267,7 +242,147 @@ func getColumnPairOntJaccard(candTableID, domainDir string, candColIndex, queryC
 	return p
 }
 
-func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, query [][]uint64, ontQuery [][]uint64, queryCard, ontQueryCard int) Pair {
+func getColumnPairOntJaccardPlusPlus(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, query []uint64, ontQuery []uint64, noOntQuery []uint64, queryCard, ontQueryCard, noOntQueryCard int) Pair {
+	// getting the embedding of the candidate column
+	//minhashFilename := getMinhashFilename(candTableID, domainDir, candColIndex)
+	minhashFilename := getUnannotatedMinhashFilename(candTableID, domainDir, candColIndex)
+	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
+		//log.Printf("Minhash file %s does not exist.", minhashFilename)
+		//panic(err)
+		return Pair{
+			QueryColIndex: queryColIndex,
+			CandTableID:   candTableID,
+			CandColIndex:  candColIndex,
+			Sim:           0.0,
+		}
+	}
+	vec, err := opendata.ReadMinhashSignature(minhashFilename, numHash)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", minhashFilename)
+		//panic(err)
+		return Pair{
+			QueryColIndex: queryColIndex,
+			CandTableID:   candTableID,
+			CandColIndex:  candColIndex,
+			Sim:           0.0,
+		}
+	}
+	jaccard := estimateJaccard(vec, query)
+	// computing ontology jaccard
+	ontMinhashFilename := getOntMinhashFilename(candTableID, domainDir, candColIndex)
+	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
+		//  log.Printf("Minhash file %s does not exist.", ontMinhashFilename)
+		//panic(err)
+		return Pair{
+			QueryColIndex: queryColIndex,
+			CandTableID:   candTableID,
+			CandColIndex:  candColIndex,
+			Sim:           0.0,
+		}
+	}
+	vec, err = opendata.ReadMinhashSignature(ontMinhashFilename, numHash)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", ontMinhashFilename)
+		//panic(err)
+		return Pair{
+			QueryColIndex: queryColIndex,
+			CandTableID:   candTableID,
+			CandColIndex:  candColIndex,
+			Sim:           0.0,
+		}
+	}
+	ontJaccard := estimateJaccard(vec, ontQuery)
+	noA, nA := getOntDomainCardinality(candTableID, domainDir, candColIndex)
+	nB := queryCard
+	noB := ontQueryCard
+	jaccardProb := sameDomainProb(jaccard, nA, nB)
+	ontProb := sameDomainProb(ontJaccard, noA, noB)
+	p := Pair{
+		QueryColIndex:          queryColIndex,
+		CandTableID:            candTableID,
+		CandColIndex:           candColIndex,
+		Jaccard:                jaccard,
+		Hypergeometric:         jaccardProb,
+		OntologyJaccard:        ontJaccard,
+		OntologyHypergeometric: ontProb,
+		Sim: jaccardProb + ontProb - (jaccardProb * ontProb),
+	}
+	return p
+}
+
+func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, query []uint64, ontQuery []uint64, noOntQuery []uint64, queryCard, ontQueryCard, noOntQueryCard int) Pair {
+	delta := 0.000001
+	// getting the embedding of the candidate column
+	minhashFilename := getMinhashFilename(candTableID, domainDir, candColIndex)
+	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
+		//log.Printf("Minhash file %s does not exist.", minhashFilename)
+		//panic(err)
+		return Pair{
+			QueryColIndex: queryColIndex,
+			CandTableID:   candTableID,
+			CandColIndex:  candColIndex,
+			Sim:           0.0,
+		}
+	}
+	vec, err := opendata.ReadMinhashSignature(minhashFilename, numHash)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", minhashFilename)
+		//panic(err)
+		return Pair{
+			QueryColIndex: queryColIndex,
+			CandTableID:   candTableID,
+			CandColIndex:  candColIndex,
+			Sim:           0.0,
+		}
+	}
+	jaccard := estimateJaccard(vec, query)
+	// computing ontology jaccard
+	ontMinhashFilename := getOntMinhashFilename(candTableID, domainDir, candColIndex)
+	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
+		//	log.Printf("Minhash file %s does not exist.", ontMinhashFilename)
+		//panic(err)
+		return Pair{
+			QueryColIndex: queryColIndex,
+			CandTableID:   candTableID,
+			CandColIndex:  candColIndex,
+			Sim:           0.0,
+		}
+	}
+	vec, err = opendata.ReadMinhashSignature(ontMinhashFilename, numHash)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", ontMinhashFilename)
+		//panic(err)
+		return Pair{
+			QueryColIndex: queryColIndex,
+			CandTableID:   candTableID,
+			CandColIndex:  candColIndex,
+			Sim:           0.0,
+		}
+	}
+	ontJaccard := estimateJaccard(vec, ontQuery)
+	noA, nA := getOntDomainCardinality(candTableID, domainDir, candColIndex)
+	nB := queryCard
+	noB := ontQueryCard
+	coverage := float64(queryCard-noOntQueryCard) / float64(queryCard)
+	jaccardProb := sameDomainProb(jaccard, nA, nB) + delta
+	ontProb := sameDomainProb(ontJaccard, noA, noB) + delta
+	log.Printf("ontProb: %f", ontProb)
+	log.Printf("Coverage ontProb: %f", (1-coverage)*jaccardProb+coverage*ontProb)
+	p := Pair{
+		QueryColIndex:          queryColIndex,
+		CandTableID:            candTableID,
+		CandColIndex:           candColIndex,
+		Jaccard:                jaccard,
+		Hypergeometric:         jaccardProb,
+		OntologyJaccard:        ontJaccard,
+		OntologyHypergeometric: ontProb,
+		Sim: (1-coverage)*jaccardProb + coverage*ontProb,
+		//Sim: ontProb,
+	}
+	return p
+}
+
+func getColumnPairOntology(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, query [][]uint64, ontQuery [][]uint64, queryCard, ontQueryCard int) Pair {
 	delta := 0.000001
 	// getting the embedding of the candidate column
 	minhashFilename := getMinhashFilename(candTableID, domainDir, candColIndex)
@@ -323,14 +438,14 @@ func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, qu
 	jaccardProb := sameDomainProb(jaccard, nA, nB) + delta
 	ontProb := sameDomainProb(ontJaccard, noA, noB) + delta
 	p := Pair{
-		QueryColIndex:   queryColIndex,
-		CandTableID:     candTableID,
-		CandColIndex:    candColIndex,
-		Jaccard:         jaccard,
-		JaccardProb:     jaccardProb,
-		OntologyJaccard: ontJaccard,
-		OntologyProb:    ontProb,
-		Sim:             jaccardProb + ontProb - (jaccardProb * ontProb),
+		QueryColIndex:          queryColIndex,
+		CandTableID:            candTableID,
+		CandColIndex:           candColIndex,
+		Jaccard:                jaccard,
+		Hypergeometric:         jaccardProb,
+		OntologyJaccard:        ontJaccard,
+		OntologyHypergeometric: ontProb,
+		Sim: jaccardProb + ontProb - (jaccardProb * ontProb),
 	}
 	return p
 }

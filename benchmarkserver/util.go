@@ -29,6 +29,7 @@ var (
 
 func parseFilename(domainDir, filename string) (tableID string, columnIndex int) {
 	tableID = strings.TrimPrefix(filepath.Dir(filename), domainDir)
+	tableID = strings.TrimPrefix(tableID, "/")
 	columnIndex, err := strconv.Atoi(strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename)))
 	if err != nil {
 		panic(err)
@@ -66,6 +67,12 @@ func getEmbFilename(tableID, domainDir string, index int) string {
 func getMinhashFilename(tableID, domainDir string, index int) string {
 	fullpath := path.Join(domainDir, tableID)
 	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "minhash"))
+	return fullpath
+}
+
+func getUnannotatedMinhashFilename(tableID, domainDir string, index int) string {
+	fullpath := path.Join(domainDir, tableID)
+	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "noann-minhash"))
 	return fullpath
 }
 
@@ -126,6 +133,7 @@ func getDomainCardinality(tableID, domainDir string, index int) int {
 func getOntMinhashFilename(tableID, domainDir string, index int) string {
 	fullpath := path.Join(domainDir, tableID)
 	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "ont-minhash-l1"))
+	//fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "ont-minhash-l2"))
 	return fullpath
 }
 

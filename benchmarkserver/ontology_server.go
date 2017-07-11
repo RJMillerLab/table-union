@@ -19,8 +19,10 @@ type OntologyJaccardServer struct {
 type OntologyJaccardQueryRequest struct {
 	Vecs             [][]uint64 `json:"table"`
 	OntVecs          [][]uint64 `json:"onttable"`
+	NoOntVecs        [][]uint64 `json:"noonttable"`
 	K                int        `json:"k"`
 	N                int        `json:"n"`
+	Cardinality      []int      `json:"card"`
 	OntCardinality   []int      `json:"ontcard"`
 	NoOntCardinality []int      `json:"noontcard"`
 }
@@ -57,9 +59,7 @@ func (s *OntologyJaccardServer) queryHandler(c *gin.Context) {
 	}
 	// Query index
 	searchResults := make([]QueryResult, 0)
-	//start := time.Now()
-	queryResults := s.OntQueryOrderAll(queryRequest.Vecs, queryRequest.OntVecs, queryRequest.N, queryRequest.K, queryRequest.NoOntCardinality, queryRequest.OntCardinality)
-	//dur := time.Since(start)
+	queryResults := s.OntQueryOrderAll(queryRequest.NoOntVecs, queryRequest.OntVecs, queryRequest.Vecs, queryRequest.N, queryRequest.K, queryRequest.NoOntCardinality, queryRequest.OntCardinality, queryRequest.Cardinality)
 	for result := range queryResults {
 		union := Union{
 			CandTableID:    result.CandidateTableID,
