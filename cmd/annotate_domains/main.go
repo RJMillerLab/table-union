@@ -9,7 +9,7 @@ import (
 func main() {
 	CheckEnv()
 	start := GetNow()
-	InitSarma()
+	InitAnnotator()
 	filenames := StreamFilenames()
 	annotations := AnnotateDomainsFromEntityFiles(filenames, 30, "entities-l0")
 	progress := DoSaveAnnotations(annotations)

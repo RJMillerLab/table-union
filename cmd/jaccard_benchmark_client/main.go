@@ -74,7 +74,7 @@ func main() {
 		wg.Wait()
 		close(alignments)
 	}()
-	progress := experiment.DoSaveAlignments(alignments, "jaccard_"+experimentType, experimentsDB, 1)
+	progress := experiment.DoSaveAlignments(alignments, "hypergeometric_"+experimentType, experimentsDB, 1)
 
 	total := experiment.ProgressCounter{}
 	for n := range progress {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"path"
 	"strconv"
@@ -26,10 +27,6 @@ func getRandomSamples() {
 		if len(queryTables) == 3000 {
 			break
 		}
-		//if _, ok := embTables[filename]; ok {
-		//	queryTables = append(queryTables, filename)
-		//	eNum += 1
-		//} else {
 		textDomains := getTextDomains(filename)
 		for _, index := range textDomains {
 			filepath := path.Join(OutputDir, "domains", filename, fmt.Sprintf("%d.entities", index))
@@ -43,8 +40,7 @@ func getRandomSamples() {
 		//}
 	}
 
-	//fout, err := os.OpenFile("/home/fnargesian/TABLE_UNION_OUTPUT/emb_or_ont.queries", os.O_CREATE|os.O_WRONLY, 0644)
-	fout, err := os.OpenFile("/home/fnargesian/TABLE_UNION_OUTPUT/ontology.queries", os.O_CREATE|os.O_WRONLY, 0644)
+	fout, err := os.OpenFile("/home/fnargesian/TABLE_UNION_OUTPUT/stratified.queries.shuffle", os.O_CREATE|os.O_WRONLY, 0644)
 	defer fout.Close()
 
 	if err != nil {
@@ -75,10 +71,7 @@ func getStrantifiedSamples(sampleSize int) {
 			filepath := path.Join(OutputDir, "domains", filename, fmt.Sprintf("%d.ont-minhash-l1", index))
 			f, err1 := os.Open(filepath)
 			f.Close()
-			//filepath = path.Join(OutputDir, "domains", filename, fmt.Sprintf("%d.noann-minhash", index))
-			//f, err2 := os.Open(filepath)
-			//f.Close()
-			if err1 == nil { //&& err2 == nil {
+			if err1 == nil {
 				filepath := path.Join(OutputDir, "domains", filename, fmt.Sprintf("%d.ft-sum", index))
 				f, err := os.Open(filepath)
 				f.Close()
@@ -111,15 +104,45 @@ func getStrantifiedSamples(sampleSize int) {
 	ontSamples := make([]string, 0)
 	embSamples := make([]string, 0)
 	ontEmbSamples := make([]string, 0)
-	fout, err := os.OpenFile("/home/fnargesian/TABLE_UNION_OUTPUT/stratified.debug", os.O_CREATE|os.O_WRONLY, 0644)
+	fout, err := os.OpenFile("/home/fnargesian/TABLE_UNION_OUTPUT/stratified.queries.shuffle", os.O_CREATE|os.O_WRONLY, 0644)
 	defer fout.Close()
-
 	if err != nil {
 		panic(err)
 	}
+	// shuffle tables
+	es := make([]string, 0)
+	for t, _ := range embTables {
+		es = append(es, t)
+	}
+	embTablesSh := make([]string, len(es))
+	perm := rand.Perm(len(es))
+	for i, v := range perm {
+		embTablesSh[v] = es[i]
+	}
+	//
+	oes := make([]string, 0)
+	for t, _ := range ontEmbTables {
+		oes = append(oes, t)
+	}
+	ontEmbTablesSh := make([]string, len(oes))
+	perm = rand.Perm(len(oes))
+	for i, v := range perm {
+		ontEmbTablesSh[v] = oes[i]
+	}
+	//
+	oos := make([]string, 0)
+	for t, _ := range ontTables {
+		oos = append(oos, t)
+	}
+	ontTablesSh := make([]string, len(oos))
+	perm = rand.Perm(len(oos))
+	for i, v := range perm {
+		ontTablesSh[v] = oos[i]
+	}
+	//
 	lineNum := 0
-	for k, _ := range embTables {
-		if len(embSamples) > int((float64(len(embTables)*sampleSize) / float64(numTables))) {
+	for _, k := range embTablesSh {
+		if len(embSamples) > int((float64(len(embTablesSh)*sampleSize) / float64(numTables))) {
 			continue
 		}
 		if lineNum != sampleSize {
@@ -135,8 +158,8 @@ func getStrantifiedSamples(sampleSize int) {
 			}
 		}
 	}
-	for k, _ := range ontEmbTables {
-		if len(ontEmbSamples) > int((float64(len(ontEmbTables)*sampleSize) / float64(numTables))) {
+	for _, k := range ontEmbTablesSh {
+		if len(ontEmbSamples) > int((float64(len(ontEmbTablesSh)*sampleSize) / float64(numTables))) {
 			continue
 		}
 		if lineNum != sampleSize {
@@ -152,8 +175,8 @@ func getStrantifiedSamples(sampleSize int) {
 			}
 		}
 	}
-	for k, _ := range ontTables {
-		if len(ontSamples) > int((float64(len(ontTables)*sampleSize) / float64(numTables))) {
+	for _, k := range ontTablesSh {
+		if len(ontSamples) > int((float64(len(ontTablesSh)*sampleSize) / float64(numTables))) {
 			continue
 		}
 		if lineNum != sampleSize {
