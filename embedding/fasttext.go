@@ -3,11 +3,9 @@ package embedding
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
 	fasttext "github.com/ekzhu/go-fasttext"
 	"github.com/gonum/matrix/mat64"
-	"github.com/gonum/stat"
 )
 
 type FastText struct {
@@ -154,34 +152,19 @@ func (ft *FastText) GetDomainEmbMean(values []string, freqs []int) ([]float64, e
 	return mean, nil
 }
 
-// Returns the covariance matrix of the domain
-func (ft *FastText) GetDomainCovariance(values []string, freqs []int) []float64 {
-	log.Printf("starting computing covar.")
-	embs := make([]float64, 0)
-	ftValuesNum := 0
-	for i, value := range values {
-		tokens := Tokenize(value, ft.tokenFun, ft.transFun)
-		vec, err := ft.getTokenizedValueEmb(tokens)
-		if err != nil {
-			continue
-		}
-		ftValuesNum += freqs[i]
-		for f := 0; f < freqs[i]; f += 1 {
-			embs = append(embs, vec...)
-		}
-	}
-	log.Printf("len(embs): %d", len(embs))
-	// computing covariance
-	matrix := mat64.NewDense(ftValuesNum, 300, embs)
-	cov := stat.CovarianceMatrix(nil, matrix, nil)
-	log.Printf("done computing covar.")
-	return flattenMatrix(cov)
-}
-
 // Returns the mean of domain embedding matrix
 func (ft *FastText) GetDomainEmbMeanCovar(values []string, freqs []int) ([]float64, []float64, error) {
-	var embs [][]float64
-	var sum []float64
+	dim := 300
+	sum := make([]float64, dim)
+	mean := make([]float64, dim)
+	covarSum := make([][]float64, dim)
+	covar := make([][]float64, dim)
+	// initialize covar matrix
+	for i, _ := range covarSum {
+		vec := make([]float64, dim)
+		covarSum[i] = vec
+		covar[i] = vec
+	}
 	ftValuesNum := 0
 	for i, value := range values {
 		freq := freqs[i]
@@ -191,32 +174,28 @@ func (ft *FastText) GetDomainEmbMeanCovar(values []string, freqs []int) ([]float
 			continue
 		}
 		ftValuesNum += freq
-		for j, x := range vec {
-			vec[j] = x * float64(freq)
-		}
-		embs = append(embs, vec)
-		if sum == nil {
-			sum = vec
-		} else {
-			add(sum, vec)
-		}
-	}
-	if sum == nil {
-		return nil, nil, ErrNoEmbFound
-	}
-	mean := multVector(sum, 1.0/float64(ftValuesNum))
-	// calculating covar
-	covar := make([]float64, len(mean))
-	covarSum := make([]float64, len(mean))
-	for _, emb := range embs {
-		for i, e := range emb {
-			covarSum[i] += ((e - mean[i]) * (e - mean[i]))
+		for f := 0; f < freq; f++ {
+			for j := 0; j < dim; j++ {
+				sum[j] += vec[j]
+				for k := 0; k < dim; k++ {
+					covarSum[j][k] += vec[j] * vec[k]
+				}
+			}
 		}
 	}
-	for i, _ := range mean {
-		covar[i] = covarSum[i] / float64(len(embs)-1)
+	for j := 0; j < dim; j++ {
+		mean[j] = sum[j] / float64(ftValuesNum)
+		for k := 0; k < dim; k++ {
+			covarSum[j][k] = covarSum[j][k] / float64(ftValuesNum)
+		}
 	}
-	return mean, covar, nil
+
+	for j := 0; j < dim; j++ {
+		for k := 0; k < dim; k++ {
+			covar[j][k] = covarSum[j][k] - sum[j]*sum[k]
+		}
+	}
+	return mean, flatten2DSlice(covar), nil
 }
 
 func multVector(v []float64, s float64) []float64 {
@@ -232,6 +211,14 @@ func flattenMatrix(a mat64.Matrix) []float64 {
 	f := make([]float64, 0)
 	for i := 0; i < r; i++ {
 		f = append(f, mat64.Row(nil, i, a)...)
+	}
+	return f
+}
+
+func flatten2DSlice(a [][]float64) []float64 {
+	f := make([]float64, len(a[0])*len(a))
+	for i := 0; i < len(a); i++ {
+		f = append(f, a[i]...)
 	}
 	return f
 }
