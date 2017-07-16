@@ -23,18 +23,18 @@ func main() {
 	var fanout int
 	var opendataDir string
 	var experimentType string
-	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark/domains",
+	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3/domains",
 		"The top-level director for all domain and embedding files")
 	flag.IntVar(&numHash, "h", 256, "LSH Parameter: number of hash functions")
-	flag.StringVar(&queryDir, "query-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark/csvfiles",
+	flag.StringVar(&queryDir, "query-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3/csvfiles",
 		"The directory of query files")
 	flag.Float64Var(&threshold, "t", 0.5, "Search Parameter: k-unionability threshold")
 	flag.IntVar(&k, "k", 3, "Search Parameter: top (n,k) unionable tables")
-	flag.IntVar(&n, "n", 10, "Search Parameter: top (n,k) unionable tables")
+	flag.IntVar(&n, "n", 20, "Search Parameter: top (n,k) unionable tables")
 	flag.StringVar(&host, "host", "http://localhost:4020", "Server host")
 	flag.StringVar(&port, "port", "4005", "Server port")
-	flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark/jaccard-experiments.sqlite", "experiments DB")
-	flag.StringVar(&opendataDir, "opendate-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark", "The    directory of open data tables.")
+	flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3/jaccard-experiments.sqlite", "experiments DB")
+	flag.StringVar(&opendataDir, "opendate-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3", "The    directory of open data tables.")
 	flag.IntVar(&fanout, "fanout", 6, "Number threads querying the server in parallel.")
 	flag.StringVar(&experimentType, "type", "fixedn", "The type of experiments: fixed k or fixed n.")
 	flag.Parse()
@@ -78,7 +78,7 @@ func main() {
 	total := experiment.ProgressCounter{}
 	for n := range progress {
 		total.Values += n.Values
-		if total.Values%1 == 0 {
+		if total.Values%100 == 0 {
 			log.Printf("Calculated and saved %d unionable tables", total.Values)
 		}
 	}
