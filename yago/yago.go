@@ -1,4 +1,4 @@
-package opendata
+package yago
 
 import (
 	"database/sql"
@@ -31,6 +31,17 @@ func InitYago(filename string) *Yago {
 	_, err = db.Exec(`
 		INSERT INTO entities(entity)
 		SELECT distinct(entity) FROM disk.types;`)
+	if err != nil {
+		panic(err)
+	}
+	return &Yago{db}
+}
+
+// Create a copy of Yago.
+// This is important when use Yago in multi-threading
+// settings. Each thread must use its own copy of Yago.
+func (y *Yago) Copy() *Yago {
+	db, err := sql.Open("sqlite3", "file::memory:?cache=shared")
 	if err != nil {
 		panic(err)
 	}
