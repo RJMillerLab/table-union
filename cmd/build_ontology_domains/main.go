@@ -78,6 +78,7 @@ func DoFindPartiallyAnnotatedDomainSegment(domain *Domain, lookup map[string]map
 	// Get the unique values
 	uniqueValues := unique(domain.Values)
 	domain.Cardinality = len(uniqueValues)
+	domain.Size = len(domain.Values)
 	// updating domain cardinality
 	for _, value := range uniqueValues {
 		words := getWords(value)
@@ -173,6 +174,13 @@ func main() {
 			panic(err)
 		}
 		fmt.Fprintln(f, partialAnnotation.Domain.Cardinality)
+		f.Close()
+		sizeFilename := partialAnnotation.Domain.PhysicalFilename("size")
+		f, err = os.OpenFile(sizeFilename, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Fprintln(f, partialAnnotation.Domain.Size)
 		f.Close()
 	}
 	fmt.Printf("%d segments with %d values in %.2f seconds\n", segCount, totalValueCount, GetNow()-start)

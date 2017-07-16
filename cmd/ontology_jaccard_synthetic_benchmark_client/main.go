@@ -73,7 +73,7 @@ func main() {
 		wg.Wait()
 		close(alignments)
 	}()
-	progress := experiment.DoSaveAlignments(alignments, "coverage_ontology_"+experimentType, experimentsDB, 1)
+	progress := experiment.DoSaveAlignments(alignments, "ontology_topk_"+experimentType, experimentsDB, 1)
 
 	total := experiment.ProgressCounter{}
 	for n := range progress {

@@ -11,7 +11,7 @@ func main() {
 	InitSarma()
 	start := GetNow()
 	queryFilenames := StreamQueryFilenames()
-	results := DoFindSarmaUnionableTables(queryFilenames, 20)
+	results := DoFindSarmaUnionableTables(queryFilenames, 2)
 	progress := DoSaveSarmaScores(results)
 	total := ProgressCounter{}
 	for n := range progress {
