@@ -2,13 +2,15 @@ package opendata
 
 import (
 	"bufio"
+	"database/sql"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"sync"
 
-	minhashlsh "github.com/ekzhu/minhash-lsh"
+	minhashlsh "github.com/RJMillerLab/table-union/minhashlsh"
 )
 
 var (
@@ -22,7 +24,7 @@ type DomainSketch struct {
 	Sketch   *minhashlsh.Minhash // the minhash sketch
 }
 
-func DoMinhashDomainsFromFiles(fanout int, files <-chan string) <-chan *DomainSketch {
+func DoMinhashDomainsFromFiles(fanout int, files <-chan string, ext string) <-chan *DomainSketch {
 	out := make(chan *DomainSketch)
 	wg := &sync.WaitGroup{}
 
@@ -31,7 +33,7 @@ func DoMinhashDomainsFromFiles(fanout int, files <-chan string) <-chan *DomainSk
 		go func(id int) {
 			for file := range files {
 				for _, index := range getTextDomains(file) {
-					minhashDomainWords(file, index, out)
+					minhashDomainWords(file, index, out, ext)
 				}
 			}
 			wg.Done()
@@ -46,11 +48,12 @@ func DoMinhashDomainsFromFiles(fanout int, files <-chan string) <-chan *DomainSk
 	return out
 }
 
-func minhashDomainWords(file string, index int, out chan *DomainSketch) {
-	filepath := path.Join(OutputDir, "domains", file, fmt.Sprintf("%d.values", index))
+func minhashDomainWords(file string, index int, out chan *DomainSketch, ext string) {
+	filepath := path.Join(OutputDir, "domains", file, fmt.Sprintf("%d.%s", index, ext))
 	f, err := os.Open(filepath)
 	if err != nil {
-		panic(err)
+		return
+		//panic(err)
 	}
 	defer f.Close()
 	mh := minhashlsh.NewMinhash(seed, numHash)
@@ -69,18 +72,122 @@ func minhashDomainWords(file string, index int, out chan *DomainSketch) {
 	}
 }
 
+func DoOntologyMinhashFromDB(fanout int, files <-chan string) <-chan *DomainSketch {
+	out := make(chan *DomainSketch)
+	wg := &sync.WaitGroup{}
+	//defer db.Close()
+	dbDomains := readDomainsWithOntologyFromDB()
+	for i := 0; i < fanout; i++ {
+		wg.Add(1)
+		go func(id int) {
+			for domain := range dbDomains {
+				minhashDomainClasses(domain.tableName, domain.columnIndex, out)
+			}
+			wg.Done()
+		}(i)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
+}
+
+type dbDomain struct {
+	tableName   string
+	columnIndex int
+}
+
+func readDomainsWithOntologyFromDB() <-chan dbDomain {
+	out := make(chan dbDomain)
+	db, err := sql.Open("sqlite3", AnnotationDB)
+	if err != nil {
+		panic(err)
+	}
+	//defer db.Close()
+	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT table_name, column_index FROM %s WHERE class_frequncy != 0;`, AllAnnotationTable))
+	//rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT table_name, column_index FROM %s;`, AllAnnotationTableL2))
+	if err != nil {
+		panic(err)
+	}
+	go func() {
+		for rows.Next() {
+			var tableName string
+			var columnIndex int
+			err := rows.Scan(&tableName, &columnIndex)
+			if err != nil {
+				panic(err)
+			}
+			log.Printf("%s", tableName)
+			out <- dbDomain{
+				tableName:   tableName,
+				columnIndex: columnIndex,
+			}
+		}
+		rows.Close()
+		db.Close()
+		close(out)
+	}()
+	return out
+}
+
+func minhashDomainClasses(file string, index int, out chan *DomainSketch) {
+	mh := minhashlsh.NewMinhash(seed, numHash)
+	db, err := sql.Open("sqlite3", AnnotationDB)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+	//rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT super_class FROM %s WHERE table_name="%s" AND column_index=%d;`, AllAnnotationTableL2, file, index))
+	//if err != nil {
+	//	panic(err)
+	//}
+	//for rows.Next() {
+	//	var superClass string
+	//	err := rows.Scan(&superClass)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	mh.Push([]byte(superClass))
+	//}
+	//rows.Close()
+	//rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class FROM %s WHERE table_name="%s" AND column_index=%d AND class_frequncy != 0;`, AllAnnotationTable, file, index))
+	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class FROM %s WHERE table_name="%s" AND column_index=%d ORDER BY class_frequncy LIMIT 10;`, AllAnnotationTable, file, index))
+	if err != nil {
+		panic(err)
+	}
+	for rows.Next() {
+		var class string
+		err := rows.Scan(&class)
+		if err != nil {
+			panic(err)
+		}
+		mh.Push([]byte(class))
+	}
+	rows.Close()
+	out <- &DomainSketch{
+		Filename: file,
+		Index:    index,
+		Sketch:   mh,
+	}
+}
+
 // Saves the domain skecthes from an input channel to disk
 // Returns a channel of progress counter
-func DoSaveDomainSketches(fanout int, sketches <-chan *DomainSketch) <-chan ProgressCounter {
+func DoSaveDomainSketches(fanout int, sketches <-chan *DomainSketch, ext string) <-chan ProgressCounter {
 	progress := make(chan ProgressCounter)
 	wg := &sync.WaitGroup{}
 	wg.Add(fanout)
 	for i := 0; i < fanout; i++ {
 		go func(id int, sketches <-chan *DomainSketch) {
 			for domain := range sketches {
-				minhashFilename := domain.PhysicalFilename("minhash")
+				log.Printf("%s", domain.Filename)
+				minhashFilename := domain.PhysicalFilename(ext)
 				err := writeMinhashSignature(domain.Sketch, minhashFilename)
 				if err == nil {
+					log.Printf("%s", minhashFilename)
 					progress <- ProgressCounter{1}
 				}
 			}
@@ -118,10 +225,11 @@ func writeMinhashSignature(mh *minhashlsh.Minhash, filename string) error {
 	return nil
 }
 
-func readMinhashSignature(filename string, numHash int) ([]uint64, error) {
+func ReadMinhashSignature(filename string, numHash int) ([]uint64, error) {
 	f, err := os.OpenFile(filename, os.O_RDONLY, 0644)
 	if err != nil {
-		panic(err)
+		return nil, err
+		//panic(err)
 	}
 	defer f.Close()
 	signature := make([]uint64, numHash)
@@ -131,4 +239,65 @@ func readMinhashSignature(filename string, numHash int) ([]uint64, error) {
 		}
 	}
 	return signature, nil
+}
+
+func GetDomainMinhash(tokenFun func(string) []string, transFun func(string) string, column []string, numHash int) []uint64 {
+	values := TokenizedValues(column, tokenFun, transFun)
+	mh := minhashlsh.NewMinhash(seed, numHash)
+
+	for tokens := range values {
+		for _, word := range tokens {
+			mh.Push([]byte(word))
+		}
+	}
+	return mh.Signature()
+}
+
+// Produce a channel of values (tokenized)
+func TokenizedValues(values []string, tokenFun func(string) []string, transFun func(string) string) chan []string {
+	out := make(chan []string)
+	go func() {
+		for _, v := range values {
+			v = transFun(v)
+			// Tokenize
+			tokens := tokenFun(v)
+			if len(tokens) > 5 {
+				// Skip text values
+				continue
+			}
+			for i, t := range tokens {
+				tokens[i] = transFun(t)
+			}
+			out <- tokens
+		}
+		close(out)
+	}()
+	return out
+}
+
+func StreamMinhashVectors(fanout int, ext string, filenames <-chan string) <-chan string {
+	out := make(chan string)
+	wg := &sync.WaitGroup{}
+	wg.Add(fanout)
+	for i := 0; i < fanout; i++ {
+		go func(id int, out chan<- string) {
+			for filename := range filenames {
+				for _, index := range getTextDomains(filename) {
+					d := &Domain{
+						Filename: filename,
+						Index:    index,
+					}
+					minhashFilename := d.PhysicalFilename(ext)
+					out <- minhashFilename
+				}
+			}
+			wg.Done()
+		}(i, out)
+
+	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }

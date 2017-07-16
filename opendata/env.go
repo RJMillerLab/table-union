@@ -44,11 +44,9 @@ var SubjectAnnotationTable = os.Getenv("SUBJECT_ANNOTATION_TABLE")
 var AllAnnotationTable = os.Getenv("ALL_ANNOTATION_TABLE")
 var SarmaTable = os.Getenv("SARMA_TABLE")
 var SarmaDB = os.Getenv("SARMA_DB")
+var AllAnnotationTableL2 = os.Getenv("ALL_ANNOTATION_TABLE_L2")
 
 func CheckEnv() {
-	if QueryList == "" {
-		panic("Environment missing")
-	}
 }
 
 func Filepath(filename string) string {

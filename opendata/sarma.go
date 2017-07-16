@@ -10,10 +10,12 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/RJMillerLab/table-union/minhashlsh"
 	"github.com/RJMillerLab/table-union/pqueue"
 	"github.com/ekzhu/counter"
 )
@@ -35,10 +37,14 @@ type domainAnnotation struct {
 
 func InitSarma() {
 	entityToClass = loadEntityClasses()
-	//prepareDB()
 }
 
-func AnnotateDomainsFromEntityFiles(files <-chan string, fanout int) <-chan *domainAnnotation {
+func InitAnnotator() {
+	entityToClass = loadEntityClasses()
+	prepareDB()
+}
+
+func AnnotateDomainsFromEntityFiles(files <-chan string, fanout int, ext string) <-chan *domainAnnotation {
 	out := make(chan *domainAnnotation, 1000)
 	wg := &sync.WaitGroup{}
 
@@ -46,14 +52,10 @@ func AnnotateDomainsFromEntityFiles(files <-chan string, fanout int) <-chan *dom
 		wg.Add(1)
 		go func(id int) {
 			for file := range files {
-				// assuming the first text column (non-numerical and non-date)
-				// as subject column
+				//subjectColumn := getSubjectColumn(file)
 				textDomains := getTextDomains(file)
-				if len(textDomains) > 0 {
-					index := textDomains[0]
-					//for index := range textDomains {
-					annotateDomainEntities(file, index, out)
-					//	}
+				for _, index := range textDomains {
+					annotateDomainEntities(file, index, out, ext)
 				}
 			}
 			wg.Done()
@@ -68,29 +70,56 @@ func AnnotateDomainsFromEntityFiles(files <-chan string, fanout int) <-chan *dom
 	return out
 }
 
-func annotateDomainEntities(file string, index int, out chan *domainAnnotation) {
-	filepath := path.Join(OutputDir, "domains", file, fmt.Sprintf("%d.entities", index))
+func getSubjectColumn(tableName string) int {
+	// assuming the first text column (non-numerical and non-date)
+	// with annotations as subject column
+	textDomains := getTextDomains(tableName)
+	if len(textDomains) == 0 {
+		return -1
+	}
+	for _, i := range textDomains {
+		filepath := path.Join(OutputDir, "domains", tableName, fmt.Sprintf("%d.entities", i))
+		file, err := os.Open(filepath)
+		if err == nil {
+			//if _, err := os.Stat(filepath); os.IsExist(err) {
+			return i
+		}
+		file.Close()
+	}
+	return -1
+}
+
+func annotateDomainEntities(file string, index int, out chan *domainAnnotation, ext string) {
+	filepath := path.Join(OutputDir, "domains", file, fmt.Sprintf("%d.%s", index, ext))
 	f, err := os.Open(filepath)
 	if err != nil {
-		out <- &domainAnnotation{
-			filename: file,
-			index:    index,
-		}
+		return
+		//out <- &domainAnnotation{
+		//	filename: file,
+		//	index:    index,
+		//}
 	}
-	defer f.Close()
+	//defer f.Close()
 	scanner := bufio.NewScanner(f)
 	classes := make(map[string]int)
 	numEntities := 0
 	for scanner.Scan() {
-		e := scanner.Text()
-		numEntities += 1
-		for _, c := range entityToClass[e] {
-			if _, ok := classes[c]; !ok {
-				classes[c] = 1
-			} else {
-				classes[c] = classes[c] + 1
+		e := strings.ToLower(scanner.Text())
+		if len(entityToClass[e]) == 0 {
+			log.Printf("class not found for entity %s", e)
+		} else {
+			numEntities += 1
+			for _, c := range entityToClass[e] {
+				if _, ok := classes[c]; !ok {
+					classes[c] = 1
+				} else {
+					classes[c] = classes[c] + 1
+				}
 			}
 		}
+	}
+	if numEntities == 0 {
+		log.Printf("numEntities = 0")
 	}
 	out <- &domainAnnotation{
 		filename:    file,
@@ -98,6 +127,7 @@ func annotateDomainEntities(file string, index int, out chan *domainAnnotation) 
 		classes:     classes,
 		numEntities: numEntities,
 	}
+	f.Close()
 	log.Printf("done annotating")
 }
 
@@ -106,8 +136,8 @@ func DoSaveAnnotations(annotations <-chan *domainAnnotation) <-chan ProgressCoun
 	if err != nil {
 		panic(err)
 	}
-	//stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(table_name, column_index, column_name, class, class_frequncy, num_entities) values(?, ?, ?, ?, ?, ?);`, AllAnnotationTable))
-	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(table_name, column_index, column_name, class, class_frequncy, num_entities) values(?, ?, ?, ?, ?, ?);`, SubjectAnnotationTable))
+	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(table_name, column_index, column_name, class, class_frequncy, num_entities) values(?, ?, ?, ?, ?, ?);`, AllAnnotationTable))
+	//stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(table_name, column_index, column_name, class, class_frequncy, num_entities) values(?, ?, ?, ?, ?, ?);`, SubjectAnnotationTable))
 	if err != nil {
 		panic(err)
 	}
@@ -119,6 +149,7 @@ func DoSaveAnnotations(annotations <-chan *domainAnnotation) <-chan ProgressCoun
 			log.Printf("saving annotations of %s", annotation.filename)
 			subjectName := GetDomainHeader(annotation.filename).Values[annotation.index]
 			if len(annotation.classes) == 0 {
+				log.Printf("No annotation for attribute %s.%d", annotation.filename, annotation.index)
 				_, err = stmt.Exec(annotation.filename, annotation.index, subjectName, "-1", 0, 0)
 				if err != nil {
 					panic(err)
@@ -167,7 +198,7 @@ func (annotation *domainAnnotation) saveToFile() {
 	filepath := path.Join(dirPath, fmt.Sprintf("%d.annos-l1", annotation.index))
 
 	f, err := os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY, 0644)
-	defer f.Close()
+	//defer f.Close()
 
 	if err == nil {
 		for c, freq := range annotation.classes {
@@ -176,7 +207,7 @@ func (annotation *domainAnnotation) saveToFile() {
 	} else {
 		panic(fmt.Sprintf("Unable to save: %s", err.Error()))
 	}
-
+	f.Close()
 	return
 }
 
@@ -215,13 +246,13 @@ func loadEntityClasses() map[string][]string {
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close()
+	//defer f.Close()
 	scanner := bufio.NewScanner(f)
 	i := 0
 	start := GetNow()
 	for scanner.Scan() {
 		parts := strings.SplitN(scanner.Text(), "|", 2)
-		entity, class := parts[0], parts[1]
+		entity, class := strings.ToLower(parts[0]), parts[1]
 		if _, ok := lookup[entity]; !ok {
 			lookup[entity] = make([]string, 0)
 		}
@@ -231,6 +262,8 @@ func loadEntityClasses() map[string][]string {
 			fmt.Printf("LoadEntityClasses: %d in %.2f seconds\n", i, GetNow()-start)
 		}
 	}
+	log.Printf("number of entities: %d", len(lookup))
+	f.Close()
 	return lookup
 }
 
@@ -242,8 +275,8 @@ func prepareDB() {
 	}
 	defer db.Close()
 	// Create table
-	//_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (table_name text,column_index int, column_name text, class text, class_frequncy int, num_entities int);`, AllAnnotationTable, AllAnnotationTable))
-	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (table_name text, column_index int, column_name text, class text, class_frequncy int, num_entities int);`, SubjectAnnotationTable, SubjectAnnotationTable))
+	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (table_name text,column_index int, column_name text, class text, class_frequncy int, num_entities int);`, AllAnnotationTable, AllAnnotationTable))
+	//_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (table_name text, column_index int, column_name text, class text, class_frequncy int, num_entities int);`, SubjectAnnotationTable, SubjectAnnotationTable))
 	if err != nil {
 		panic(err)
 	}
@@ -251,14 +284,12 @@ func prepareDB() {
 
 func bucketize(queryFilename string) <-chan string {
 	candidateTables := make(chan string)
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
+	subjectColumn := getSubjectColumn(queryFilename)
+	if subjectColumn == -1 {
+		log.Printf("No subject column was found for query %s", queryFilename)
+		return candidateTables
+	}
 	go func() {
-		textDomains := getTextDomains(queryFilename)
-		if len(textDomains) == 0 {
-			log.Printf("No subject column was found for query %s", queryFilename)
-			return
-		}
 		// output db
 		db, err := sql.Open("sqlite3", AnnotationDB)
 		if err != nil {
@@ -266,11 +297,12 @@ func bucketize(queryFilename string) <-chan string {
 		}
 		//defer db.Close()
 		//rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT a2.table_name as candidate_table FROM %s a1, %s a2 WHERE a1.table_name="%s" AND (a1.column_name=a2.column_name OR a1.class=a2.class);`, AllAnnotationTable, AllAnnotationTable, queryFilename))
-		rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT a2.table_name as candidate_table FROM %s a2, (SELECT * FROM %s WHERE table_name="%s") a1 WHERE a1.column_name=a2.column_name OR a1.class=a2.class;`, AllAnnotationTable, AllAnnotationTable, queryFilename))
+		rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT a2.table_name as candidate_table FROM %s a2, (SELECT * FROM %s WHERE table_name="%s" ORDER BY class_frequncy limit 20) a1 WHERE a2.subject_column=a2.column_index and (a1.column_name=a2.column_name OR a1.class=a2.class);`, AllAnnotationTable, AllAnnotationTable, queryFilename))
 		if err != nil {
 			panic(err)
 		}
 		//
+		count := 0
 		for rows.Next() {
 			var candidateTable string
 			err := rows.Scan(&candidateTable)
@@ -278,14 +310,13 @@ func bucketize(queryFilename string) <-chan string {
 				panic(err)
 			}
 			candidateTables <- candidateTable
+			count += 1
 		}
+		log.Printf("buck size: %d", count)
 		rows.Close()
 		db.Close()
-		wg.Done()
-	}()
-	go func() {
-		wg.Wait()
 		close(candidateTables)
+		//wg.Done()
 	}()
 	return candidateTables
 
@@ -296,24 +327,63 @@ type pair struct {
 	candidateColIndex int
 }
 
+func readEntities(tableName string, columnIndex int) []string {
+	entities := make([]string, 0)
+	filepath := path.Join(OutputDir, "domains", tableName, fmt.Sprintf("%d.ont-minhash-l1", columnIndex))
+	f, err := os.Open(filepath)
+	if err != nil {
+		return []string{}
+	}
+	//defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		e := scanner.Text()
+		entities = append(entities, e)
+	}
+	f.Close()
+	return entities
+}
+
+func shareEntities(queryFilename, candidateFilename string, queryTextColumns, candidateTextColumns []int) bool {
+	queryEntities := readEntities(queryFilename, queryTextColumns[0])
+	candidateEntities := readEntities(candidateFilename, candidateTextColumns[0])
+	for _, e1 := range queryEntities {
+		for _, e2 := range candidateEntities {
+			if strings.ToLower(e1) == strings.ToLower(e2) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func computeSchemaConsistency(queryFilename, candidateFilename string, queryTextColumns, candidateTextColumns []int) float64 {
 	// topK queue is used to find max weight matching
 	schemaMapping := pqueue.NewTopKQueue(len(queryTextColumns) * len(candidateTextColumns))
 	// for each pair of columns read labels, tokenize and compute fuzzy jaccard
+	haveSharedEntities := shareEntities(queryFilename, candidateFilename, queryTextColumns, candidateTextColumns)
 	for iqtc, qtc := range queryTextColumns {
 		for ictc, ctc := range candidateTextColumns {
 			matchingScore := computeLabelsFuzzyJaccard(queryFilename, qtc, candidateFilename, ctc)
 			if matchingScore != 0.0 {
-				valueConsistency := computeValueConsistency(queryFilename, candidateFilename, iqtc, ictc)
-				if valueConsistency >= 0.8 {
+				if haveSharedEntities {
+					valueConsistency := computeValueConsistency(queryFilename, candidateFilename, iqtc, ictc)
 					log.Printf("valueConsistency: %f", valueConsistency)
-					p := pair{
-						queryColIndex:     qtc,
-						candidateColIndex: ctc,
+					if valueConsistency >= 0.8 {
+						p := pair{
+							queryColIndex:     qtc,
+							candidateColIndex: ctc,
+						}
+						schemaMapping.Push(p, matchingScore)
+						continue
 					}
-					schemaMapping.Push(p, matchingScore)
 				}
 			}
+			p := pair{
+				queryColIndex:     qtc,
+				candidateColIndex: ctc,
+			}
+			schemaMapping.Push(p, matchingScore)
 		}
 	}
 	// mapping weight
@@ -347,7 +417,7 @@ func makeDomainAnnotationCounterFromDB(tableName string, columnIndex int) *count
 	}
 	defer db.Close()
 	// read and tokenize the labels of the query
-	rows, err := db.Query(fmt.Sprintf(`SELECT column_name, class FROM %s WHERE table_name = "%s" AND        column_index = %d;`, AllAnnotationTable, tableName, columnIndex))
+	rows, err := db.Query(fmt.Sprintf(`SELECT column_name, class FROM %s WHERE table_name = "%s" AND        column_index = %d ORDER BY class_frequncy LIMIT 20;`, AllAnnotationTable, tableName, columnIndex))
 	if err != nil {
 		panic(err)
 	}
@@ -377,13 +447,14 @@ func makeDomainEntityCounter(tableName string, columnIndex int) (*counter.Counte
 		//log.Printf("error loading %s", filepath)
 		return nil, err
 	}
-	defer f.Close()
+	//defer f.Close()
 	scanner := bufio.NewScanner(f)
 	domainEntityCounter := counter.NewCounter()
 	for scanner.Scan() {
 		e := scanner.Text()
 		domainEntityCounter.Update(e)
 	}
+	f.Close()
 	return domainEntityCounter, nil
 }
 
@@ -403,7 +474,10 @@ func annotateEntityCounter(counter *counter.Counter) map[string]int {
 	classes := make(map[string]int)
 	elems, freqs := counter.Freqs()
 	for i, elem := range elems {
-		e := elem.(string)
+		e := strings.ToLower(elem.(string))
+		if len(entityToClass[e]) == 0 {
+			log.Printf("No class found for entity %s", e)
+		}
 		for _, c := range entityToClass[e] {
 			if _, ok := classes[c]; !ok {
 				classes[c] = freqs[i]
@@ -422,7 +496,14 @@ func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, que
 	}
 	defer db.Close()
 	// computing w(X,c)
-	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class, class_frequncy, num_entities FROM %s WHERE table_name="%s";`, SubjectAnnotationTable, queryTable))
+	//rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class, class_frequncy, num_entities FROM %s WHERE table_name="%s";`, SubjectAnnotationTable, queryTable))
+	querySubjectCol := getSubjectColumn(queryTable)
+	candidateSubjectCol := getSubjectColumn(candidateTable)
+	if querySubjectCol == -1 || candidateSubjectCol == -1 {
+		return 0.0
+	}
+	//rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class, class_frequncy, num_entities FROM %s WHERE table_name="%s";`, AllAnnotationTable, queryTable))
+	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class, class_frequncy, num_entities FROM %s WHERE table_name="%s" AND column_index=%d;`, AllAnnotationTable, queryTable, querySubjectCol))
 	if err != nil {
 		panic(err)
 	}
@@ -440,11 +521,13 @@ func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, que
 	}
 	rows.Close()
 	// finding Y\X classes
-	queryEntityCounter, err := makeDomainEntityCounter(queryTable, queryTextColumns[0])
+	//queryEntityCounter, err := makeDomainEntityCounter(queryTable, queryTextColumns[0])
+	queryEntityCounter, err := makeDomainEntityCounter(queryTable, querySubjectCol)
 	if err != nil {
 		return 0.0
 	}
-	candidateEntityCounter, err := makeDomainEntityCounter(candidateTable, candidateTextColumns[0])
+	//candidateEntityCounter, err := makeDomainEntityCounter(candidateTable, candidateTextColumns[0])
+	candidateEntityCounter, err := makeDomainEntityCounter(candidateTable, candidateSubjectCol)
 	if err != nil {
 		return 0.0
 	}
@@ -467,17 +550,22 @@ func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, que
 }
 
 func computeSarmaUnionabilityScores(queryFilename, candidateFilename string, queryTextColumns, candidateTextColumns []int) (float64, float64) {
+	//return 1.0, 1.0
 	ece := computeEntityConsistencyAndExpansion(queryFilename, candidateFilename, queryTextColumns, candidateTextColumns)
-	sc := computeSchemaConsistency(queryFilename, candidateFilename, queryTextColumns, candidateTextColumns)
-	sarma := ece * sc
-	if sarma != 0.0 {
-		log.Printf("ece: %f * sc: %f = sarma: %f", ece, sc, sarma)
+	sc := 0.0
+	if ece > 0.0 {
+		log.Printf("non negative entity criterion, computing schema consistency!")
+		sc = computeSchemaConsistency(queryFilename, candidateFilename, queryTextColumns, candidateTextColumns)
 	}
+	sarma := ece * sc
+	//if sarma != 0.0 {
+	log.Printf("query: %s and candidate: %s has ece: %f * sc: %f = sarma: %f", queryFilename, candidateFilename, ece, sc, sarma)
+	//}
 	return ece, sc
 }
 
 func DoFindSarmaUnionableTables(files <-chan string, fanout int) <-chan *sarmaResult {
-	out := make(chan *sarmaResult)
+	out := make(chan *sarmaResult, 10000)
 	wg := &sync.WaitGroup{}
 	wg.Add(fanout)
 	for i := 0; i < fanout; i++ {
@@ -498,6 +586,7 @@ func DoFindSarmaUnionableTables(files <-chan string, fanout int) <-chan *sarmaRe
 }
 
 func DoSaveSarmaScores(scores <-chan *sarmaResult) <-chan ProgressCounter {
+	log.Printf("saving sarma scores")
 	db, err := sql.Open("sqlite3", SarmaDB)
 	if err != nil {
 		panic(err)
@@ -516,6 +605,7 @@ func DoSaveSarmaScores(scores <-chan *sarmaResult) <-chan ProgressCounter {
 	progress := make(chan ProgressCounter)
 	go func() {
 		for score := range scores {
+			log.Printf("score is : %f", score.entityConsistencyAndExpansion)
 			//log.Printf("saving the score of %s", score.queryTable)
 			_, err = stmt.Exec(score.queryTable, score.candidateTable, score.entityConsistencyAndExpansion, score.schemaConsistency, score.entityConsistencyAndExpansion*score.schemaConsistency)
 			if err != nil {
@@ -541,11 +631,13 @@ type sarmaResult struct {
 }
 
 func findSarmaUnionableTables(queryTable string, out chan *sarmaResult) {
+	resultBucket := bucketize(queryTable)
 	wg := &sync.WaitGroup{}
 	wg.Add(3)
 	for i := 0; i < 3; i++ {
 		go func() {
-			for candidateTable := range bucketize(queryTable) {
+			for candidateTable := range resultBucket {
+				log.Printf("cand: %s and query: %s", candidateTable, queryTable)
 				queryTextColumns := getTextDomains(queryTable)
 				candidateTextColumns := getTextDomains(candidateTable)
 				//log.Printf("len(queryTextColumns): %d and len(candidateTextColumns): %d", len(queryTextColumns), len(candidateTextColumns))
@@ -562,25 +654,27 @@ func findSarmaUnionableTables(queryTable string, out chan *sarmaResult) {
 					}
 				}
 			}
+			log.Printf("processed the bucket")
 			wg.Done()
 		}()
 	}
 	wg.Wait()
+	log.Printf("done waiting")
 }
 
 func computeValueConsistency(queryTable, candidateTable string, queryColumnIndex, candidateColumnIndex int) float64 {
 	valueConsistency := 0.0
 	numPairs := 0
 	wg := &sync.WaitGroup{}
-	wg.Add(3)
-	for i := 0; i < 3; i++ {
+	wg.Add(2)
+	for i := 0; i < 2; i++ {
 		go func() {
 			for vp := range makeDomainValuePairs(queryTable, candidateTable, queryColumnIndex, candidateColumnIndex) {
 				d := dice(vp.value1, vp.value2)
 				valueConsistency += d
-				//if d > 0.0 {
-				numPairs += 1
-				//}
+				if d > 0.0 {
+					numPairs += 1
+				}
 			}
 			wg.Done()
 		}()
@@ -608,11 +702,21 @@ func makeDomainValuePairs(queryTable, candidateTable string, queryColumnIndex, c
 	}
 	out := make(chan valuePair)
 	go func() {
+		seenPairs := make(map[valuePair]bool)
 		for _, qval := range queryValues {
 			for _, cval := range candidateValues {
-				out <- valuePair{
+				p1 := valuePair{
 					value1: qval,
 					value2: cval,
+				}
+				p2 := valuePair{
+					value1: cval,
+					value2: qval,
+				}
+				if _, ok := seenPairs[p1]; !ok {
+					out <- p1
+					seenPairs[p1] = true
+					seenPairs[p2] = true
 				}
 			}
 		}
@@ -627,7 +731,6 @@ func getDomainValues(tableID string, columnIndex int) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
 	values := make([]string, 0)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -637,6 +740,7 @@ func getDomainValues(tableID string, columnIndex int) ([]string, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
+	file.Close()
 	return values, nil
 }
 
@@ -664,4 +768,84 @@ func dice(a, b string) (coefficient float64) {
 		denom++
 	}
 	return 2 * coefficient / denom
+}
+
+func GetOntDomain(values []string, numHash int, lookup map[string]map[string]bool, counts map[string]int, entityClass map[string][]string, transFun func(string) string, tokenFun func(string) []string) ([]uint64, []uint64, []uint64, int, int, int) {
+	// The set of entities found
+	noAnnotation := make([]string, 0)
+	annotation := make([]string, 0)
+	// Get the unique values
+	uniqueValues := unique(values)
+	cardinality := len(uniqueValues)
+	// updating domain cardinality
+	for _, value := range uniqueValues {
+		words := getWords(value)
+		foundEntities := findEntities(words, lookup, counts)
+		if len(foundEntities) == 0 {
+			noAnnotation = append(noAnnotation, value)
+		}
+		for _, ent := range foundEntities {
+			annotation = append(annotation, ent)
+		}
+	}
+	//l1_annotations := annotateEntities(annotation, entityClass)
+	attMinhash := getMinhash(tokenFun, transFun, uniqueValues, numHash)
+	//ontMinhash := getMinhash(tokenFun, transFun, l1_annotations, numHash)
+	ontMinhash := getMinhash(tokenFun, transFun, annotation, numHash)
+	//ontMinhash := getMinhash(tokenFun, transFun, annotation, numHash)
+	noOntMinhash := getMinhash(tokenFun, transFun, noAnnotation, numHash)
+	return ontMinhash, noOntMinhash, attMinhash, len(annotation), len(noAnnotation), cardinality
+}
+
+func annotateEntities(entities []string, entityClass map[string][]string) []string {
+	K := 10
+	classes := make(map[string]int, 0)
+	for _, ent := range entities {
+		e := strings.ToLower(ent)
+		if len(entityClass[e]) == 0 {
+			log.Printf("No class found for entity %s", e)
+			//continue
+		}
+		for _, c := range entityClass[e] {
+			if _, ok := classes[c]; !ok {
+				classes[c] = 1
+			} else {
+				classes[c] = classes[c] + 1
+			}
+		}
+	}
+	freqs := make([]int, 0)
+	freqClass := make(map[int][]string)
+	for k, v := range classes {
+		if _, ok := freqClass[v]; !ok {
+			freqClass[v] = []string{k}
+			freqs = append(freqs, v)
+		} else {
+			freqClass[v] = append(freqClass[v], k)
+		}
+	}
+
+	sort.Ints(freqs)
+	annotations := make([]string, 0)
+	for i := len(freqs) - 1; i >= 0; i-- {
+		for _, c := range freqClass[freqs[i]] {
+			annotations = append(annotations, c)
+			if len(annotations) == K {
+				return annotations
+			}
+		}
+	}
+	return annotations
+}
+
+func getMinhash(tokenFun func(string) []string, transFun func(string) string, column []string, numHash int) []uint64 {
+	values := TokenizedValues(column, tokenFun, transFun)
+	mh := minhashlsh.NewMinhash(seed, numHash)
+
+	for tokens := range values {
+		for _, word := range tokens {
+			mh.Push([]byte(word))
+		}
+	}
+	return mh.Signature()
 }

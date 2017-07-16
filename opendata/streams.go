@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -52,14 +53,19 @@ func exists(filename string) bool {
 func StreamFilenames() <-chan string {
 	output := make(chan string)
 	go func() {
-		f, _ := os.Open(OpendataList)
+		f, err := os.Open(OpendataList)
+		if err != nil {
+			panic(err)
+		}
 		defer f.Close()
 
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			parts := strings.SplitN(scanner.Text(), " ", 3)
-			filename := path.Join(parts...)
-			output <- filename
+			filename := filepath.Join(parts...)
+			if !strings.Contains(filename, " ") {
+				output <- filename
+			}
 		}
 		close(output)
 	}()
@@ -69,9 +75,11 @@ func StreamFilenames() <-chan string {
 
 // The projected column fragment.
 type Domain struct {
-	Filename string   // the logical filename of the CSV file
-	Index    int      // the position of the domain in the csv file
-	Values   []string // the list of values in THIS fragment.
+	Filename    string   // the logical filename of the CSV file
+	Index       int      // the position of the domain in the csv file
+	Values      []string // the list of values in THIS fragment.
+	Cardinality int      // the cardinality of domain
+	Size        int      // size of domain
 }
 
 // Saves the domain values into its value file
@@ -141,7 +149,7 @@ func domainsFromCells(cells [][]string, filename string, width int) []*Domain {
 
 	domains := make([]*Domain, width)
 	for i := 0; i < width; i++ {
-		domains[i] = &Domain{filename, i, nil}
+		domains[i] = &Domain{filename, i, nil, 0, 0}
 	}
 	for _, row := range cells {
 		for c := 0; c < width; c++ {
@@ -162,10 +170,10 @@ func makeDomains(filenames <-chan string, out chan *Domain) {
 	for filename := range filenames {
 		f, err := os.Open(Filepath(filename))
 		if err != nil {
+			//panic(err)
 			f.Close()
 			continue
 		}
-
 		// Uses the csv parser to read
 		// the csv content line by line
 		// the first row is the headers of the domains
@@ -422,9 +430,10 @@ func getTextDomains(file string) (indices []int) {
 			if parts[1] == "text" {
 				indices = append(indices, index)
 			}
+		} else {
+			log.Printf("get text domains not 2: %v", parts)
 		}
 	}
-
 	return
 }
 
@@ -460,15 +469,20 @@ func streamDomainWords(file string, index int, out chan *Domain) {
 		words := wordsFromLine(scanner.Text())
 		for _, word := range words {
 			values = append(values, normalize(word))
-			if len(values) >= 1000 {
-				out <- &Domain{
-					Filename: file,
-					Index:    index,
-					Values:   values,
-				}
-				values = nil
-			}
+			//if len(values) >= 1000 {
+			//	out <- &Domain{
+			//		Filename: file,
+			//		Index:    index,
+			//		Values:   values,
+			//	}
+			//	values = nil
+			//}
 		}
+	}
+	out <- &Domain{
+		Filename: file,
+		Index:    index,
+		Values:   values,
 	}
 }
 
@@ -551,12 +565,19 @@ func StreamValueFreqFromCache(fanout int, filenames <-chan string) <-chan *Value
 		go func(id int, out chan<- *ValueFreq) {
 			for filename := range filenames {
 				for _, index := range getTextDomains(filename) {
+					//fp := path.Join(OutputDir, "domains", filename, fmt.Sprintf("%d.ft-sum", index))
+					//f, err := os.Open(fp)
+					//f.Close()
+					//if err != nil {
+					//	log.Printf("should generate emb for %s", fp)
+
 					d := &Domain{
 						Filename: filename,
 						Index:    index,
 					}
 					valueFilename := d.PhysicalFilename("values")
 					out <- getValueFreq(valueFilename, filename, index)
+					//}
 				}
 			}
 			wg.Done()
@@ -583,7 +604,8 @@ func StreamEmbVectors(fanout int, filenames <-chan string) <-chan string {
 						Filename: filename,
 						Index:    index,
 					}
-					embFilename := d.PhysicalFilename("ft-sum")
+					//embFilename := d.PhysicalFilename("ft-sum")
+					embFilename := d.PhysicalFilename("ft-mean")
 					out <- embFilename
 				}
 			}
@@ -611,6 +633,7 @@ func StreamQueryFilenames() <-chan string {
 		for scanner.Scan() {
 			parts := strings.SplitN(scanner.Text(), " ", 3)
 			filename := path.Join(parts...)
+			//filename := scanner.Text()
 			output <- filename
 		}
 		close(output)
