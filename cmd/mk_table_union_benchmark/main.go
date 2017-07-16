@@ -19,14 +19,15 @@ var (
 	databases = [][]string{
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db", "canada"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/catalog.data.gov.jsonl.db", "us"},
-		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db", "uk"},
+		[]string{"/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db", "uk"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
-		[]string{"/home/ekzhu/OPENDATA/2017-06-05/datahub.io.jsonl.db", "datahub"},
+		// []string{"/home/ekzhu/OPENDATA/2017-06-05/datahub.io.jsonl.db", "datahub"},
 	}
-	numBenchmarkTablePerRaw               = 10
+	numRawTableToSelect                   = 200
+	numBenchmarkTablePerRaw               = 25
 	fastTextMinNumCol                     = 3
 	fasttextMinPct                        = 0.8
-	maxSrcTableNumRow                     = 100000
+	maxSrcTableNumRow                     = 1000000
 	statTablename                         = "dataset_profile"
 	maxNumDistinctBeforeGiveUp            = 100
 	maxNumCharPerValue                    = 256
@@ -61,12 +62,9 @@ func (stat tableStat) countNumFastTextCols() int {
 
 func main() {
 	var output string
-	var numRawTableToSelect int
 	var fastTextDatabaseFilename string
 	flag.StringVar(&output, "output", "",
 		"The output is a SQLite database storing the benchmark tables.")
-	flag.IntVar(&numRawTableToSelect, "numSrc", 10,
-		"The number of source tables to select for creating benchmark")
 	flag.StringVar(&fastTextDatabaseFilename, "fasttext",
 		"/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"The FastText database")
