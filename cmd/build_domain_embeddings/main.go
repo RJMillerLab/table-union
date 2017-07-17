@@ -56,7 +56,6 @@ func main() {
 				if err := embedding.WriteVecToDisk(covar, binary.BigEndian, vecFilename); err != nil {
 					panic(err)
 				}
-				log.Printf("embeddig %s", vf.Filename)
 			}
 			wg.Done()
 		}()

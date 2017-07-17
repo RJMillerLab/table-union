@@ -11,7 +11,9 @@ func main() {
 	start := GetNow()
 	filenames := StreamFilenames()
 	sketches := DoMinhashDomainsFromFiles(10, filenames, "values")
+	//sketches := DoMinhashDomainsFromFiles(10, filenames, "entities")
 	progress := DoSaveDomainSketches(10, sketches, "minhash")
+	//progress := DoSaveDomainSketches(10, sketches, "entities-minhash")
 	total := ProgressCounter{}
 	for n := range progress {
 		total.Values += n.Values

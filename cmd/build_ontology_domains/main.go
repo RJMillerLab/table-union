@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	. "github.com/RJMillerLab/table-union/opendata"
+	"github.com/RJMillerLab/table-union/yago"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -71,7 +72,28 @@ type PartialAnnotation struct {
 	Entities           map[string]bool
 }
 
-func DoFindPartiallyAnnotatedDomainSegment(domain *Domain, lookup map[string]map[string]bool, counts map[string]int) *PartialAnnotation {
+func DoFindPartiallyAnnotatedDomainSegment(domain *Domain, yg *yago.Yago) *PartialAnnotation {
+	// The set of entities found
+	noAnnotation := make(map[string]bool)
+	annotation := make(map[string]bool)
+	// Get the unique values
+	uniqueValues := unique(domain.Values)
+	domain.Cardinality = len(uniqueValues)
+	domain.Size = len(domain.Values)
+	// Match unique data values with YAGO entities
+	for _, value := range uniqueValues {
+		foundEntities := yg.MatchEntity(value, 3)
+		if len(foundEntities) == 0 {
+			noAnnotation[value] = true
+		}
+		for _, entity := range foundEntities {
+			annotation[entity] = true
+		}
+	}
+	return &PartialAnnotation{domain, noAnnotation, annotation}
+}
+
+func DoFindPartiallyAnnotatedDomainSegmentPlus(domain *Domain, lookup map[string]map[string]bool, counts map[string]int) *PartialAnnotation {
 	// The set of entities found
 	noAnnotation := make(map[string]bool)
 	annotation := make(map[string]bool)
@@ -95,8 +117,9 @@ func DoFindPartiallyAnnotatedDomainSegment(domain *Domain, lookup map[string]map
 
 func main() {
 	CheckEnv()
-	lookup := LoadEntityWords()
-	counts := LoadEntityWordCount()
+	yg := yago.InitYago(Yago_db)
+	//lookup := LoadEntityWords()
+	//counts := LoadEntityWordCount()
 
 	start := GetNow()
 	filenames := StreamFilenames()
@@ -108,12 +131,13 @@ func main() {
 	wg := &sync.WaitGroup{}
 	wg.Add(fanout)
 	for thread := 0; thread < fanout; thread++ {
-		go func(id int, queue <-chan *Domain, progress chan<- *PartialAnnotation) {
+		go func(id int, yg *yago.Yago, queue <-chan *Domain, progress chan<- *PartialAnnotation) {
 			for domain := range queue {
-				progress <- DoFindPartiallyAnnotatedDomainSegment(domain, lookup, counts)
+				//progress <- DoFindPartiallyAnnotatedDomainSegmentPlus(domain, lookup, counts)
+				progress <- DoFindPartiallyAnnotatedDomainSegment(domain, yg)
 			}
 			wg.Done()
-		}(thread, domains, progress)
+		}(thread, yg.Copy(), domains, progress)
 	}
 	go func() {
 		wg.Wait()
