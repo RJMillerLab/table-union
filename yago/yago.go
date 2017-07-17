@@ -57,8 +57,8 @@ func (y *Yago) Close() error {
 func (y *Yago) MatchEntity(data string, limit int) []string {
 	data = notAlphaNumeric.ReplaceAllString(data, " ")
 	rows, err := y.db.Query(`
-		SELECT entity FROM entities WHERE entity MATCH ?
-		ORDER BY rank LIMIT ?`, data, limit)
+		SELECT entity FROM entities WHERE entities MATCH ?
+		ORDER BY rank LIMIT ?;`, data, limit)
 	if err != nil {
 		panic(err)
 	}
