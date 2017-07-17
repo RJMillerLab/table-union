@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 var notAlphaNumeric = regexp.MustCompile("[^a-zA-Z0-9]+")
@@ -54,8 +55,12 @@ func (y *Yago) Close() error {
 
 // MatchEntity attempts to find entities whose
 // names match the given data value.
-func (y *Yago) MatchEntity(data string, limit int) []string {
-	data = notAlphaNumeric.ReplaceAllString(data, " ")
+func (y *Yago) MatchEntity(data string, limit int) (results []string) {
+	results = make([]string, 0)
+	data = strings.TrimSpace(notAlphaNumeric.ReplaceAllString(data, " "))
+	if data == "" {
+		return
+	}
 	rows, err := y.db.Query(`
 		SELECT entity FROM entities WHERE entities MATCH ?
 		ORDER BY rank LIMIT ?;`, data, limit)
@@ -63,7 +68,6 @@ func (y *Yago) MatchEntity(data string, limit int) []string {
 		panic(err)
 	}
 	defer rows.Close()
-	results := make([]string, 0)
 	for rows.Next() {
 		var entity string
 		if err := rows.Scan(&entity); err != nil {
@@ -74,5 +78,5 @@ func (y *Yago) MatchEntity(data string, limit int) []string {
 	if err := rows.Err(); err != nil {
 		panic(err)
 	}
-	return results
+	return
 }
