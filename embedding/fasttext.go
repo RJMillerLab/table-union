@@ -3,6 +3,7 @@ package embedding
 import (
 	"database/sql"
 	"fmt"
+	"math"
 
 	fasttext "github.com/ekzhu/go-fasttext"
 	"github.com/gonum/matrix/mat64"
@@ -152,7 +153,40 @@ func (ft *FastText) GetDomainEmbMean(values []string, freqs []int) ([]float64, e
 	return mean, nil
 }
 
-// Returns the mean of domain embedding matrix
+// Returns the mean and covar of domain embedding matrix
+func (ft *FastText) GetDomainEmbMeanVar(values []string, freqs []int) ([]float64, []float64, int, error) {
+	dim := 300
+	sum := make([]float64, dim)
+	mean := make([]float64, dim)
+	covarSum := make([]float64, dim)
+	covar := make([]float64, dim)
+	ftValuesNum := 0
+	for i, value := range values {
+		freq := freqs[i]
+		tokens := Tokenize(value, ft.tokenFun, ft.transFun)
+		vec, err := ft.getTokenizedValueEmb(tokens)
+		if err != nil {
+			continue
+		}
+		//vec := vecs[i]
+		ftValuesNum += freq
+		for j := 0; j < dim; j++ {
+			sum[j] += (float64(freq) * vec[j])
+			covarSum[j] += (float64(freq) * vec[j] * vec[j])
+		}
+	}
+	for j := 0; j < dim; j++ {
+		mean[j] = sum[j] / float64(ftValuesNum)
+		covarSum[j] = covarSum[j] / float64(ftValuesNum)
+	}
+
+	for j := 0; j < dim; j++ {
+		covar[j] = covarSum[j] - math.Pow(mean[j], 2.0)
+	}
+	return mean, covar, ftValuesNum, nil
+}
+
+// Returns the mean and covar of domain embedding matrix
 func (ft *FastText) GetDomainEmbMeanCovar(values []string, freqs []int) ([]float64, []float64, error) {
 	dim := 300
 	sum := make([]float64, dim)
@@ -174,12 +208,10 @@ func (ft *FastText) GetDomainEmbMeanCovar(values []string, freqs []int) ([]float
 			continue
 		}
 		ftValuesNum += freq
-		for f := 0; f < freq; f++ {
-			for j := 0; j < dim; j++ {
-				sum[j] += vec[j]
-				for k := 0; k < dim; k++ {
-					covarSum[j][k] += vec[j] * vec[k]
-				}
+		for j := 0; j < dim; j++ {
+			sum[j] += (float64(freq) * vec[j])
+			for k := 0; k < dim; k++ {
+				covarSum[j][k] += (float64(freq) * vec[j] * vec[k])
 			}
 		}
 	}
@@ -216,7 +248,7 @@ func flattenMatrix(a mat64.Matrix) []float64 {
 }
 
 func flatten2DSlice(a [][]float64) []float64 {
-	f := make([]float64, len(a[0])*len(a))
+	f := make([]float64, 0)
 	for i := 0; i < len(a); i++ {
 		f = append(f, a[i]...)
 	}

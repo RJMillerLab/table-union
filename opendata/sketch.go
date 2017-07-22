@@ -154,7 +154,7 @@ func minhashDomainClasses(file string, index int, out chan *DomainSketch) {
 	//}
 	//rows.Close()
 	//rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class FROM %s WHERE table_name="%s" AND column_index=%d AND class_frequncy != 0;`, AllAnnotationTable, file, index))
-	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class FROM %s WHERE table_name="%s" AND column_index=%d ORDER BY class_frequncy LIMIT 10;`, AllAnnotationTable, file, index))
+	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class FROM %s WHERE table_name="%s" AND column_index=%d;`, AllAnnotationTable, file, index))
 	if err != nil {
 		panic(err)
 	}

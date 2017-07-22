@@ -131,7 +131,11 @@ func GetDomainHeader(file string) *Domain {
 	filepath := path.Join(OutputDir, "domains", file, "index")
 	lines, err := readLines(filepath, -1)
 	if err != nil {
-		panic(err)
+		return &Domain{
+			Filename: file,
+			Index:    -1,
+		}
+		//panic(err)
 	}
 	return &Domain{
 		Filename: file,
@@ -425,13 +429,14 @@ func getTextDomains(file string) (indices []int) {
 		if len(parts) == 2 {
 			index, err := strconv.Atoi(parts[0])
 			if err != nil {
+				log.Printf("error in types of file: %s", file)
 				panic(err)
 			}
 			if parts[1] == "text" {
 				indices = append(indices, index)
 			}
 		} else {
-			log.Printf("get text domains not 2: %v", parts)
+			log.Printf("get text domains not 2: %v %s", parts, file)
 		}
 	}
 	return
@@ -479,6 +484,7 @@ func streamDomainWords(file string, index int, out chan *Domain) {
 			//}
 		}
 	}
+	log.Printf("len(values): %d", len(values))
 	out <- &Domain{
 		Filename: file,
 		Index:    index,
@@ -489,9 +495,8 @@ func streamDomainWords(file string, index int, out chan *Domain) {
 func StreamDomainValuesFromFiles(fanout int, files <-chan string) <-chan *Domain {
 	out := make(chan *Domain)
 	wg := &sync.WaitGroup{}
-
+	wg.Add(fanout)
 	for i := 0; i < fanout; i++ {
-		wg.Add(1)
 		go func(id int) {
 			for file := range files {
 				for _, index := range getTextDomains(file) {

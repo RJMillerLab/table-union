@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"log"
 	"math"
 
 	"github.com/ekzhu/counter"
@@ -67,37 +68,46 @@ func GetDomainEmbSum(ft *fasttext.FastText, tokenFun func(string) []string, tran
 // Returns the mean of domain embedding matrix
 func GetDomainEmbMeanCovar(ft *fasttext.FastText, tokenFun func(string) []string, transFun func(string) string, column []string) ([]float64, []float64, error) {
 	values := TokenizedValues(column, tokenFun, transFun)
-	var embs [][]float64
-	var sum []float64
+	dim := 300
+	log.Printf("domain size: %d", len(values))
+	sum := make([]float64, dim)
+	mean := make([]float64, dim)
+	covarSum := make([][]float64, dim)
+	covar := make([][]float64, dim)
+	// initialize covar matrix
+	for i, _ := range covarSum {
+		vec := make([]float64, dim)
+		covarSum[i] = vec
+		covar[i] = vec
+	}
 	ftValuesNum := 0
 	for tokens := range values {
 		vec, err := GetValueEmb(ft, tokens)
 		if err != nil {
 			continue
 		}
-		embs = append(embs, vec)
-		if sum == nil {
-			sum = vec
-		} else {
-			add(sum, vec)
+		for j := 0; j < dim; j++ {
+			sum[j] += vec[j]
+			for k := 0; k < dim; k++ {
+				covarSum[j][k] += vec[j] * vec[k]
+			}
 		}
 	}
-	if sum == nil {
-		return nil, nil, ErrNoEmbFound
-	}
-	mean := multVector(sum, 1.0/float64(ftValuesNum))
-	// calculating covar
-	covar := make([]float64, len(mean))
-	covarSum := make([]float64, len(mean))
-	for _, emb := range embs {
-		for i, e := range emb {
-			covarSum[i] += ((e - mean[i]) * (e - mean[i]))
+
+	for j := 0; j < dim; j++ {
+		mean[j] = sum[j] / float64(ftValuesNum)
+		for k := 0; k < dim; k++ {
+			covarSum[j][k] = covarSum[j][k] / float64(ftValuesNum)
 		}
 	}
-	for i, _ := range mean {
-		covar[i] = covarSum[i] / float64(len(embs)-1)
+
+	for j := 0; j < dim; j++ {
+		for k := 0; k < dim; k++ {
+			covar[j][k] = covarSum[j][k] - sum[j]*sum[k]
+		}
 	}
-	return mean, covar, nil
+
+	return mean, flatten2DSlice(covar), nil
 }
 
 func GetDomainEmb(ft *fasttext.FastText, tokenFun func(string) []string, transFun func(string) string, column []string, kfirst int) (*mat64.Dense, error) {

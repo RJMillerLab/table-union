@@ -10,13 +10,13 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/RJMillerLab/table-union/minhashlsh"
 	"github.com/RJMillerLab/table-union/pqueue"
+	"github.com/RJMillerLab/table-union/yago"
 	"github.com/ekzhu/counter"
 )
 
@@ -36,7 +36,7 @@ type domainAnnotation struct {
 }
 
 func InitSarma() {
-	entityToClass = loadEntityClasses()
+	//entityToClass = loadEntityClasses()
 }
 
 func InitAnnotator() {
@@ -155,6 +155,18 @@ func DoSaveAnnotations(annotations <-chan *domainAnnotation) <-chan ProgressCoun
 					panic(err)
 				}
 			}
+			if len(annotation.classes) != 0 {
+				// saving to a file
+				cardFilename := path.Join(OutputDir, "domains", annotation.filename, fmt.Sprintf("%d.%s", annotation.index, "ont-card"))
+				log.Printf("saving ontcard of %s", cardFilename)
+				f, err := os.OpenFile(cardFilename, os.O_CREATE|os.O_WRONLY, 0644)
+				if err != nil {
+					panic(err)
+				}
+				log.Printf("ont-card: %d", len(annotation.classes))
+				fmt.Fprintln(f, len(annotation.classes))
+				f.Close()
+			}
 			for class, freq := range annotation.classes {
 				_, err = stmt.Exec(annotation.filename, annotation.index, subjectName, class, freq, annotation.numEntities)
 				if err != nil {
@@ -171,23 +183,6 @@ func DoSaveAnnotations(annotations <-chan *domainAnnotation) <-chan ProgressCoun
 		close(progress)
 	}()
 	return progress
-}
-
-func saveAnnotation(annotation *domainAnnotation, progress chan ProgressCounter) {
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
-	go func() {
-		annotation.saveToDB()
-		wg.Done()
-	}()
-	go func() {
-		annotation.saveToFile()
-		wg.Done()
-	}()
-	go func() {
-		wg.Wait()
-		progress <- ProgressCounter{1}
-	}()
 }
 
 func (annotation *domainAnnotation) saveToFile() {
@@ -470,7 +465,22 @@ func computeLabelsFuzzyJaccard(queryFilename string, queryColumnIndex int, candi
 	return float64(intersectCardinality) / float64(queryCounter.Unique()+candidateCounter.Unique()-intersectCardinality)
 }
 
-func annotateEntityCounter(counter *counter.Counter) map[string]int {
+func annotateEntityCounter(counter *counter.Counter, yg *yago.Yago) map[string]int {
+	elems, _ := counter.Freqs()
+	annotations := make(map[string]int)
+	for _, value := range elems {
+		foundEntities := yg.MatchEntity(value.(string), 3)
+		for _, entity := range foundEntities {
+			if _, ok := annotations[entity]; !ok {
+				annotations[entity] = 1
+			} else {
+				annotations[entity] = annotations[entity] + 1
+			}
+		}
+	}
+	return annotations
+}
+func annotateEntityCounterPlus(counter *counter.Counter) map[string]int {
 	classes := make(map[string]int)
 	elems, freqs := counter.Freqs()
 	for i, elem := range elems {
@@ -489,7 +499,7 @@ func annotateEntityCounter(counter *counter.Counter) map[string]int {
 	return classes
 }
 
-func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, queryTextColumns, candidateTextColumns []int) float64 {
+func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, queryTextColumns, candidateTextColumns []int, yg *yago.Yago) float64 {
 	db, err := sql.Open("sqlite3", AnnotationDB)
 	if err != nil {
 		panic(err)
@@ -533,7 +543,7 @@ func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, que
 	}
 	differenceEntityCounter := candidateEntityCounter.Difference(queryEntityCounter)
 	// annotate the difference
-	candidateAnnotations := annotateEntityCounter(differenceEntityCounter)
+	candidateAnnotations := annotateEntityCounter(differenceEntityCounter, yg)
 	candidateClassScores := make(map[string]float64)
 	entityCard := candidateEntityCounter.Unique()
 	for class, freq := range candidateAnnotations {
@@ -541,6 +551,8 @@ func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, que
 	}
 	// computing L(X).L(Y\X)
 	SEP := 0.0
+	log.Printf("len(candidateClassScores): %d", len(candidateClassScores))
+	log.Printf("len(queryClassScores): %d", len(queryClassScores))
 	for c, w := range candidateClassScores {
 		if s, ok := queryClassScores[c]; ok {
 			SEP += s * w
@@ -549,9 +561,8 @@ func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, que
 	return SEP
 }
 
-func computeSarmaUnionabilityScores(queryFilename, candidateFilename string, queryTextColumns, candidateTextColumns []int) (float64, float64) {
-	//return 1.0, 1.0
-	ece := computeEntityConsistencyAndExpansion(queryFilename, candidateFilename, queryTextColumns, candidateTextColumns)
+func computeSarmaUnionabilityScores(queryFilename, candidateFilename string, queryTextColumns, candidateTextColumns []int, yg *yago.Yago) (float64, float64) {
+	ece := computeEntityConsistencyAndExpansion(queryFilename, candidateFilename, queryTextColumns, candidateTextColumns, yg)
 	sc := 0.0
 	if ece > 0.0 {
 		log.Printf("non negative entity criterion, computing schema consistency!")
@@ -564,7 +575,7 @@ func computeSarmaUnionabilityScores(queryFilename, candidateFilename string, que
 	return ece, sc
 }
 
-func DoFindSarmaUnionableTables(files <-chan string, fanout int) <-chan *sarmaResult {
+func DoFindSarmaUnionableTables(files <-chan string, fanout int, yg *yago.Yago) <-chan *sarmaResult {
 	out := make(chan *sarmaResult, 10000)
 	wg := &sync.WaitGroup{}
 	wg.Add(fanout)
@@ -572,7 +583,7 @@ func DoFindSarmaUnionableTables(files <-chan string, fanout int) <-chan *sarmaRe
 		go func() {
 			for queryTable := range files {
 				start := GetNow()
-				findSarmaUnionableTables(queryTable, out)
+				findSarmaUnionableTables(queryTable, out, yg)
 				fmt.Printf("Processed the query in %.2f seconds\n", GetNow()-start)
 			}
 			wg.Done()
@@ -630,7 +641,7 @@ type sarmaResult struct {
 	schemaConsistency             float64
 }
 
-func findSarmaUnionableTables(queryTable string, out chan *sarmaResult) {
+func findSarmaUnionableTables(queryTable string, out chan *sarmaResult, yg *yago.Yago) {
 	resultBucket := bucketize(queryTable)
 	wg := &sync.WaitGroup{}
 	wg.Add(3)
@@ -644,7 +655,7 @@ func findSarmaUnionableTables(queryTable string, out chan *sarmaResult) {
 				if len(queryTextColumns) == 0 || len(candidateTextColumns) == 0 {
 					continue
 				}
-				ece, sc := computeSarmaUnionabilityScores(queryTable, candidateTable, queryTextColumns, candidateTextColumns)
+				ece, sc := computeSarmaUnionabilityScores(queryTable, candidateTable, queryTextColumns, candidateTextColumns, yg.Copy())
 				if ece*sc != 0.0 {
 					out <- &sarmaResult{
 						queryTable:                    queryTable,
@@ -663,6 +674,7 @@ func findSarmaUnionableTables(queryTable string, out chan *sarmaResult) {
 }
 
 func computeValueConsistency(queryTable, candidateTable string, queryColumnIndex, candidateColumnIndex int) float64 {
+	return 1.0
 	valueConsistency := 0.0
 	numPairs := 0
 	wg := &sync.WaitGroup{}
@@ -770,7 +782,41 @@ func dice(a, b string) (coefficient float64) {
 	return 2 * coefficient / denom
 }
 
-func GetOntDomain(values []string, numHash int, lookup map[string]map[string]bool, counts map[string]int, entityClass map[string][]string, transFun func(string) string, tokenFun func(string) []string) ([]uint64, []uint64, []uint64, int, int, int) {
+func GetOntDomain(yg *yago.Yago, values []string, numHash int, entityClass map[string][]string, transFun func(string) string, tokenFun func(string) []string) ([]uint64, []uint64, []uint64, int, int, int) {
+	// The set of entities found
+	noAnnotation := make(map[string]bool)
+	annotation := make(map[string]bool)
+	// Get the unique values
+	uniqueValues := unique(values)
+	cardinality := len(uniqueValues)
+	log.Printf("len(uniqueValues): %d", len(uniqueValues))
+	// Match unique data values with YAGO entities
+	for _, value := range uniqueValues {
+		foundEntities := yg.MatchEntity(value, 3)
+		if len(foundEntities) == 0 {
+			noAnnotation[value] = true
+		}
+		for _, entity := range foundEntities {
+			annotation[entity] = true
+		}
+	}
+	entities := make([]string, 0)
+	for k, _ := range annotation {
+		entities = append(entities, k)
+	}
+	noEntities := make([]string, 0)
+	for k, _ := range noAnnotation {
+		noEntities = append(noEntities, k)
+	}
+	l1_annotations := annotateEntities(entities, entityClass)
+	attMinhash := getMinhash(tokenFun, transFun, uniqueValues, numHash)
+	ontMinhash := getMinhash(tokenFun, transFun, l1_annotations, numHash)
+	//ontMinhash := getMinhash(tokenFun, transFun, annotation, numHash)
+	noOntMinhash := getMinhash(tokenFun, transFun, noEntities, numHash)
+	return ontMinhash, noOntMinhash, attMinhash, len(l1_annotations), len(noEntities), cardinality
+}
+
+func GetOntDomainPlus(values []string, numHash int, lookup map[string]map[string]bool, counts map[string]int, entityClass map[string][]string, transFun func(string) string, tokenFun func(string) []string) ([]uint64, []uint64, []uint64, int, int, int) {
 	// The set of entities found
 	noAnnotation := make([]string, 0)
 	annotation := make([]string, 0)
@@ -788,18 +834,18 @@ func GetOntDomain(values []string, numHash int, lookup map[string]map[string]boo
 			annotation = append(annotation, ent)
 		}
 	}
-	//l1_annotations := annotateEntities(annotation, entityClass)
+	l1_annotations := annotateEntities(annotation, entityClass)
 	attMinhash := getMinhash(tokenFun, transFun, uniqueValues, numHash)
-	//ontMinhash := getMinhash(tokenFun, transFun, l1_annotations, numHash)
-	ontMinhash := getMinhash(tokenFun, transFun, annotation, numHash)
+	ontMinhash := getMinhash(tokenFun, transFun, l1_annotations, numHash)
 	//ontMinhash := getMinhash(tokenFun, transFun, annotation, numHash)
 	noOntMinhash := getMinhash(tokenFun, transFun, noAnnotation, numHash)
-	return ontMinhash, noOntMinhash, attMinhash, len(annotation), len(noAnnotation), cardinality
+	return ontMinhash, noOntMinhash, attMinhash, len(l1_annotations), len(noAnnotation), cardinality
 }
 
 func annotateEntities(entities []string, entityClass map[string][]string) []string {
-	K := 10
-	classes := make(map[string]int, 0)
+	//K := 10
+	classes := make(map[string]int)
+	annotations := make([]string, 0)
 	for _, ent := range entities {
 		e := strings.ToLower(ent)
 		if len(entityClass[e]) == 0 {
@@ -809,32 +855,36 @@ func annotateEntities(entities []string, entityClass map[string][]string) []stri
 		for _, c := range entityClass[e] {
 			if _, ok := classes[c]; !ok {
 				classes[c] = 1
+				annotations = append(annotations, c)
+			}
+			//else {
+			//	classes[c] = classes[c] + 1
+			//}
+		}
+	}
+	/*
+		freqs := make([]int, 0)
+		freqClass := make(map[int][]string)
+		for k, v := range classes {
+			if _, ok := freqClass[v]; !ok {
+				freqClass[v] = []string{k}
+				freqs = append(freqs, v)
 			} else {
-				classes[c] = classes[c] + 1
+				freqClass[v] = append(freqClass[v], k)
 			}
 		}
-	}
-	freqs := make([]int, 0)
-	freqClass := make(map[int][]string)
-	for k, v := range classes {
-		if _, ok := freqClass[v]; !ok {
-			freqClass[v] = []string{k}
-			freqs = append(freqs, v)
-		} else {
-			freqClass[v] = append(freqClass[v], k)
-		}
-	}
 
-	sort.Ints(freqs)
-	annotations := make([]string, 0)
-	for i := len(freqs) - 1; i >= 0; i-- {
-		for _, c := range freqClass[freqs[i]] {
-			annotations = append(annotations, c)
-			if len(annotations) == K {
-				return annotations
+		sort.Ints(freqs)
+		annotations := make([]string, 0)
+		for i := len(freqs) - 1; i >= 0; i-- {
+			for _, c := range freqClass[freqs[i]] {
+				annotations = append(annotations, c)
+				if len(annotations) == K {
+					return annotations
+				}
 			}
 		}
-	}
+	*/
 	return annotations
 }
 
