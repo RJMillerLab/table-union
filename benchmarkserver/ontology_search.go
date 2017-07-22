@@ -20,9 +20,9 @@ func (index *JaccardUnionIndex) OntBuild() error {
 	domainfilenames := opendata.StreamFilenames()
 	minhashFilenames := opendata.StreamMinhashVectors(10, "ont-minhash-l1", domainfilenames)
 	//minhashFilenames := opendata.StreamMinhashVectors(10, "ont-minhash-l2", domainfilenames)
+	//minhashFilenames := opendata.StreamMinhashVectors(10, "entities-minhash", domainfilenames)
 	count := 0
 	for file := range minhashFilenames {
-		log.Printf("insert: %s", file)
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			//		log.Printf("Minhash file does not exist: %s", file)
 			continue
@@ -47,10 +47,10 @@ func (index *JaccardUnionIndex) OntBuild() error {
 func (index *JaccardUnionIndex) NoOntBuild() error {
 	log.Printf("no ont build")
 	domainfilenames := opendata.StreamFilenames()
+	//minhashFilenames := opendata.StreamMinhashVectors(10, "minhash", domainfilenames)
 	minhashFilenames := opendata.StreamMinhashVectors(10, "noann-minhash", domainfilenames)
 	count := 0
 	for file := range minhashFilenames {
-		log.Printf("no ont insert: %s", file)
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			//log.Printf("Minhash file does not exist: %s", file)
 			continue
@@ -96,7 +96,7 @@ func (server *OntologyJaccardServer) OntQueryOrderAll(noOntQuery, ontQuery, quer
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
-		for pair := range server.ui.lsh.QueryPlus(querySigs, done1) {
+		for pair := range server.ui.lsh.QueryPlus(noOntQuerySigs, done1) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairOntJaccardPlus(tableID, server.ui.domainDir, columnIndex, pair.QueryIndex, server.ui.numHash, query[pair.QueryIndex], ontQuery[pair.QueryIndex], noOntQuery[pair.QueryIndex], queryCard[pair.QueryIndex], ontQueryCard[pair.QueryIndex], noOntQueryCard[pair.QueryIndex])
 			if e.Sim != 0.0 {
@@ -124,31 +124,34 @@ func (server *OntologyJaccardServer) OntQueryOrderAll(noOntQuery, ontQuery, quer
 			}
 			reduceQueue.Push(pair, pair.Sim)
 			if reduceQueue.Size() == batchSize {
-				if finished := alignment.processPairsPlus(reduceQueue, results); finished {
+				if finished := alignment.processPairsOntology(reduceQueue, results); finished {
 					close(done1)
 					close(done2)
+					wwg.Done()
+					return
 				}
 				reduceQueue = pqueue.NewTopKQueue(batchSize)
 			}
+		}
+		if reduceQueue.Size() != 0 {
+			alignment.processPairsOntology(reduceQueue, results)
 		}
 		wwg.Done()
 	}()
 	go func() {
 		wwg.Wait()
-		log.Printf("done with the index go routines")
 		close(results)
 	}()
 
 	go func() {
 		wg.Wait()
-		log.Printf("done with processing the reduce batch")
 		close(reduceBatch)
 	}()
 
 	return results
 }
 
-func (a alignment) processPairsPlus(reduceQueue *pqueue.TopKQueue, out chan<- SearchResult) bool {
+func (a alignment) processPairsOntology(reduceQueue *pqueue.TopKQueue, out chan<- SearchResult) bool {
 	pairs, _ := reduceQueue.Descending()
 	for i := range pairs {
 		pair := pairs[i].(Pair)
@@ -184,136 +187,10 @@ func (a alignment) processPairsPlus(reduceQueue *pqueue.TopKQueue, out chan<- Se
 	return a.completedTables.Unique() == a.n
 }
 
-func getColumnPairOntJaccard(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, query [][]uint64, ontQuery [][]uint64) Pair {
-	// getting the embedding of the candidate column
-	minhashFilename := getMinhashFilename(candTableID, domainDir, candColIndex)
-	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
-		//log.Printf("Minhash file %s does not exist.", minhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	vec, err := opendata.ReadMinhashSignature(minhashFilename, numHash)
-	if err != nil {
-		log.Printf("Error in reading %s from disk.", minhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	jaccard := estimateJaccard(vec, query[queryColIndex])
-	// computing ontology jaccard
-	ontMinhashFilename := getOntMinhashFilename(candTableID, domainDir, candColIndex)
-	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
-		//log.Printf("Minhash file %s does not exist.", ontMinhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	vec, err = opendata.ReadMinhashSignature(ontMinhashFilename, numHash)
-	if err != nil {
-		log.Printf("Error in reading %s from disk.", ontMinhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	ontJaccard := estimateJaccard(vec, ontQuery[queryColIndex])
-	p := Pair{
-		QueryColIndex: queryColIndex,
-		CandTableID:   candTableID,
-		CandColIndex:  candColIndex,
-		Sim:           jaccard * ontJaccard,
-	}
-	return p
-}
-
-func getColumnPairOntJaccardPlusPlus(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, query []uint64, ontQuery []uint64, noOntQuery []uint64, queryCard, ontQueryCard, noOntQueryCard int) Pair {
-	// getting the embedding of the candidate column
-	//minhashFilename := getMinhashFilename(candTableID, domainDir, candColIndex)
-	minhashFilename := getUnannotatedMinhashFilename(candTableID, domainDir, candColIndex)
-	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
-		//log.Printf("Minhash file %s does not exist.", minhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	vec, err := opendata.ReadMinhashSignature(minhashFilename, numHash)
-	if err != nil {
-		log.Printf("Error in reading %s from disk.", minhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	jaccard := estimateJaccard(vec, query)
-	// computing ontology jaccard
-	ontMinhashFilename := getOntMinhashFilename(candTableID, domainDir, candColIndex)
-	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
-		//  log.Printf("Minhash file %s does not exist.", ontMinhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	vec, err = opendata.ReadMinhashSignature(ontMinhashFilename, numHash)
-	if err != nil {
-		log.Printf("Error in reading %s from disk.", ontMinhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	ontJaccard := estimateJaccard(vec, ontQuery)
-	noA, nA := getOntDomainCardinality(candTableID, domainDir, candColIndex)
-	nB := queryCard
-	noB := ontQueryCard
-	jaccardProb := sameDomainProb(jaccard, nA, nB)
-	ontProb := sameDomainProb(ontJaccard, noA, noB)
-	p := Pair{
-		QueryColIndex:          queryColIndex,
-		CandTableID:            candTableID,
-		CandColIndex:           candColIndex,
-		Jaccard:                jaccard,
-		Hypergeometric:         jaccardProb,
-		OntologyJaccard:        ontJaccard,
-		OntologyHypergeometric: ontProb,
-		Sim: jaccardProb + ontProb - (jaccardProb * ontProb),
-	}
-	return p
-}
-
 func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, query []uint64, ontQuery []uint64, noOntQuery []uint64, queryCard, ontQueryCard, noOntQueryCard int) Pair {
-	delta := 0.000001
 	// getting the embedding of the candidate column
-	minhashFilename := getMinhashFilename(candTableID, domainDir, candColIndex)
+	minhashFilename := getUnannotatedMinhashFilename(candTableID, domainDir, candColIndex)
+	//minhashFilename := getMinhashFilename(candTableID, domainDir, candColIndex)
 	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
 		//log.Printf("Minhash file %s does not exist.", minhashFilename)
 		//panic(err)
@@ -335,7 +212,7 @@ func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, qu
 			Sim:           0.0,
 		}
 	}
-	jaccard := estimateJaccard(vec, query)
+	jaccard := estimateJaccard(vec, noOntQuery)
 	// computing ontology jaccard
 	ontMinhashFilename := getOntMinhashFilename(candTableID, domainDir, candColIndex)
 	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
@@ -351,7 +228,6 @@ func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, qu
 	vec, err = opendata.ReadMinhashSignature(ontMinhashFilename, numHash)
 	if err != nil {
 		log.Printf("Error in reading %s from disk.", ontMinhashFilename)
-		//panic(err)
 		return Pair{
 			QueryColIndex: queryColIndex,
 			CandTableID:   candTableID,
@@ -361,13 +237,12 @@ func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, qu
 	}
 	ontJaccard := estimateJaccard(vec, ontQuery)
 	noA, nA := getOntDomainCardinality(candTableID, domainDir, candColIndex)
-	nB := queryCard
-	noB := ontQueryCard
+	nB := ontQueryCard
+	noB := noOntQueryCard
 	coverage := float64(queryCard-noOntQueryCard) / float64(queryCard)
-	jaccardProb := sameDomainProb(jaccard, nA, nB) + delta
-	ontProb := sameDomainProb(ontJaccard, noA, noB) + delta
-	log.Printf("ontProb: %f", ontProb)
-	log.Printf("Coverage ontProb: %f", (1-coverage)*jaccardProb+coverage*ontProb)
+	jaccardProb := sameDomainProb(jaccard, noA, noB)
+	ontProb := sameDomainProb(ontJaccard, nA, nB)
+	//log.Printf("tableID: %s.%d, annB: %d, noannB: %d, annA: %d, noAnnA: %d, j: %f, h: %f, oj: %f, oh: %f coverage sim: %f maxsim: %f", candTableID, candColIndex, nB, noB, nA, noA, jaccard, jaccardProb, ontJaccard, ontProb, (1-coverage)*jaccardProb+coverage*ontProb, math.Max(jaccardProb, ontProb))
 	p := Pair{
 		QueryColIndex:          queryColIndex,
 		CandTableID:            candTableID,
@@ -378,74 +253,11 @@ func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, qu
 		OntologyHypergeometric: ontProb,
 		Sim: (1-coverage)*jaccardProb + coverage*ontProb,
 		//Sim: ontProb,
+		//Sim: jaccardProb,
+		//Sim: ontProb + jaccardProb,
+		//Sim: ontProb * jaccardProb,
+		//Sim: math.Max(jaccardProb, ontProb),
 	}
-	return p
-}
-
-func getColumnPairOntology(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, query [][]uint64, ontQuery [][]uint64, queryCard, ontQueryCard int) Pair {
-	delta := 0.000001
-	// getting the embedding of the candidate column
-	minhashFilename := getMinhashFilename(candTableID, domainDir, candColIndex)
-	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
-		//log.Printf("Minhash file %s does not exist.", minhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	vec, err := opendata.ReadMinhashSignature(minhashFilename, numHash)
-	if err != nil {
-		log.Printf("Error in reading %s from disk.", minhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	jaccard := estimateJaccard(vec, query[queryColIndex])
-	// computing ontology jaccard
-	ontMinhashFilename := getOntMinhashFilename(candTableID, domainDir, candColIndex)
-	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
-		//	log.Printf("Minhash file %s does not exist.", ontMinhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	vec, err = opendata.ReadMinhashSignature(ontMinhashFilename, numHash)
-	if err != nil {
-		log.Printf("Error in reading %s from disk.", ontMinhashFilename)
-		//panic(err)
-		return Pair{
-			QueryColIndex: queryColIndex,
-			CandTableID:   candTableID,
-			CandColIndex:  candColIndex,
-			Sim:           0.0,
-		}
-	}
-	ontJaccard := estimateJaccard(vec, ontQuery[queryColIndex])
-	noA, nA := getOntDomainCardinality(candTableID, domainDir, candColIndex)
-	nB := queryCard
-	noB := ontQueryCard
-	jaccardProb := sameDomainProb(jaccard, nA, nB) + delta
-	ontProb := sameDomainProb(ontJaccard, noA, noB) + delta
-	p := Pair{
-		QueryColIndex:          queryColIndex,
-		CandTableID:            candTableID,
-		CandColIndex:           candColIndex,
-		Jaccard:                jaccard,
-		Hypergeometric:         jaccardProb,
-		OntologyJaccard:        ontJaccard,
-		OntologyHypergeometric: ontProb,
-		Sim: jaccardProb + ontProb - (jaccardProb * ontProb),
-	}
+	//log.Printf("ontProb: %f, jaccardProb: %f, sim: %f", ontProb, jaccardProb, p.Sim)
 	return p
 }

@@ -71,7 +71,6 @@ func (s *JaccardServer) queryHandler(c *gin.Context) {
 			TableUnion: union,
 		})
 	}
-	log.Printf("len(response): %d", len(searchResults))
 	response := QueryResponse{
 		Result: searchResults,
 	}

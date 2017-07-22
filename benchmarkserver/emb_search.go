@@ -21,7 +21,7 @@ import (
 
 var (
 	ByteOrder = binary.BigEndian
-	batchSize = 2000
+	batchSize = 1000
 )
 
 type SearchResult struct {
@@ -48,6 +48,7 @@ func NewUnionIndex(domainDir string, lsh *simhashlsh.CosineLSH) *UnionIndex {
 }
 
 func (index *UnionIndex) Build() error {
+	start := getNow()
 	domainfilenames := opendata.StreamFilenames()
 	embfilenames := opendata.StreamEmbVectors(10, domainfilenames)
 	count := 0
@@ -69,6 +70,7 @@ func (index *UnionIndex) Build() error {
 		index.lsh.Add(vec, toColumnID(tableID, columnIndex))
 	}
 	index.lsh.Index()
+	log.Printf("index time for embedding: %f", getNow()-start)
 	return nil
 }
 
@@ -107,6 +109,9 @@ func (a alignment) hasSeenBetter(pair Pair) bool {
 	if !a.hasPartialTable(pair.CandTableID) {
 		return false
 	}
+	if a.hasCompleted(pair.CandTableID) {
+		return true
+	}
 	return a.partialAlign[pair.CandTableID].Has(pair.CandColIndex) ||
 		a.reverseAlign[pair.CandTableID].Has(pair.QueryColIndex)
 }
@@ -124,7 +129,7 @@ func (a alignment) get(candidateTableID string) []Pair {
 	return pairs
 }
 
-func (a alignment) processPairs(pairQueue *pqueue.TopKQueue, out chan<- SearchResult) bool {
+func (a alignment) processPairsEmbedding(pairQueue *pqueue.TopKQueue, out chan<- SearchResult) bool {
 	pairs, _ := pairQueue.Descending()
 	for i := range pairs {
 		pair := pairs[i].(Pair)
@@ -139,7 +144,7 @@ func (a alignment) processPairs(pairQueue *pqueue.TopKQueue, out chan<- SearchRe
 		}
 		a.partialAlign[pair.CandTableID].Update(pair.CandColIndex)
 		a.reverseAlign[pair.CandTableID].Update(pair.QueryColIndex)
-		a.tableQueues[pair.CandTableID].Push(pair, pair.T2)
+		a.tableQueues[pair.CandTableID].Push(pair, pair.Cosine)
 		// When we get k unique column alignments for a candidate table
 		if a.tableQueues[pair.CandTableID].Size() == a.k {
 			a.completedTables.Update(pair.CandTableID)
@@ -162,6 +167,7 @@ func (a alignment) processPairs(pairQueue *pqueue.TopKQueue, out chan<- SearchRe
 
 func (index *UnionIndex) QueryOrderAll(query, queryCovar [][]float64, N, K int, queryCardinality []int) <-chan SearchResult {
 	log.Printf("Started querying the index with %d columns.", len(query))
+	start := getNow()
 	results := make(chan SearchResult)
 	go func() {
 		defer close(results)
@@ -175,21 +181,30 @@ func (index *UnionIndex) QueryOrderAll(query, queryCovar [][]float64, N, K int, 
 			if alignment.hasCompleted(tableID) {
 				continue
 			}
-			//e := getColumnPairPlus(tableID, index.domainDir, columnIndex, pair.QueryIndex, query[pair.QueryIndex], queryCovar[pair.QueryIndex], queryCardinality[pair.QueryIndex])
-			e := getColumnPair(tableID, index.domainDir, columnIndex, pair.QueryIndex, query[pair.QueryIndex])
-			//batch.Push(e, e.T2)
-			batch.Push(e, e.Cosine)
+			e := getColumnPairPlus(tableID, index.domainDir, columnIndex, pair.QueryIndex, query[pair.QueryIndex], queryCovar[pair.QueryIndex], queryCardinality[pair.QueryIndex])
+			if !math.IsNaN(e.T2) && !math.IsNaN(e.F) && !math.IsInf(e.T2, 0) && !math.IsInf(e.F, 0) {
+				if e.Cosine != 0.0 {
+					batch.Push(e, e.Cosine)
+					//batch.Push(e, -1.0*e.T2)
+					log.Printf("scores: c: %f t2: %f", e.Cosine, e.T2)
+					if e.Cosine > 0.9 && e.T2 > 100 {
+						log.Printf("anomaly: c: %f t2: %f", e.Cosine, e.T2)
+					}
+				}
+			}
 			if batch.Size() < batchSize {
 				continue
 			}
 			// Process the batch
-			if finished := alignment.processPairs(batch, results); finished {
+			if finished := alignment.processPairsEmbedding(batch, results); finished {
+				log.Printf("elapse time: %f", getNow()-start)
 				return
 			}
 		}
 		// Don't forget remaining pairs in the queue
 		if !batch.Empty() {
-			alignment.processPairs(batch, results)
+			alignment.processPairsEmbedding(batch, results)
+			log.Printf("elapse time: %f", getNow()-start)
 		}
 	}()
 	return results
@@ -244,31 +259,98 @@ func getColumnPairPlus(candTableID, domainDir string, candColIndex, queryColInde
 		log.Printf("Error in reading %s from disk.", covarFilename)
 		panic(err)
 	}
-	card := getDomainCardinality(candTableID, domainDir, candColIndex)
+	//card := getDomainCardinality(candTableID, domainDir, candColIndex)
+	card := getDomainSize(candTableID, domainDir, candColIndex)
 	cosine := embedding.Cosine(mean, queryMean)
 	// inserting the pair into its corresponding priority queue
 	ht2, f := getT2Statistics(mean, queryMean, covar, queryCovar, card, queryCardinality)
-	if math.IsNaN(ht2) || math.IsNaN(f) || math.IsInf(ht2, 0) || math.IsInf(f, 0) {
-		ht2 = 1000
-		f = 1000
-	}
 	p := Pair{
-		QueryColIndex: queryColIndex,
-		CandTableID:   candTableID,
-		CandColIndex:  candColIndex,
-		Cosine:        cosine,
-		T2:            ht2,
-		F:             f,
-		Sim:           ht2,
+		QueryColIndex:    queryColIndex,
+		CandTableID:      candTableID,
+		CandColIndex:     candColIndex,
+		Cosine:           cosine,
+		T2:               math.Abs(ht2),
+		F:                math.Abs(f),
+		Sim:              math.Abs(ht2),
+		QueryCardinality: queryCardinality,
+		CandCardinality:  card,
 	}
 	return p
 }
 
 func getT2Statistics(m1, m2 []float64, cv1, cv2 []float64, card1, card2 int) (float64, float64) {
+	dim := len(cv1)
+	if len(cv1) != len(cv2) {
+		log.Printf("covar matrix mismatch")
+		return 0.0, 0.0
+	}
+	t0 := mat64.NewDense(1, dim, cv1)
+	t1 := mat64.NewDense(1, dim, cv2)
+	t2 := mat64.NewDense(0, 0, nil)
+	t3 := mat64.NewDense(0, 0, nil)
+	t2.Scale(float64(card1-1), t0)
+	t3.Scale(float64(card2-1), t1)
+	t0 = mat64.NewDense(0, 0, nil)
+	t0.Add(t2, t3)
+	t1 = mat64.NewDense(0, 0, nil)
+	t1.Scale(1.0/float64(card1+card2-2), t0)
+	t2 = mat64.NewDense(0, 0, nil)
+	t2.Scale((1.0/float64(card1) + 1.0/float64(card2)), t1)
+	//if !isInvertible(t2Values) {
+	//	t3 = mat64.NewDense(0, 0, nil)
+	//	t3.Sub(t0, t2)
+	//	return t3
+	//}
+	cols := scaleColsReciprocal(t2.RawRowView(0))
+	t1 = mat64.NewDense(1, dim, cols)
+	t0 = mat64.NewDense(1, dim, m1)
+	t2 = mat64.NewDense(1, dim, m2)
+	t3 = mat64.NewDense(0, 0, nil)
+	t3.Sub(t0, t2)
+	t2 = mat64.NewDense(0, 0, nil)
+	t2.MulElem(t3, t1)
+	t0 = mat64.NewDense(0, 0, nil)
+	t0.Mul(t2, t3.T())
+	T2 := t0.At(0, 0)
+	// Computing F-distribution
+	p := len(m1)
+	n := card1 + card2 - 1
+	f := (float64(n-p) / math.Abs(float64(p*(n-1)))) * T2
+	return T2, f
+}
+
+func scaleColsReciprocal(vals []float64) []float64 {
+	recips := make([]float64, len(vals))
+	invertible := isInvertible(vals)
+	for j := 0; j < len(vals); j++ {
+		if invertible {
+			recips[j] = (1.0 / vals[j])
+		} else {
+			recips[j] = (1.0 / (vals[j] + 1.0))
+		}
+	}
+	return recips
+}
+
+func isInvertible(vals []float64) bool {
+	for _, v := range vals {
+		if v < 0.0001 {
+			return false
+		}
+	}
+	return true
+}
+
+func getT2StatisticsPlus(m1, m2 []float64, cv1, cv2 []float64, card1, card2 int) (float64, float64) {
+	return 1.0, 1.0
 	//dim := int(math.Sqrt(float64(len(cv1))))
 	dim := len(cv1)
-	cvd1 := mat64.NewDense(dim, dim, getCovarMatrix(cv1))
-	cvd2 := mat64.NewDense(dim, dim, getCovarMatrix(cv2))
+	//cvd1 := mat64.NewDense(dim, dim, cv1)
+	//cvd2 := mat64.NewDense(dim, dim, cv2)
+	//cvd1 := mat64.NewDense(dim, dim, getCovarMatrix(cv1))
+	//cvd2 := mat64.NewDense(dim, dim, getCovarMatrix(cv2))
+	cvd1 := mat64.NewDense(1, dim, cv1)
+	cvd2 := mat64.NewDense(1, dim, cv2)
 	t1 := mat64.NewDense(0, 0, nil)
 	t2 := mat64.NewDense(0, 0, nil)
 	t1.Scale(float64(card1-1), cvd1)
@@ -299,6 +381,7 @@ func getT2Statistics(m1, m2 []float64, cv1, cv2 []float64, card1, card2 int) (fl
 
 func getCovarMatrix(variance []float64) []float64 {
 	dim := len(variance)
+	log.Printf("len(covar) :%d", dim)
 	covariance := make([]float64, dim*dim)
 	for i := 0; i < len(variance); i++ {
 		for j := 0; j < len(variance); j++ {

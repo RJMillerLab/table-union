@@ -3,6 +3,7 @@ package benchmarkserver
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -78,7 +79,8 @@ func getUnannotatedMinhashFilename(tableID, domainDir string, index int) string 
 
 func getOntDomainCardinality(tableID, domainDir string, index int) (int, int) {
 	cardpath := path.Join(domainDir, tableID)
-	cardpath = path.Join(cardpath, fmt.Sprintf("%d.%s", index, "ont-card"))
+	cardpath = path.Join(cardpath, fmt.Sprintf("%d.%s", index, "ont-noann-card"))
+	log.Printf("cardpath: %s", cardpath)
 	f, err := os.Open(cardpath)
 	defer f.Close()
 	if err != nil {
@@ -96,15 +98,58 @@ func getOntDomainCardinality(tableID, domainDir string, index int) (int, int) {
 			}
 			lineIndex += 1
 		}
-		if lineIndex == 1 {
+		//if lineIndex == 1 {
+		//	c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
+		//	if err == nil {
+		//		ocard = c
+		//	}
+		//	lineIndex += 1
+		//}
+	}
+	ontCardpath := path.Join(domainDir, tableID)
+	ontCardpath = path.Join(ontCardpath, fmt.Sprintf("%d.%s", index, "ont-card"))
+	fo, err := os.Open(ontCardpath)
+	defer fo.Close()
+	if err != nil {
+		return 0.0, 0.0
+	}
+	scanner = bufio.NewScanner(fo)
+	lineIndex = 0
+	for scanner.Scan() {
+		if lineIndex == 0 {
 			c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
 			if err == nil {
 				ocard = c
+			} else {
+				panic(err)
+			}
+		}
+		lineIndex += 1
+	}
+	return card, ocard
+}
+
+func getDomainSize(tableID, domainDir string, index int) int {
+	cardpath := path.Join(domainDir, tableID)
+	cardpath = path.Join(cardpath, fmt.Sprintf("%d.%s", index, "size"))
+	f, err := os.Open(cardpath)
+	defer f.Close()
+	if err != nil {
+		return 0.0
+	}
+	card := 0
+	scanner := bufio.NewScanner(f)
+	lineIndex := 0
+	for scanner.Scan() {
+		if lineIndex == 0 {
+			c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
+			if err == nil {
+				card = c
 			}
 			lineIndex += 1
 		}
 	}
-	return card, ocard
+	return card
 }
 
 func getDomainCardinality(tableID, domainDir string, index int) int {

@@ -4,11 +4,17 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
 
 	"github.com/RJMillerLab/table-union/embedding"
 	"github.com/ekzhu/datatable"
@@ -16,7 +22,8 @@ import (
 )
 
 var (
-	domainDir = "/home/fnargesian/TABLE_UNION_OUTPUT/domains"
+	domainDir   = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3/domains"
+	opendataDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3/csvfiles"
 )
 
 type Client struct {
@@ -39,6 +46,7 @@ func NewClient(ft *fasttext.FastText, host string) (*Client, error) {
 }
 
 func (c *Client) mkReq(queryRequest QueryRequest) QueryResponse {
+	var queryResponse QueryResponse
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(&queryRequest); err != nil {
 		panic(err)
@@ -51,13 +59,22 @@ func (c *Client) mkReq(queryRequest QueryRequest) QueryResponse {
 	resp, err := c.cli.Do(req)
 	if err != nil {
 		panic(err)
+		if nErr, ok := err.(*net.OpError); ok {
+			if nErr.Err == syscall.EPIPE {
+				log.Printf("broken pipe! retrying!")
+				resp, err = c.cli.Do(req)
+				if err != nil {
+					log.Printf("retring failed!")
+					return queryResponse
+				}
+			}
+		}
 	}
 	queryResponseData, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
 	defer resp.Body.Close()
-	var queryResponse QueryResponse
 	if err := json.Unmarshal(queryResponseData, &queryResponse); err != nil {
 		log.Printf("No response found")
 		//panic(err)
@@ -124,37 +141,45 @@ func (c *Client) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryRe
 	results := make([]QueryResult, 0)
 	f, err := os.Open(queryCSVFilename)
 	if err != nil {
-		panic(err)
+		log.Printf("dataset file not found")
+		return results
+		//panic(err)
 	}
 	defer f.Close()
 	reader := csv.NewReader(f)
 	queryTable, err := datatable.FromCSV(reader)
 	queryHeaders := queryTable.GetRow(0)
 	if err != nil {
-		panic(err)
+		log.Printf("error in reading datasets.")
+		return results
+		//panic(err)
 	}
 	// Create embeddings
 	means := make([][]float64, 0)
-	//covars := make([][]float64, 0)
-	//cards := make([]int, 0)
+	covars := make([][]float64, 0)
+	cards := make([]int, 0)
 	queryTextHeaders := make([]string, 0)
 	textToAllHeaders := make(map[int]int)
 	for i := 0; i < queryTable.NumCol(); i++ {
 		col := queryTable.GetColumn(i)
 		if classifyValues(col) == "text" {
 			//mean, covar, err := embedding.GetDomainEmbMeanCovar(c.ft, c.tokenFun, c.transFun, col)
-			mean, err := embedding.GetDomainEmbSum(c.ft, c.tokenFun, c.transFun, col)
+			//mean, err := embedding.GetDomainEmbSum(c.ft, c.tokenFun, c.transFun, col)
+			mean, covar, err := getDomainEmbMeanCovar(queryCSVFilename, i)
 			if err != nil {
 				log.Printf("Embedding not found for column %d", i)
 				continue
 			}
-			//if len(mean) != 0 && len(covar) != 0 && !containsNan(covar) && !containsNan(mean) {
-			if len(mean) != 0 {
-				means = append(means, mean)
-				//covars = append(covars, covar)
-				//cards = append(cards, getCardinality(col))
-				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
-				textToAllHeaders[len(queryTextHeaders)-1] = i
+			if len(mean) != 0 && len(covar) != 0 && !containsNan(covar) && !containsNan(mean) {
+				if len(mean) != 0 && len(covar) == 300 {
+					means = append(means, mean)
+					covars = append(covars, covar)
+					size := len(col)
+					cards = append(cards, size)
+					//cards = append(cards, getCardinality(col))
+					queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
+					textToAllHeaders[len(queryTextHeaders)-1] = i
+				}
 			}
 		}
 	}
@@ -163,9 +188,13 @@ func (c *Client) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryRe
 		minK = len(means)
 	}
 	// Query server
+	if len(covars) == 0 {
+		return results
+	}
 	for _, kp := range ks {
-		//resp := c.mkReq(QueryRequest{Vecs: means, Covars: covars, K: kp, N: n, Cards: cards})
-		resp := c.mkReq(QueryRequest{Vecs: means, K: kp, N: n})
+		resp := c.mkReq(QueryRequest{Vecs: means, Covars: covars, K: kp, N: n, Cards: cards})
+		//resp := c.mkReq(QueryRequest{Vecs: means, K: kp, N: n, Cards: cards})
+		//resp := c.mkReq(QueryRequest{Vecs: means, K: kp, N: n})
 		// Process results
 		if resp.Result == nil || len(resp.Result) == 0 {
 			log.Printf("No result found for %s.", queryCSVFilename)
@@ -191,4 +220,34 @@ func containsNan(matrix []float64) bool {
 		}
 	}
 	return false
+}
+
+func getDomainEmbMeanCovar(tableID string, colIndex int) ([]float64, []float64, error) {
+	tableID = strings.Replace(tableID, opendataDir, "", -1)
+	meanFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-mean", tableID, colIndex))
+	if _, err := os.Stat(meanFilename); os.IsNotExist(err) {
+		log.Printf("Mean embedding file %s does not exist.", meanFilename)
+		return nil, nil, err
+	}
+	mean, err := embedding.ReadVecFromDisk(meanFilename, ByteOrder)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", meanFilename)
+		return nil, nil, err
+	}
+	// reading covariance matrix
+	covarFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-covar", tableID, colIndex))
+	if _, err := os.Stat(covarFilename); os.IsNotExist(err) {
+		log.Printf("Embedding file %s does not exist.", covarFilename)
+		return nil, nil, err
+	}
+	covar, err := embedding.ReadVecFromDisk(covarFilename, ByteOrder)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", covarFilename)
+		return nil, nil, err
+	}
+	return mean, covar, nil
+}
+
+func getNow() float64 {
+	return float64(time.Now().UnixNano()) / 1E9
 }

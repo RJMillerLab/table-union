@@ -17,7 +17,7 @@ type Server struct {
 
 type QueryRequest struct {
 	Vecs   [][]float64 `json:"table"`
-	Covars [][]float64 `json:"covarianc_table"`
+	Covars [][]float64 `json:"covariance"`
 	K      int         `json:"k"`
 	N      int         `json:"n"`
 	Cards  []int       `json:"card"`
@@ -64,13 +64,16 @@ func (s *Server) Close() error {
 }
 
 func (s *Server) queryHandler(c *gin.Context) {
+	log.Printf("server")
 	body, err := ioutil.ReadAll(io.LimitReader(c.Request.Body, 1048576))
 	if err != nil {
+		log.Printf("http.StatusBadRequest")
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 	var queryRequest QueryRequest
 	if err := json.Unmarshal(body, &queryRequest); err != nil {
+		log.Printf("http.StatusUnprocessableEntity")
 		c.AbortWithStatus(http.StatusUnprocessableEntity)
 		return
 	}

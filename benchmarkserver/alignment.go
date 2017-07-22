@@ -14,7 +14,10 @@ type Pair struct {
 	CandTableID            string
 	CandColIndex           int
 	QueryColIndex          int
+	QueryCardinality       int
+	CandCardinality        int
 	Jaccard                float64
+	Containment            float64
 	Hypergeometric         float64
 	OntologyJaccard        float64
 	OntologyHypergeometric float64

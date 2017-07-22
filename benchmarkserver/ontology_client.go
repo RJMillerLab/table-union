@@ -12,9 +12,12 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/RJMillerLab/table-union/opendata"
+	"github.com/RJMillerLab/table-union/yago"
 	"github.com/ekzhu/datatable"
 )
 
@@ -22,6 +25,7 @@ var (
 	yagoDB             = "/home/kenpu/TABLE_UNION_OUTPUT/yago.sqlite3.0"
 	wordEntityFilename = "/home/kenpu/TABLE_UNION_OUTPUT/word-entity.txt"
 	classFilename      = "/home/fnargesian/TABLE_UNION_OUTPUT/entity-category.txt"
+	yagoFilename       = "/home/fnargesian/TABLE_UNION_OUTPUT/yago.sqlite3.0"
 	//classFilename = "/home/fnargesian/TABLE_UNION_OUTPUT/entity-class.txt"
 )
 
@@ -34,22 +38,25 @@ type OntologyJaccardClient struct {
 	entityLookup map[string]map[string]bool
 	entityCounts map[string]int
 	entityClass  map[string][]string
+	yago         *yago.Yago
 }
 
 func NewOntologyJaccardClient(host string, numHash int) (*OntologyJaccardClient, error) {
 	log.Printf("New jaccard client for experiments.")
-	lookup := loadEntityWords(wordEntityFilename)
-	counts := loadEntityWordCount(yagoDB)
-	classes := loadEntityClasses(classFilename)
+	//lookup := loadEntityWords(wordEntityFilename)
+	//counts := loadEntityWordCount(yagoDB)
+	//classes := loadEntityClasses(classFilename)
+	//yg := yago.InitYago(yagoFilename)
 	return &OntologyJaccardClient{
-		host:         host,
-		cli:          &http.Client{},
-		transFun:     DefaultTransFun,
-		tokenFun:     DefaultTokenFun,
-		numHash:      numHash,
-		entityLookup: lookup,
-		entityCounts: counts,
-		entityClass:  classes,
+		host:     host,
+		cli:      &http.Client{},
+		transFun: DefaultTransFun,
+		tokenFun: DefaultTokenFun,
+		numHash:  numHash,
+		//entityLookup: lookup,
+		//entityCounts: counts,
+		//entityClass:  classes,
+		//	yago:         yg,
 	}, nil
 }
 
@@ -105,8 +112,9 @@ func (c *OntologyJaccardClient) QueryWithFixedK(queryCSVFilename string, k, maxN
 	for i := 0; i < queryTable.NumCol(); i++ {
 		col := queryTable.GetColumn(i)
 		if classifyValues(col) == "text" {
-			ontVec, noOntVec, vec, ontCard, noOntCard, card := opendata.GetOntDomain(col, c.numHash, c.entityLookup, c.entityCounts, c.entityClass, c.transFun, c.tokenFun)
-			if len(vec) != 0 && len(ontVec) != 0 {
+			ontVec, noOntVec, vec, ontCard, noOntCard, card, err := getAttributeOntologyData(queryCSVFilename, i, c.numHash)
+			//ontVec, noOntVec, vec, ontCard, noOntCard, card := opendata.GetOntDomain(c.yago.Copy(), col, c.numHash, c.entityClass, c.transFun, c.tokenFun)
+			if err == nil {
 				vecs = append(vecs, vec)
 				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
 				textToAllHeaders[len(queryTextHeaders)-1] = i
@@ -148,7 +156,8 @@ func (c *OntologyJaccardClient) QueryWithFixedN(queryCSVFilename string, minK, n
 	results := make([]QueryResult, 0)
 	f, err := os.Open(queryCSVFilename)
 	if err != nil {
-		panic(err)
+		log.Printf("Query %s not found.", queryCSVFilename)
+		//panic(err)
 	}
 	defer f.Close()
 	reader := csv.NewReader(f)
@@ -169,8 +178,9 @@ func (c *OntologyJaccardClient) QueryWithFixedN(queryCSVFilename string, minK, n
 	for i := 0; i < queryTable.NumCol(); i++ {
 		col := queryTable.GetColumn(i)
 		if classifyValues(col) == "text" {
-			ontVec, noOntVec, vec, ontCard, noOntCard, card := opendata.GetOntDomain(col, c.numHash, c.entityLookup, c.entityCounts, c.entityClass, c.transFun, c.tokenFun)
-			if len(vec) != 0 && len(ontVec) != 0 {
+			//ontVec, noOntVec, vec, ontCard, noOntCard, card := opendata.GetOntDomain(c.yago, col, c.numHash, c.entityClass, c.transFun, c.tokenFun)
+			ontVec, noOntVec, vec, ontCard, noOntCard, card, err := getAttributeOntologyData(queryCSVFilename, i, c.numHash)
+			if err == nil {
 				noOntVecs = append(noOntVecs, noOntVec)
 				vecs = append(vecs, vec)
 				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
@@ -290,4 +300,78 @@ func loadEntityClasses(classFilename string) map[string][]string {
 	log.Printf("number of entities: %d", len(lookup))
 	f.Close()
 	return lookup
+}
+
+func getAttributeOntologyData(tableID string, colIndex, numHash int) ([]uint64, []uint64, []uint64, int, int, int, error) {
+	tableID = strings.Replace(tableID, opendataDir, "", -1)
+	ontVecFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ont-minhash-l1", tableID, colIndex))
+	ontVec, err := opendata.ReadMinhashSignature(ontVecFilename, numHash)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", ontVecFilename)
+		//ontVec = make([]uint64, 0)
+		return nil, nil, nil, 0, 0, 0, err
+	}
+	//
+	noOntVecFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.noann-minhash", tableID, colIndex))
+	noOntVec, err := opendata.ReadMinhashSignature(noOntVecFilename, numHash)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", noOntVecFilename)
+		//noOntVec = make([]uint64, 0)
+		return nil, nil, nil, 0, 0, 0, err
+	}
+	//
+	vecFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.minhash", tableID, colIndex))
+	vec, err := opendata.ReadMinhashSignature(vecFilename, numHash)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", vecFilename)
+		//vec = make([]uint64, 0)
+		return nil, nil, nil, 0, 0, 0, err
+	}
+	//
+	cardpath := path.Join(domainDir, tableID, fmt.Sprintf("%d.%s", colIndex, "ont-noann-card"))
+	f, err := os.Open(cardpath)
+	defer f.Close()
+	if err != nil {
+		return nil, nil, nil, 0, 0, 0, err
+	}
+	noOntCard := 0
+	card := 0
+	scanner := bufio.NewScanner(f)
+	lineIndex := 0
+	for scanner.Scan() {
+		if lineIndex == 0 {
+			c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
+			if err == nil {
+				noOntCard = c
+			}
+		}
+		if lineIndex == 2 {
+			c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
+			if err == nil {
+				card = c
+			}
+		}
+		lineIndex += 1
+	}
+	//
+	cardpath = path.Join(domainDir, tableID, fmt.Sprintf("%d.%s", colIndex, "ont-card"))
+	f, err = os.Open(cardpath)
+	defer f.Close()
+	if err != nil {
+		return nil, nil, nil, 0, 0, 0, err
+	}
+	ontCard := 0
+	scanner = bufio.NewScanner(f)
+	lineIndex = 0
+	for scanner.Scan() {
+		if lineIndex == 0 {
+			c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
+			if err == nil {
+				ontCard = c
+			}
+		}
+		lineIndex += 1
+	}
+	//
+	return ontVec, noOntVec, vec, ontCard, noOntCard, card, nil
 }

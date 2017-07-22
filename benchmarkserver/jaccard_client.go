@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	ks = []int{2, 4, 6, 8, 10, 15}
+	ks = []int{3} //2, 4, 6, 8, 10, 15}
 )
 
 type JaccardClient struct {
@@ -67,7 +67,8 @@ func (c *JaccardClient) QueryWithFixedK(queryCSVFilename string, k, maxN int) []
 	results := make([]QueryResult, 0)
 	f, err := os.Open(queryCSVFilename)
 	if err != nil {
-		panic(err)
+		log.Printf("Query %s not found.", queryCSVFilename)
+		//panic(err)
 	}
 	defer f.Close()
 	reader := csv.NewReader(f)

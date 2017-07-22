@@ -5,7 +5,9 @@ import (
 	"log"
 	"math"
 	"os"
+	"time"
 
+	"github.com/ekzhu/counter"
 	_ "github.com/mattn/go-sqlite3"
 
 	minhashlsh "github.com/RJMillerLab/table-union/minhashlsh"
@@ -31,6 +33,7 @@ func NewJaccardUnionIndex(domainDir string, lsh *minhashlsh.MinhashLSH, numHash 
 }
 
 func (index *JaccardUnionIndex) Build() error {
+	start := getNow()
 	domainfilenames := opendata.StreamFilenames()
 	minhashFilenames := opendata.StreamMinhashVectors(10, "minhash", domainfilenames)
 	count := 0
@@ -52,6 +55,7 @@ func (index *JaccardUnionIndex) Build() error {
 		index.lsh.Add(toColumnID(tableID, columnIndex), vec)
 	}
 	index.lsh.Index()
+	log.Printf("index time for jaccard: %f", getNow()-start)
 	return nil
 }
 
@@ -77,21 +81,59 @@ func (index *JaccardUnionIndex) QueryOrderAll(query [][]uint64, N, K int, queryC
 			}
 			//e := getColumnPairJaccard(tableID, index.domainDir, columnIndex, pair.QueryIndex, index.numHash, query)
 			e := getColumnPairJaccardPlus(tableID, index.domainDir, columnIndex, pair.QueryIndex, index.numHash, query, queryCardinality[pair.QueryIndex])
-			batch.Push(e, e.Sim)
+			if e.Sim != 0.0 {
+				batch.Push(e, e.Sim)
+			}
 			if batch.Size() < batchSize {
 				continue
 			}
 			// Process the batch
-			if finished := alignment.processPairs(batch, results); finished {
+			if finished := alignment.processPairsSyntactic(batch, results); finished {
 				return
 			}
 		}
 		// Don't forget remaining pairs in the queue
 		if !batch.Empty() {
-			alignment.processPairs(batch, results)
+			alignment.processPairsSyntactic(batch, results)
 		}
 	}()
 	return results
+}
+
+func (a alignment) processPairsSyntactic(pairQueue *pqueue.TopKQueue, out chan<- SearchResult) bool {
+	pairs, _ := pairQueue.Descending()
+	for i := range pairs {
+		pair := pairs[i].(Pair)
+		if !a.hasPartialTable(pair.CandTableID) {
+			a.tableQueues[pair.CandTableID] = pqueue.NewTopKQueue(a.k)
+			a.partialAlign[pair.CandTableID] = counter.NewCounter()
+			a.reverseAlign[pair.CandTableID] = counter.NewCounter()
+		}
+		if a.hasSeenBetter(pair) {
+			// because we are using priority queue
+			continue
+		}
+		a.partialAlign[pair.CandTableID].Update(pair.CandColIndex)
+		a.reverseAlign[pair.CandTableID].Update(pair.QueryColIndex)
+		a.tableQueues[pair.CandTableID].Push(pair, pair.Hypergeometric)
+		// When we get k unique column alignments for a candidate table
+		if a.tableQueues[pair.CandTableID].Size() == a.k {
+			a.completedTables.Update(pair.CandTableID)
+			result := SearchResult{
+				CandidateTableID: pair.CandTableID,
+				Alignment:        a.get(pair.CandTableID),
+				K:                a.k,
+				N:                a.completedTables.Unique(),
+				Duration:         float64(time.Now().Sub(a.startTime)) / float64(1000000),
+			}
+			out <- result
+		}
+		// Check if we are done
+		if a.completedTables.Unique() == a.n {
+			return true
+		}
+	}
+	return a.completedTables.Unique() == a.n
 }
 
 func getColumnPairJaccardPlus(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, query [][]uint64, queryCardinality int) Pair {
@@ -108,14 +150,19 @@ func getColumnPairJaccardPlus(candTableID, domainDir string, candColIndex, query
 	}
 	// inserting the pair into its corresponding priority queue
 	jaccard := estimateJaccard(vec, query[queryColIndex])
-	nA := getDomainCardinality(candTableID, domainDir, candColIndex)
-	nB := queryCardinality
+	nB := getDomainCardinality(candTableID, domainDir, candColIndex)
+	nA := queryCardinality
+	containment := (jaccard * (float64(nA + nB))) / ((1.0 + jaccard) * float64(nA))
 	sig := sameDomainProb(jaccard, nA, nB)
+	if sig >= 0.99 {
+		log.Printf("nA: %d, nB: %d, jaccard: %f, containment: %f", nA, nB, jaccard, containment)
+	}
 	p := Pair{
 		QueryColIndex:  queryColIndex,
 		CandTableID:    candTableID,
 		CandColIndex:   candColIndex,
 		Jaccard:        jaccard,
+		Containment:    containment,
 		Hypergeometric: sig,
 		Sim:            sig,
 	}
@@ -149,11 +196,14 @@ func getColumnPairJaccard(candTableID, domainDir string, candColIndex, queryColI
 func sameDomainProbPlus(estimatedJaccard float64, nA, nB int) float64 {
 	N := nA + nB
 	k := int(math.Floor((estimatedJaccard * float64(N)) / (1.0 + estimatedJaccard)))
+	if (k == nA || k == nB) && (nA != nB) {
+		return 0.0
+	}
 	if k > nA {
 		log.Printf("invalid intersection")
 	}
 	F_k_A_B := 0.0
-	for i := 1; i <= k; i++ {
+	for i := 0; i < k; i++ {
 		F_k_A_B += hyperGeometricProb(i, nA, nB, N)
 	}
 	if F_k_A_B > 1.0 {
@@ -169,7 +219,7 @@ func sameDomainProb(estimatedJaccard float64, nA, nB int) float64 {
 		k = int(math.Min(float64(nA), float64(nB)))
 	}
 	F_k_A_B := 0.0
-	for i := 0; i <= k; i++ {
+	for i := 0; i < k; i++ {
 		F_k_A_B += math.Exp(logHyperGeometricProb(i, nA, nB, N))
 	}
 	if F_k_A_B > 2.0 {
@@ -189,6 +239,9 @@ func logHyperGeometricProb(k, K, n, N int) float64 {
 }
 
 func combination(np, kp int) int64 {
+	if kp == 0 {
+		return 1
+	}
 	var r int64
 	k := int64(kp)
 	n := int64(np)
