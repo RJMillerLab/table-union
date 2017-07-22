@@ -16,11 +16,11 @@ func main() {
 	var port string
 	var threshold float64
 	var numHash int
-	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark/domains",
+	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3/domains",
 		"The top-level director for all domain and embedding files")
-	flag.StringVar(&port, "port", "4024", "Server port")
+	flag.StringVar(&port, "port", "4074", "Server port")
 	flag.IntVar(&numHash, "h", 256, "LSH Parameter: number of hash functions")
-	flag.Float64Var(&threshold, "t", 0.5, "Search Parameter: k-unionability threshold")
+	flag.Float64Var(&threshold, "t", 0.7, "Search Parameter: k-unionability threshold")
 	flag.Parse()
 	// Build Search Index
 	ui := benchmarkserver.NewUnionIndex(domainDir, simhashlsh.NewCosineLSH(FastTextDim, numHash, threshold))

@@ -23,19 +23,19 @@ func main() {
 	var fanout int
 	var opendataDir string
 	var experimentType string
-	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark/domains",
+	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3/domains",
 		"The top-level director for all domain and embedding files")
 	flag.IntVar(&numHash, "h", 256, "LSH Parameter: number of hash functions")
-	flag.StringVar(&queryDir, "query-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark/csvfiles",
+	flag.StringVar(&queryDir, "query-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3/csvfiles",
 		"The directory of query files")
-	flag.Float64Var(&threshold, "t", 0.5, "Search Parameter: k-unionability threshold")
+	flag.Float64Var(&threshold, "t", 0.7, "Search Parameter: k-unionability threshold")
 	flag.IntVar(&k, "k", 3, "Search Parameter: top (n,k) unionable tables")
-	flag.IntVar(&n, "n", 10, "Search Parameter: top (n,k) unionable tables")
-	flag.StringVar(&host, "host", "http://localhost:4022", "Server host")
-	flag.StringVar(&port, "port", "4022", "Server port")
-	flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark/ont-jaccard-experiments.sqlite", "experiments DB")
-	flag.StringVar(&opendataDir, "opendate-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark", "The        directory of open data tables.")
-	flag.IntVar(&fanout, "fanout", 6, "Number threads querying the server in parallel.")
+	flag.IntVar(&n, "n", 25, "Search Parameter: top (n,k) unionable tables")
+	flag.StringVar(&host, "host", "http://localhost:4049", "Server host")
+	flag.StringVar(&port, "port", "4049", "Server port")
+	flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3/ont-jaccard-experiments.sqlite", "experiments DB")
+	flag.StringVar(&opendataDir, "opendate-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3", "The        directory of open data tables.")
+	flag.IntVar(&fanout, "fanout", 8, "Number threads querying the server in parallel.")
 	flag.StringVar(&experimentType, "type", "fixedn", "The type of experiments: fixed k or fixed n.")
 	flag.Parse()
 	// Create client
@@ -73,7 +73,7 @@ func main() {
 		wg.Wait()
 		close(alignments)
 	}()
-	progress := experiment.DoSaveAlignments(alignments, "ontology_topk_"+experimentType, experimentsDB, 1)
+	progress := experiment.DoSaveAlignments(alignments, "ontology_"+experimentType, experimentsDB, 1)
 
 	total := experiment.ProgressCounter{}
 	for n := range progress {

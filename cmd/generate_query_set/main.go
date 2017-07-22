@@ -61,7 +61,7 @@ func getStrantifiedSamples(sampleSize int) {
 	ontEmbTables := make(map[string]bool)
 	for filename := range StreamFilenames() {
 		textDomains := getTextDomains(filename)
-		if len(textDomains) < 3 && len(textDomains) > 30 {
+		if len(textDomains) < 3 { // len(textDomains) > 30 {
 			if _, ok := valTables[filename]; !ok {
 				valTables[filename] = true
 			}
@@ -72,7 +72,7 @@ func getStrantifiedSamples(sampleSize int) {
 			f, err1 := os.Open(filepath)
 			f.Close()
 			if err1 == nil {
-				filepath := path.Join(OutputDir, "domains", filename, fmt.Sprintf("%d.ft-sum", index))
+				filepath := path.Join(OutputDir, "domains", filename, fmt.Sprintf("%d.ft-mean", index))
 				f, err := os.Open(filepath)
 				f.Close()
 				if err == nil {
@@ -87,7 +87,7 @@ func getStrantifiedSamples(sampleSize int) {
 					continue
 				}
 			} else {
-				filepath := path.Join(OutputDir, "domains", filename, fmt.Sprintf("%d.ft-sum", index))
+				filepath := path.Join(OutputDir, "domains", filename, fmt.Sprintf("%d.ft-mean", index))
 				f, err := os.Open(filepath)
 				f.Close()
 				if err == nil {

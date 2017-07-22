@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -134,6 +135,7 @@ func main() {
 		go func(id int, yg *yago.Yago, queue <-chan *Domain, progress chan<- *PartialAnnotation) {
 			for domain := range queue {
 				//progress <- DoFindPartiallyAnnotatedDomainSegmentPlus(domain, lookup, counts)
+				log.Printf("domain: %s %d", domain.Filename, domain.Index)
 				progress <- DoFindPartiallyAnnotatedDomainSegment(domain, yg)
 			}
 			wg.Done()
@@ -183,7 +185,7 @@ func main() {
 			}
 			f.Close()
 		}
-		cardFilename := partialAnnotation.Domain.PhysicalFilename("ont-card")
+		cardFilename := partialAnnotation.Domain.PhysicalFilename("ont-noann-card")
 		f, err := os.OpenFile(cardFilename, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			panic(err)
@@ -199,13 +201,13 @@ func main() {
 		}
 		fmt.Fprintln(f, partialAnnotation.Domain.Cardinality)
 		f.Close()
-		sizeFilename := partialAnnotation.Domain.PhysicalFilename("size")
-		f, err = os.OpenFile(sizeFilename, os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Fprintln(f, partialAnnotation.Domain.Size)
-		f.Close()
+		//sizeFilename := partialAnnotation.Domain.PhysicalFilename("size")
+		//f, err = os.OpenFile(sizeFilename, os.O_CREATE|os.O_WRONLY, 0644)
+		//if err != nil {
+		//	panic(err)
+		//}
+		//fmt.Fprintln(f, partialAnnotation.Domain.Size)
+		//f.Close()
 	}
 	fmt.Printf("%d segments with %d values in %.2f seconds\n", segCount, totalValueCount, GetNow()-start)
 

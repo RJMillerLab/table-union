@@ -4,14 +4,16 @@ import (
 	"fmt"
 
 	. "github.com/RJMillerLab/table-union/opendata"
+	"github.com/RJMillerLab/table-union/yago"
 )
 
 func main() {
 	CheckEnv()
 	InitSarma()
 	start := GetNow()
+	yg := yago.InitYago(Yago_db)
 	queryFilenames := StreamQueryFilenames()
-	results := DoFindSarmaUnionableTables(queryFilenames, 2)
+	results := DoFindSarmaUnionableTables(queryFilenames, 3, yg)
 	progress := DoSaveSarmaScores(results)
 	total := ProgressCounter{}
 	for n := range progress {

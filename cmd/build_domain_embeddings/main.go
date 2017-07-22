@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -42,9 +43,13 @@ func main() {
 				//vec, err := ft.GetDomainEmbSum(vf.Values, vf.Freq)
 				log.Printf("file: %s", vf.Filename)
 				//mean, covar, err := ft.GetDomainEmbMeanCovar(vf.Values, vf.Freq)
-				mean, covar, err := ft.GetDomainEmbMeanVar(vf.Values, vf.Freq)
+				mean, covar, size, err := ft.GetDomainEmbMeanVar(vf.Values, vf.Freq)
 				if err != nil {
-					fmt.Printf("Error in building embedding for %s - %d: %s\n", vf.Filename, vf.Index, err.Error())
+					log.Printf("Error in building embedding for %s - %d: %s\n", vf.Filename, vf.Index, err.Error())
+					continue
+				}
+				if size == 0 {
+					log.Printf("No embedding representation found for %s.%d.", vf.Filename, vf.Index)
 					continue
 				}
 				//vecFilename := filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.ft-sum", vf.Filename, vf.Index))
@@ -56,6 +61,13 @@ func main() {
 				if err := embedding.WriteVecToDisk(covar, binary.BigEndian, vecFilename); err != nil {
 					panic(err)
 				}
+				sizeFilename := filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.size", vf.Filename, vf.Index))
+				f, err := os.OpenFile(sizeFilename, os.O_CREATE|os.O_WRONLY, 0644)
+				if err != nil {
+					panic(err)
+				}
+				fmt.Fprintln(f, size)
+				f.Close()
 			}
 			wg.Done()
 		}()
