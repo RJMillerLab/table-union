@@ -80,3 +80,42 @@ func (y *Yago) MatchEntity(data string, limit int) (results []string) {
 	}
 	return
 }
+
+// MatchEntityNonStrict attempts to find entities whose
+// names match the given data value.
+func (y *Yago) MatchEntityNonStrict(data string, limit int) (results []string) {
+	results = make([]string, 0)
+	data = strings.ToLower(strings.TrimSpace(notAlphaNumeric.ReplaceAllString(data, " ")))
+	query := ""
+	for _, token := range strings.Split(data, " ") {
+		if len(token) == 0 {
+			continue
+		}
+		if len(query) == 0 {
+			query += token
+		} else {
+			query += " OR " + token
+		}
+	}
+	if query == "" {
+		return
+	}
+	rows, err := y.db.Query(`
+		SELECT entity FROM entities WHERE entities MATCH ?
+		ORDER BY rank LIMIT ?;`, query, limit)
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var entity string
+		if err := rows.Scan(&entity); err != nil {
+			panic(err)
+		}
+		results = append(results, entity)
+	}
+	if err := rows.Err(); err != nil {
+		panic(err)
+	}
+	return
+}

@@ -11,14 +11,16 @@ import (
 
 	opendata "github.com/RJMillerLab/go-opendata"
 	"github.com/RJMillerLab/table-union/embedding"
+	"github.com/RJMillerLab/table-union/yago"
 	"github.com/daviddengcn/go-algs/ed"
 	"github.com/ekzhu/counter"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
 	databases = [][]string{
-		// []string{"/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db", "canada"},
-		// []string{"/home/ekzhu/OPENDATA/2017-06-05/catalog.data.gov.jsonl.db", "us"},
+		[]string{"/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db", "canada"},
+		[]string{"/home/ekzhu/OPENDATA/2017-03-05/catalog.data.gov.jsonl.db", "us"},
 		[]string{"/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db", "uk"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/datahub.io.jsonl.db", "datahub"},
@@ -27,6 +29,8 @@ var (
 	numBenchmarkTablePerRaw               = 25
 	fastTextMinNumCol                     = 3
 	fasttextMinPct                        = 0.8
+	yagoMinNumCol                         = fastTextMinNumCol
+	yagoMinPct                            = fasttextMinPct
 	maxSrcTableNumRow                     = 1000000
 	statTablename                         = "dataset_profile"
 	maxNumDistinctBeforeGiveUp            = 100
@@ -41,33 +45,53 @@ type tableStat struct {
 }
 
 type columnStat struct {
-	distinctCount int
-	nmapped       int
+	distinctCount  int
+	fastTextMapped int
+	yagoMapped     int
 }
 
-func (stat tableStat) isFastTextCol(i int) bool {
-	pct := float64(stat.colStats[i].nmapped) / float64(stat.colStats[i].distinctCount)
+func (colStat columnStat) isFastTextCol() bool {
+	pct := float64(colStat.fastTextMapped) / float64(colStat.distinctCount)
 	return pct >= fasttextMinPct
 }
 
-func (stat tableStat) countNumFastTextCols() int {
+func (colStat columnStat) isYagoCol() bool {
+	pct := float64(colStat.yagoMapped) / float64(colStat.distinctCount)
+	return pct >= yagoMinPct
+}
+
+func (stat tableStat) metFastTextCriteria() bool {
 	var n int
-	for i := range stat.colStats {
-		if stat.isFastTextCol(i) {
+	for _, s := range stat.colStats {
+		if s.isFastTextCol() {
 			n++
 		}
 	}
-	return n
+	return n >= fastTextMinNumCol
+}
+
+func (stat tableStat) metYagoCriteria() bool {
+	var n int
+	for _, s := range stat.colStats {
+		if s.isYagoCol() {
+			n++
+		}
+	}
+	return n >= yagoMinNumCol
 }
 
 func main() {
 	var output string
 	var fastTextDatabaseFilename string
+	var yagoDatabaseFilename string
 	flag.StringVar(&output, "output", "",
 		"The output is a SQLite database storing the benchmark tables.")
 	flag.StringVar(&fastTextDatabaseFilename, "fasttext",
 		"/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"The FastText database")
+	flag.StringVar(&yagoDatabaseFilename, "yago",
+		"/home/ekzhu/YAGO/yago.sqlite",
+		"The YAGO SQLite3 database")
 	flag.Parse()
 	od, err := opendata.NewExplorer(output)
 	if err != nil {
@@ -131,6 +155,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer ft.Close()
+
+	// Init YAGO database
+	log.Printf("Loading YAGO database from %s ...", yagoDatabaseFilename)
+	yg := yago.InitYago(yagoDatabaseFilename)
+	defer yg.Close()
 
 	// Select tables to be used as the source tables
 	log.Print("Selecting tables that have values map to FastText...")
@@ -147,18 +177,16 @@ func main() {
 				stat.Database, stat.Name)
 			continue
 		}
-		if stat.NumCol < fastTextMinNumCol {
-			log.Printf("Skipping table %s.%s as to few columns",
+		if stat.NumCol < fastTextMinNumCol || stat.NumCol < yagoMinNumCol {
+			log.Printf("Skipping table %s.%s as too few columns",
 				stat.Database, stat.Name)
 			continue
 		}
-		if selectedPackages.Has(stat.MetadataId) {
+		if selectedPackages.Has(stat.MetadataID) {
 			log.Printf("Skipping table %s.%s as a sibling table was selected",
 				stat.Database, stat.Name)
 			continue
 		}
-		log.Printf("Scanning table %s.%s (%d rows, %d columns)...",
-			stat.Database, stat.Name, stat.NumRow, stat.NumCol)
 		// Get the column names and their types
 		columns, colTypes, err := od.GetColumns(stat.Database, stat.Name)
 		if err != nil {
@@ -192,6 +220,8 @@ func main() {
 			}
 		}
 		// Collecting column stats for each text column
+		log.Printf("Scanning table %s.%s (%d rows, %d columns)...",
+			stat.Database, stat.Name, stat.NumRow, stat.NumCol)
 		var readErr error
 		for _, i := range textCols {
 			column := columns[i]
@@ -206,14 +236,20 @@ func main() {
 						continue
 					}
 					count++
-					if count == maxNumDistinctBeforeGiveUp && !stat.isFastTextCol(i) {
+					if count == maxNumDistinctBeforeGiveUp && (!stat.colStats[i].isFastTextCol() || !stat.colStats[i].isYagoCol()) {
 						break
 					}
 					if len(value.String) > maxNumCharPerValue {
 						continue
 					}
-					if _, err := ft.GetValueEmb(value.String); err == nil {
-						stat.colStats[i].nmapped++
+					v := strings.ToLower(strings.TrimFunc(strings.TrimSpace(value.String), unicode.IsPunct))
+					// Check if all tokens can find a fast text match
+					if _, err := ft.GetValueEmbStrict(v); err == nil {
+						stat.colStats[i].fastTextMapped++
+					}
+					// Check if all tokens can be used to find a entity match
+					if result := yg.MatchEntity(strings.ToLower(v), 1); len(result) > 0 {
+						stat.colStats[i].yagoMapped++
 					}
 				}
 				return nil
@@ -229,12 +265,10 @@ func main() {
 			continue
 		}
 		// Count number of columns meeting the criteria
-		n := stat.countNumFastTextCols()
-		if n >= fastTextMinNumCol {
-			log.Printf("Selected %s.%s has %d columns with more than %.0f%% matches",
-				stat.Database, stat.Name, n, fasttextMinPct*100.0)
+		if stat.metYagoCriteria() && stat.metFastTextCriteria() {
+			log.Printf("Selected %s.%s", stat.Database, stat.Name)
 			selected = append(selected, stat)
-			selectedPackages.Update(stat.MetadataId)
+			selectedPackages.Update(stat.MetadataID)
 		} else {
 			log.Printf("Skipped %s.%s as requirement not satisfied",
 				stat.Database, stat.Name)
@@ -243,14 +277,14 @@ func main() {
 
 	// Generating tablets
 	log.Print("Generating benchmark tables from selected source tables...")
-	for _, stat := range selected {
+	for rank, stat := range selected {
 		limit := stat.NumRow / numBenchmarkTablePerRaw
 		if limit == 0 {
 			panic("Getting limit = 0")
 		}
 		for i := 0; i < numBenchmarkTablePerRaw; i++ {
 			offset := limit * i
-			tablename := fmt.Sprintf("%s____%s____%d", stat.Database, stat.Name, i)
+			tablename := fmt.Sprintf("%d____%s____%s____%d", rank, stat.Database, stat.Name, i)
 			if err := od.LoadTableLimit(stat.Database, stat.Name, tablename, offset, limit); err != nil {
 				panic(err)
 			}

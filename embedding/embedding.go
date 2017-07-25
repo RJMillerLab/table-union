@@ -202,9 +202,9 @@ func GetValueEmb(ft *fasttext.FastText, tokenizedValue []string) ([]float64, err
 			panic(err)
 		}
 		if valueVec == nil {
-			valueVec = emb.Vec
+			valueVec = emb
 		} else {
-			add(valueVec, emb.Vec)
+			add(valueVec, emb)
 		}
 		count++
 	}

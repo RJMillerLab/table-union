@@ -99,6 +99,11 @@ func (ft *FastText) GetValueEmb(value string) ([]float64, error) {
 	return ft.getTokenizedValueEmb(tokens)
 }
 
+func (ft *FastText) GetValueEmbStrict(value string) ([]float64, error) {
+	tokens := Tokenize(value, ft.tokenFun, ft.transFun)
+	return ft.getTokenizedValueEmbStrict(tokens)
+}
+
 // Returns the domain embedding by summation given the
 // distinct values and their frequencies
 func (ft *FastText) GetDomainEmbSum(values []string, freqs []int) ([]float64, error) {
@@ -256,9 +261,34 @@ func flatten2DSlice(a [][]float64) []float64 {
 }
 
 // Returns the embedding vector of a tokenized data value
+func (ft *FastText) getTokenizedValueEmbStrict(tokenizedValue []string) ([]float64, error) {
+	var valueVec []float64
+	for _, token := range tokenizedValue {
+		if len(token) == 0 {
+			continue
+		}
+		emb, err := ft.GetEmb(token)
+		if err == ErrNoEmbFound {
+			return nil, err
+		}
+		if err != nil {
+			panic(err)
+		}
+		if valueVec == nil {
+			valueVec = emb
+		} else {
+			add(valueVec, emb)
+		}
+	}
+	if valueVec == nil {
+		return nil, ErrNoEmbFound
+	}
+	return valueVec, nil
+}
+
+// Returns the embedding vector of a tokenized data value
 func (ft *FastText) getTokenizedValueEmb(tokenizedValue []string) ([]float64, error) {
 	var valueVec []float64
-	var count int
 	for _, token := range tokenizedValue {
 		emb, err := ft.GetEmb(token)
 		if err == ErrNoEmbFound {
@@ -272,7 +302,6 @@ func (ft *FastText) getTokenizedValueEmb(tokenizedValue []string) ([]float64, er
 		} else {
 			add(valueVec, emb)
 		}
-		count++
 	}
 	if valueVec == nil {
 		return nil, ErrNoEmbFound
