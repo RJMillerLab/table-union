@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -36,6 +37,7 @@ var (
 	maxNumDistinctBeforeGiveUp            = 100
 	maxNumCharPerValue                    = 256
 	minEditDistanceBetweenSelectedColumns = 5
+	notAlphaNumeric                       = regexp.MustCompile("[^a-zA-Z0-9]+")
 )
 
 type tableStat struct {
@@ -227,7 +229,6 @@ func main() {
 			column := columns[i]
 			err = od.ReadColumnDistinct(stat.Database, stat.Name, column, func(rows *sql.Rows) error {
 				var value sql.NullString
-				var count int
 				for rows.Next() {
 					if err := rows.Scan(&value); err != nil {
 						return err
@@ -235,20 +236,19 @@ func main() {
 					if !value.Valid {
 						continue
 					}
-					count++
-					if count == maxNumDistinctBeforeGiveUp && (!stat.colStats[i].isFastTextCol() || !stat.colStats[i].isYagoCol()) {
+					stat.colStats[i].distinctCount++
+					if stat.colStats[i].distinctCount == maxNumDistinctBeforeGiveUp && (!stat.colStats[i].isFastTextCol() || !stat.colStats[i].isYagoCol()) {
 						break
 					}
 					if len(value.String) > maxNumCharPerValue {
 						continue
 					}
-					v := strings.ToLower(strings.TrimFunc(strings.TrimSpace(value.String), unicode.IsPunct))
 					// Check if all tokens can find a fast text match
-					if _, err := ft.GetValueEmbStrict(v); err == nil {
+					if _, err := ft.GetValueEmbStrict(value.String); err == nil {
 						stat.colStats[i].fastTextMapped++
 					}
 					// Check if all tokens can be used to find a entity match
-					if result := yg.MatchEntity(strings.ToLower(v), 1); len(result) > 0 {
+					if result := yg.MatchEntity(value.String, 1); len(result) > 0 {
 						stat.colStats[i].yagoMapped++
 					}
 				}

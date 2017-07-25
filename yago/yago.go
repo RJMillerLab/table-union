@@ -57,13 +57,20 @@ func (y *Yago) Close() error {
 // names match the given data value.
 func (y *Yago) MatchEntity(data string, limit int) (results []string) {
 	results = make([]string, 0)
-	data = strings.TrimSpace(notAlphaNumeric.ReplaceAllString(data, " "))
-	if data == "" {
+	data = notAlphaNumeric.ReplaceAllString(data, " ")
+	query := ""
+	for _, token := range strings.Split(data, " ") {
+		if len(token) == 0 {
+			continue
+		}
+		query += fmt.Sprintf(` "%s"`, token)
+	}
+	if query == "" {
 		return
 	}
 	rows, err := y.db.Query(`
 		SELECT entity FROM entities WHERE entities MATCH ?
-		ORDER BY rank LIMIT ?;`, data, limit)
+		ORDER BY rank LIMIT ?;`, query, limit)
 	if err != nil {
 		panic(err)
 	}
@@ -85,7 +92,7 @@ func (y *Yago) MatchEntity(data string, limit int) (results []string) {
 // names match the given data value.
 func (y *Yago) MatchEntityNonStrict(data string, limit int) (results []string) {
 	results = make([]string, 0)
-	data = strings.ToLower(strings.TrimSpace(notAlphaNumeric.ReplaceAllString(data, " ")))
+	data = notAlphaNumeric.ReplaceAllString(data, " ")
 	query := ""
 	for _, token := range strings.Split(data, " ") {
 		if len(token) == 0 {
