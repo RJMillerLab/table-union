@@ -231,7 +231,7 @@ func main() {
 		if ignoreCoverage {
 			// If we don't use YAGO and FastText coverage as selection criteria
 			// We can early-decide based on what we have so far
-			if len(textCols) < fastTextMinNumCol || len(textCols) < yagoMinNumCol {
+			if len(textCols) >= fastTextMinNumCol || len(textCols) >= yagoMinNumCol {
 				log.Printf("Selected %s.%s", stat.Database, stat.Name)
 				selected = append(selected, stat)
 				selectedPackages.Update(stat.MetadataID)
