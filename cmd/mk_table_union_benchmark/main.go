@@ -86,6 +86,7 @@ func main() {
 	var output string
 	var fastTextDatabaseFilename string
 	var yagoDatabaseFilename string
+	var ignoreCoverage bool
 	flag.StringVar(&output, "output", "",
 		"The output is a SQLite database storing the benchmark tables.")
 	flag.StringVar(&fastTextDatabaseFilename, "fasttext",
@@ -94,6 +95,8 @@ func main() {
 	flag.StringVar(&yagoDatabaseFilename, "yago",
 		"/home/ekzhu/YAGO/yago.sqlite",
 		"The YAGO SQLite3 database")
+	flag.BoolVar(&ignoreCoverage, "ignore-coverage", false,
+		"Do not use YAGO and FastText coverage as selection criteria")
 	flag.Parse()
 	od, err := opendata.NewExplorer(output)
 	if err != nil {
@@ -145,24 +148,28 @@ func main() {
 		return stats[i].NumRow > stats[j].NumRow
 	})
 
-	// Init FastText word set
-	log.Printf("Loading FastText database from %s...", fastTextDatabaseFilename)
-	ft, err := embedding.InitInMemoryFastText(fastTextDatabaseFilename,
-		func(s string) []string {
-			return strings.Split(s, " ")
-		},
-		func(s string) string {
-			return strings.ToLower(strings.TrimFunc(strings.TrimSpace(s), unicode.IsPunct))
-		})
-	if err != nil {
-		panic(err)
-	}
-	defer ft.Close()
+	var ft *embedding.FastText
+	var yg *yago.Yago
+	if !ignoreCoverage {
+		// Init FastText word set
+		log.Printf("Loading FastText database from %s...", fastTextDatabaseFilename)
+		ft, err = embedding.InitInMemoryFastText(fastTextDatabaseFilename,
+			func(s string) []string {
+				return strings.Split(s, " ")
+			},
+			func(s string) string {
+				return strings.ToLower(strings.TrimFunc(strings.TrimSpace(s), unicode.IsPunct))
+			})
+		if err != nil {
+			panic(err)
+		}
+		defer ft.Close()
 
-	// Init YAGO database
-	log.Printf("Loading YAGO database from %s ...", yagoDatabaseFilename)
-	yg := yago.InitYago(yagoDatabaseFilename)
-	defer yg.Close()
+		// Init YAGO database
+		log.Printf("Loading YAGO database from %s ...", yagoDatabaseFilename)
+		yg = yago.InitYago(yagoDatabaseFilename)
+		defer yg.Close()
+	}
 
 	// Select tables to be used as the source tables
 	log.Print("Selecting tables that have values map to FastText...")
@@ -220,6 +227,19 @@ func main() {
 			if colType.DatabaseTypeName() == "TEXT" {
 				textCols = append(textCols, i)
 			}
+		}
+		if ignoreCoverage {
+			// If we don't use YAGO and FastText coverage as selection criteria
+			// We can early-decide based on what we have so far
+			if len(textCols) < fastTextMinNumCol || len(textCols) < yagoMinNumCol {
+				log.Printf("Selected %s.%s", stat.Database, stat.Name)
+				selected = append(selected, stat)
+				selectedPackages.Update(stat.MetadataID)
+			} else {
+				log.Printf("Skipped %s.%s as requirement not satisfied",
+					stat.Database, stat.Name)
+			}
+			continue
 		}
 		// Collecting column stats for each text column
 		log.Printf("Scanning table %s.%s (%d rows, %d columns)...",
