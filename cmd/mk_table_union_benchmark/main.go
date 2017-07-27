@@ -26,13 +26,13 @@ var (
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/datahub.io.jsonl.db", "datahub"},
 	}
-	numRawTableToSelect                   = 200
+	numRawTableToSelect                   = 20
 	numBenchmarkTablePerRaw               = 25
 	fastTextMinNumCol                     = 3
 	fasttextMinPct                        = 0.8
 	yagoMinNumCol                         = fastTextMinNumCol
 	yagoMinPct                            = fasttextMinPct
-	maxSrcTableNumRow                     = 1000000
+	maxSrcTableNumRow                     = 25000
 	statTablename                         = "dataset_profile"
 	maxNumDistinctBeforeGiveUp            = 100
 	maxNumCharPerValue                    = 256
@@ -105,14 +105,18 @@ func main() {
 	// Cleaning cached tables
 	log.Print("Cleaning previously generated tables...")
 	cached, err := od.CachedTables()
+	var countCached int
 	for _, name := range cached {
 		if name == statTablename {
 			continue
 		}
+		countCached++
+		fmt.Printf("\rDropping %d out of %d", countCached, len(cached)-1)
 		if err := od.DropCachedTable(name); err != nil {
 			panic(err)
 		}
 	}
+	fmt.Println()
 
 	// Attaching databases
 	for _, database := range databases {
@@ -182,8 +186,8 @@ func main() {
 		// Use the local wrapper
 		stat := tableStat{&stats[s], nil, nil}
 		if stat.NumRow > maxSrcTableNumRow {
-			log.Printf("Skipping table %s.%s as max number of rows exceeded",
-				stat.Database, stat.Name)
+			// log.Printf("Skipping table %s.%s as max number of rows exceeded",
+			// 	stat.Database, stat.Name)
 			continue
 		}
 		if stat.NumCol < fastTextMinNumCol || stat.NumCol < yagoMinNumCol {
@@ -302,10 +306,16 @@ func main() {
 		if limit == 0 {
 			panic("Getting limit = 0")
 		}
+		// First load the original table into the cache in random order
+		// of rows
+		originalTablename := fmt.Sprintf("%d____%s____%s", rank, stat.Database, stat.Name)
+		if err := od.LoadTable(stat.Database, stat.Name, originalTablename); err != nil {
+			panic(err)
+		}
 		for i := 0; i < numBenchmarkTablePerRaw; i++ {
 			offset := limit * i
 			tablename := fmt.Sprintf("%d____%s____%s____%d", rank, stat.Database, stat.Name, i)
-			if err := od.LoadTableLimit(stat.Database, stat.Name, tablename, offset, limit); err != nil {
+			if err := od.LoadTableLimit("", originalTablename, tablename, offset, limit); err != nil {
 				panic(err)
 			}
 		}
