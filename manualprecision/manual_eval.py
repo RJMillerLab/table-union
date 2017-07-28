@@ -13,10 +13,11 @@ class Candidate:
         self.candidate_table_name = candidate_table_name
         self.query_table = query_table
         self.candidate_table = candidate_table
+        self.n = alignment[0][2]
         cols = list(self.query_table)
-        self.query_columns = [cols[x[0]] for x in alignment]
+        self.query_columns = [cols[x[0]] for x in alignment if x[2] == self.n]
         cols = list(self.candidate_table)
-        self.candidate_columns = [cols[x[1]] for x in alignment]
+        self.candidate_columns = [cols[x[1]] for x in alignment if x[2] ==self.n]
 
     def _print_table(self, table):
         with io.StringIO(table.to_csv(None, index=False)) as f:
@@ -67,14 +68,15 @@ class CandidateFactory:
         prev_candidate_table_name = None
         alignment = []
         c = self.conn.cursor()
-        rows = c.execute("SELECT * FROM debug WHERE n <= 5 ORDER BY query_table, candidate_table;")
+        rows = c.execute("SELECT * FROM debug WHERE n <= 5 ORDER BY query_table, candidate_table, n;")
         for row in rows:
             # Set local varaibles from database
             query_table_name = row['query_table']
             candidate_table_name = row['candidate_table']
             query_col_index = row['query_col_index']
             candidate_col_index = row['candidate_col_index']
-            pair = (query_col_index, candidate_col_index)
+            n = row['n']
+            pair = (query_col_index, candidate_col_index, n)
             if (query_table_name == prev_query_table_name and candidate_table_name == prev_candidate_table_name) or (prev_query_table_name is None and prev_candidate_table_name is None):
                 pass
             else:
@@ -110,11 +112,12 @@ class Evaluation:
         self.conn = sqlite3.connect(output_sqlite)
         self.c = self.conn.cursor()
         self.c.execute('''
-            CREATE TABLE IF NOT EXISTS manual_eval(
+            CREATE TABLE IF NOT EXISTS evaluation(
                 query_table TEXT,
                 candidate_table TEXT,
+                n INT,
                 is_correct BOOL,
-                UNIQUE(query_table, candidate_table) ON CONFLICT REPLACE
+                UNIQUE(query_table, candidate_table, n) ON CONFLICT REPLACE
             );''')
         self.conn.commit()
 
@@ -127,9 +130,10 @@ class Evaluation:
         return self.c.fetchone() is not None
 
     def set(self, canadiate, is_correct):
-        self.c.execute("INSERT INTO manual_eval VALUES (?, ?, ?);",
+        self.c.execute("INSERT INTO manual_eval VALUES (?, ?, ?, ?);",
                 (canadiate.query_table_name,
                  canadiate.candidate_table_name,
+                 candidate.n,
                  is_correct))
         self.conn.commit()
 
