@@ -74,12 +74,14 @@ class CandidateFactory:
             candidate_table_name = row['candidate_table']
             query_col_index = row['query_col_index']
             candidate_col_index = row['candidate_col_index']
+            pair = (query_col_index, candidate_col_index)
             if (query_table_name == prev_query_table_name and candidate_table_name == prev_candidate_table_name) or (prev_query_table_name is None and prev_candidate_table_name is None):
-                alignment.append((query_col_index, candidate_col_index))
+                pass
             else:
                 yield (prev_query_table_name, prev_candidate_table_name, alignment)
                 alignment = []
-                alignment.append((query_col_index, candidate_col_index))
+            if pair not in alignment:
+                alignment.append(pair)
             prev_query_table_name = query_table_name
             prev_candidate_table_name = candidate_table_name
         self.conn.close()
