@@ -26,9 +26,9 @@ var (
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/datahub.io.jsonl.db", "datahub"},
 	}
-	numRawTableToSelect                   = 20
+	numRawTableToSelect                   = 100
 	numBenchmarkTablePerRaw               = 25
-	fastTextMinNumCol                     = 3
+	fastTextMinNumCol                     = 4
 	fasttextMinPct                        = 0.8
 	yagoMinNumCol                         = fastTextMinNumCol
 	yagoMinPct                            = fasttextMinPct
