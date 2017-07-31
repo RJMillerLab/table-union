@@ -46,6 +46,11 @@ a.extend(e1)
 a.extend(e2)
 a.extend(e3)
 ta = tsne.fit_transform(a)
+with open("data.txt", "w") as f:
+    f.write("%d %d %d\n" % (len(e1), len(e2), len(e3)))
+    for t in ta:
+        f.write("%f,%f\n" % (t[0], t[1]))
+
 t3 = ta[len(e1)+len(e2):]
 t2 = ta[len(e1):len(e1)+len(e2)]
 t1 = ta[:len(e1)]
