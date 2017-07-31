@@ -48,8 +48,9 @@ class Candidate:
 
 class CandidateFactory:
 
-    def __init__(self, path_prefix, result_sqlite, evaluation):
+    def __init__(self, path_prefix, result_sqlite, table_name, evaluation):
         self.path_prefix = path_prefix
+        self.table_name = table_name
         self.results = collections.defaultdict(lambda : collections.defaultdict(list))
         self.conn = sqlite3.connect(result_sqlite)
         self.conn.row_factory = lambda cursor, row : dict((col[0], row[i]) for i, col in enumerate(cursor.description))
@@ -68,7 +69,7 @@ class CandidateFactory:
         prev_candidate_table_name = None
         alignment = []
         c = self.conn.cursor()
-        rows = c.execute("SELECT * FROM debug WHERE n <= 5 ORDER BY query_table, candidate_table, n;")
+        rows = c.execute("SELECT * FROM %s WHERE n <= 5 and (select count(name) from query_tables where name = query_table) > 0 ORDER BY query_table, candidate_table, n;" % (self.table_name))
         for row in rows:
             # Set local varaibles from database
             query_table_name = row['query_table']
@@ -108,17 +109,18 @@ class CandidateFactory:
 
 class Evaluation:
 
-    def __init__(self, output_sqlite):
+    def __init__(self, output_sqlite, table_name):
         self.conn = sqlite3.connect(output_sqlite)
+        self.table_name = table_name
         self.c = self.conn.cursor()
         self.c.execute('''
-            CREATE TABLE IF NOT EXISTS evaluation(
+            CREATE TABLE IF NOT EXISTS %s(
                 query_table TEXT,
                 candidate_table TEXT,
                 n INT,
                 is_correct BOOL,
                 UNIQUE(query_table, candidate_table, n) ON CONFLICT REPLACE
-            );''')
+            );''' % (table_name))
         self.conn.commit()
 
     def done(self):
@@ -126,19 +128,19 @@ class Evaluation:
         self.conn.close()
 
     def is_evaluated(self, query_table_name, candidate_table_name):
-        self.c.execute("SELECT rowid FROM manual_eval WHERE query_table = ? AND candidate_table = ?;", (query_table_name, candidate_table_name))
+        self.c.execute("SELECT rowid FROM %s WHERE query_table = ? AND candidate_table = ?;" % (self.table_name), (query_table_name, candidate_table_name))
         return self.c.fetchone() is not None
 
     def set(self, canadiate, is_correct):
-        self.c.execute("INSERT INTO manual_eval VALUES (?, ?, ?, ?);",
+        self.c.execute("INSERT INTO %s VALUES (?, ?, ?, ?);" % (self.table_name),
                 (canadiate.query_table_name,
                  canadiate.candidate_table_name,
                  candidate.n,
                  is_correct))
         self.conn.commit()
 
-evaluation = Evaluation('./manual_eval.sqlite')
-iterator = CandidateFactory('/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only', './canada_query_results.sqlite', evaluation).iterator()
+evaluation = Evaluation('./manual_eval.sqlite', 't2')
+iterator = CandidateFactory('/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only', './query_results.sqlite', 't2', evaluation).iterator()
 candidate = None
 
 def get():
