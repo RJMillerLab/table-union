@@ -1,0 +1,3342 @@
+"""A' Soalin'"""
+"""Adeste Fideles; (O Come, All Ye Faithful)"""
+"""All Alone on Christmas"""
+"""All I Really Want for Christmas"""
+"""All I Want for Christmas Is a Real Good Tan"""
+"""All I Want for Christmas Is My Two Front Teeth"""
+"""All I Want for Christmas Is You"" (1)"
+"""All I Want for Christmas Is You"" (2)"
+"""All I Want for Christmas Is You"" (3)"
+"""All My Love for Christmas"""
+"""Amen"""
+"""Angels Among Us"""
+"""Angels We Have Heard on High"""
+"""Another Lonely Christmas"""
+"""Auld Lang Syne"""
+"""Away in a Manger"""
+"""Babes in Toyland/March of the Toys"""
+"""A Baby Changes Everything"""
+"""Baby, It's Cold Outside"""
+"""Baby Jesus Is Born"""
+"""Baby's First Christmas"""
+"""Back Door Santa"""
+"""Barefoot Santa Claus"""
+"""Because It's Christmas (For All The Children)"""
+"""The Bell That Couldn't Jingle"""
+"""Believe"""
+"""Belleau Wood"""
+"""The Bells of St. Mary's"""
+"""Better Days"""
+"""The Blessings"""
+"""Blue Christmas"""
+"""Blue December"""
+"""Blue Lonely Winter"""
+"""Blue Winter"""
+"""Boogie Woogie Santa Claus"""
+"""Breath of Heaven (Mary's Song)"""
+"""Call Me Claus"""
+"""Candy Cane Children"""
+"""Candy Cane Christmas"""
+"""Carol of the Bells"""
+"""Caroling, Caroling"""
+"""Celebrate Me Home"""
+"""Cherry Cherry Christmas"""
+"""Child of God"""
+"""Child of Winter"""
+"""Children's Christmas Song"""
+"""The Chipmunk Song (Christmas Don't Be Late)"""
+"""C-H-R-I-S-T-M-A-S"""
+"""Christmas Ain't Christmas (Without the One You Love)"""
+"""Christmas All Over Again"""
+"""Christmas Alphabet"""
+"""Christmas at Ground Zero"""
+"""Christmas at K-Mart"""
+"""Christmas at the Zoo"""
+"""Christmas Auld Lang Syne"""
+"""Christmas (Baby Please Come Home)"""
+"""Christmas Blues"""
+"""The Christmas Blues"""
+"""Christmas Canon"""
+"""Christmas Can't Be Far Away"""
+"""Christmas Can't Be Very Far Away"""
+"""Christmas Carol"""
+"""Christmas Carols by the Old Corral"""
+"""Christmas Celebration"""
+"""Christmas (Comes But Once a Year)"""
+"""Christmas Cookies"""
+"""Christmas Day"""
+"""Christmas Dinner"""
+"""Christmas Dragnet (Parts I & II)"""
+"""Christmas Dream"""
+"""Christmas Eve in My Hometown"""
+"""Christmas Eve/Sarajevo 12/24"""
+"""Christmas for Cowboys"""
+"""Christmas in America"""
+"""Christmas in Dixie"""
+"""Christmas in Hollis"""
+"""Christmas in Killarney"""
+"""Christmas in My Hometown"" (1)"
+"""Christmas in My Hometown"" (2)"
+"""Christmas in New Orleans"""
+"""Christmas in the Caribbean"""
+"""Christmas in Your Arms"""
+"""Christmas Is"" (1)"
+"""Christmas Is"" (2)"
+"""Christmas Is for Children"""
+"""Christmas Is Going to the Dogs"""
+"""Christmas Is Just A Song For Us This Year"""
+"""Christmas Is Just Around the Corner"""
+"""Christmas Is Now Drawing Near at Hand"""
+"""Christmas is the Time to Say 'I Love You'"""
+"""Christmas Island"""
+"""Christmas Lights"""
+"""A Christmas Love"""
+"""Christmas Lullaby"""
+"""Christmas Medley"""
+"""Christmas Memories"""
+"""Christmas Must Be Tonight"""
+"""Christmas Night in Harlem"""
+"""Christmas Party"""
+"""Christmas Rappin'"""
+"""The Christmas Shoes"""
+"""Christmas Shopping"""
+"""Christmas Song"""
+"""The Christmas Song"""
+"""The Christmas Song (Merry Christmas to You)"""
+"""Christmas Spirit"""
+"""Christmas Tears"""
+"""Christmas This Year"""
+"""Christmas Through Your Eyes"""
+"""Christmas Time"" (1)"
+"""Christmas Time"" (2)"
+"""Christmas Time"" (3)"
+"""Christmas Time (Is Here Again)"""
+"""Christmas Time Is Here"" (1)"
+"""Christmas Time Is Here"" (2)"
+"""Christmas Time's A Comin'"""
+"""Christmas Tonight"""
+"""Christmas Tree"""
+"""Christmas Vacation"""
+"""The Christmas Waltz"""
+"""Christmas Will Be Just Another Lonely Day"""
+"""A Christmas Wish"""
+"""Christmas with the Devil"""
+"""Christmas Without You"""
+"""Christmas Wrapping"""
+"""Christmastime"" (1)"
+"""Christmastime"" (2)"
+"""Cold December Night"""
+"""Colorado Christmas"""
+"""Coming Home for Christmas"""
+"""Cool Yule"""
+"""Coventry Carol"""
+"""Daddy's Drinking Up Our Christmas"""
+"""Dearest Santa"""
+"""Deck the Halls"""
+"""Dig That Crazy Santa Claus"""
+"""Ding Dong, Ding Dong"""
+"""Do They Know It's Christmas?"""
+"""Do You Hear What I Hear?"""
+"""Dominick the Donkey (The Italian Christmas Donkey)"""
+"""Â¿DÃ_nde EstÃ¡ Santa Claus? (Where Is Santa Claus?)"""
+"""Don't Save It All for Christmas Day"""
+"""Don't Shoot Me Santa"""
+"""(Don't Wait 'Till) The Night Before Christmas"""
+"""Dreams of Fireflies (On a Christmas Night)"""
+"""Early Christmas Morning"""
+"""Easier Said Than Done"""
+"""8 Days of Christmas"""
+"""Elf's Lament"""
+"""Even Santa Claus Gets the Blues"""
+"""Every Year, Every Christmas"""
+"""(Everybody's Waitin' for) The Man with the Bag"""
+"""Everyday Will Be Like a Holiday"""
+"""Fa La La"""
+"""Father Christmas"""
+"""Feliz Navidad"""
+"""The First Christmas"""
+"""The First Noel"""
+"""Footprints in the Snow"""
+"""Frosty the Snowman"""
+"""Gabriel's Message"""
+"""Gee Whiz, It's Christmas"""
+"""The Gift"""
+"""The Gift of Giving"""
+"""Give Love on Christmas Day"""
+"""Go Tell It on the Mountain"""
+"""God Rest Ye Merry, Gentlemen"""
+"""Goin' Home (Sing a Song of Christmas Cheer)"""
+"""Grandma Got Run Over by a Reindeer"""
+"""A Great Big Sled"""
+"""The Greatest Gift of All"""
+"""Greatest Time of Year"""
+"""Green Chri$tma$"""
+"""Grown-Up Christmas List"""
+"""Hangin' Round The Mistletoe"""
+"""Happy Birthday, Jesus"""
+"""Happy Christmas, Little Friend"""
+"""The Happy Elf"""
+"""Happy Holiday"""
+"""Happy New Year"" (1)"
+"""Happy New Year"" (2)"
+"""The Happy Reindeer"""
+"""Happy Xmas (War Is Over)"""
+"""Hard Candy Christmas"""
+"""Hark! The Herald Angels Sing"""
+"""Have Yourself a Merry Little Christmas"""
+"""The Heart of Christmas"""
+"""Here Comes Santa Claus (Right Down Santa Claus Lane)"""
+"""Here's Your Sign Christmas"""
+"""Hey America"""
+"""Hey Santa!"""
+"""Holiday Hootenanny"""
+"""Holiday in Cambodia"""
+"""A Holly Jolly Christmas"""
+"""Home for Christmas"""
+"""Honky Tonk Christmas"""
+"""Hooray for Santa Claus"""
+"""How Lovely Is Christmas"""
+"""Hurry Home for Christmas"""
+"""I Believe in Father Christmas"""
+"""I Don't Intend to Spend Christmas Without You"""
+"""I Don't Wanna Spend One More Christmas Without You"""
+"""I Farted on Santa's Lap (Now Christmas Is Gonna Stink for Me)"""
+"""I Heard the Bells on Christmas Day"""
+"""I Only Want You for Christmas"""
+"""I Saw Mommy Kissing Santa Claus"""
+"""I Saw Three Ships"""
+"""I Want a Hippopotamus for Christmas"""
+"""I Want Eddie Fisher for Christmas"""
+"""I Wish Everyday Could Be Like Christmas"""
+"""I Wish It Could Be Christmas Everyday"""
+"""I Won't Be Home for Christmas"""
+"""I Yust Go Nuts at Christmas"""
+"""I'll Be Home"""
+"""I'll Be Home for Christmas"""
+"""I'll Make Every Day Christmas (for My Woman)"""
+"""I'm Gonna Lasso Santa Claus"""
+"""I've Got My Love To Keep Me Warm"""
+"""If Every Day Was Like Christmas"""
+"""If We Make It Through December"""
+"""It Came Upon a Midnight Clear"""
+"""It Doesn't Have to Be That Way"""
+"""It May Be Winter Outside (But in My Heart It's Spring)"""
+"""It Must Have Been the Mistletoe"""
+"""It Wasn't His Child"""
+"""It Won't Be Christmas Without You"""
+"""It Won't Be The Same This Year"""
+"""It Wouldn't Be Christmas (Without You)"""
+"""It's Beginning to Look a Lot Like Christmas"""
+"""It's Christmas"""
+"""It's Christmas (All Over The World)"""
+"""It's Christmas Time All Over the World"""
+"""(It's Gonna Be A) Lonely Christmas"""
+"""It's Just Another New Year's Eve"""
+"""It's So Close to Christmas (And I'm So Far From Home)"""
+"""It's the Most Wonderful Time of the Year"""
+"""Jesu, Joy of Man's Desiring"""
+"""Jingle Bell Rock"""
+"""Jingle Bells"""
+"""Jingo Jango"""
+"""Joy to the World"""
+"""The Kid"""
+"""The Kid in Me"""
+"""A Kiss for Christmas (O Tannenbaum)"""
+"""Kissin' by the Mistletoe"""
+"""Last Christmas"""
+"""Leroy the Redneck Reindeer"""
+"""Let It Be Christmas"""
+"""Let It Snow"""
+"""Let It Snow! Let It Snow! Let It Snow!"""
+"""Let's Light the Christmas Tree"""
+"""Let's Make a Baby King"""
+"""Let's Make Christmas Mean Something This Year"""
+"""Let's Make Christmas Merry, Baby"""
+"""Let's Start the New Year Right"""
+"""Let the Season Take Wing"""
+"""Light of the Stable"""
+"""Li'l Elfy"""
+"""Little Altar Boy"""
+"""Little Becky's Christmas Wish"""
+"""The Little Boy that Santa Claus Forgot"""
+"""The Little Drummer Boy (Carol of the Drum)"""
+"""Little Saint Nick"""
+"""Little Sandy Sleighfoot"""
+"""Lonesome Christmas"""
+"""Love Is"""
+"""Love on Layaway"""
+"""The Man with All the Toys"""
+"""Macarena Christmas"""
+"""Marshmallow World"""
+"""The Marvelous Toy"""
+"""Mary, Did You Know"""
+"""Mary's Boy Child"""
+"""May Christmas Bring You Happiness"""
+"""May You Always"""
+"""Mele Kalikimaka"""
+"""Merry Christmas"""
+"""Merry Christmas (I Don't Want to Fight Tonight)"""
+"""Merry Christmas, Baby"""
+"""Merry Christmas Darling"""
+"""Merry Christmas Everybody"""
+"""Merry Christmas from the Family"""
+"""Merry Christmas, Happy Holidays"""
+"""Merry Christmas in the NFL"""
+"""Merry Christmas Santa Claus (You're a Lovely Guy)"""
+"""Merry Christmas Strait to You"""
+"""Merry Merry Christmas Baby"""
+"""Merry Merry Merry Frickin' Christmas"""
+"""Merry Twistmas"""
+"""Mistletoe"" (1)"
+"""Mistletoe"" (2)"
+"""Mistletoe And Holly"""
+"""The Mistletoe and Me"""
+"""Money in a Card (On This Christmas Day)"""
+"""Monsters' Holiday"""
+"""Mr. Hankey the Christmas Poo"""
+"""Must Be Santa"""
+"""My Boyfriend's Coming Home for Christmas"""
+"""My Christmas Card to You"""
+"""My Favorite Things"""
+"""My Mom and Santa Claus"""
+"""My Only Wish (This Year)"""
+"""Natividad (Nativity)"""
+"""New Year's Eve 1999"""
+"""A New York Christmas"""
+"""The Night Before Christmas"" (1)"
+"""The Night Before Christmas"" (2)"
+"""The Night Before Christmas Song"""
+"""The Night Santa Went Crazy"""
+"""Nina-Non"""
+"""A Not So Merry Christmas"""
+"""The Nutcracker Suite"""
+"""Nuttin' for Christmas"""
+"""O Bambino (One Cold and Blessed Winter)"""
+"""O Come All Ye Faithful"""
+"""O Holy Night"""
+"""Oh Santa!"""
+"""O Tannenbaum"""
+"""Oi to the World"""
+"""OÃ_che ChiÃºn (Silent Night)"""
+"""An Old Christmas Card"""
+"""The Old Man's Back in Town"""
+"""Old Time Christmas"""
+"""Old Toy Trains"""
+"""One Wish (for Christmas)"""
+"""Our Winter Love"""
+"""Paper Angels"""
+"""Parade of the Wooden Soldiers"""
+"""Peace on Earth/Little Drummer Boy"""
+"""Please Come Home for Christmas"""
+"""Please Daddy (Don't Get Drunk This Christmas)"""
+"""Please Uncle Sam (Send Back My Man)"""
+"""Po' Folks' Christmas"""
+"""Presents for Christmas"""
+"""Pretty Paper"""
+"""Put a Little Holiday in Your Heart"""
+"""Put Christ Back Into Christmas"""
+"""The Real Meaning of Christmas"""
+"""Redneck 12 Days of Christmas"""
+"""Reindeer Boogie"""
+"""Remember Bethlehem"""
+"""Ring Out, Solstice Bells"""
+"""River"""
+"""Rock and Roll Christmas"""
+"""Rockin' Around the Christmas Tree"""
+"""Rockin' Little Christmas"""
+"""Rudolph, the Red-Nosed Reindeer"""
+"""Run Rudolph Run"""
+"""Same Old Lang Syne"""
+"""Santa Baby"""
+"""Santa Baby (Gimme, Gimme, Gimme)"""
+"""Santa Bring My Baby Back (To Me)"""
+"""Santa Claus and His Old Lady"""
+"""Santa Claus Go Straight to the Ghetto"""
+"""Santa Claus Got Stuck in My Chimney"""
+"""Santa Claus Is Back in Town"""
+"""Santa Claus Is Comin' (In a Boogie Woogie Choo Choo Train)"""
+"""Santa Claus Is Comin' to Town"""
+"""Santa Claus Is Definitely Here to Stay"""
+"""Santa Claus Is Watching You"""
+"""Santa Claus Lane"""
+"""Santa Got Lost In Texas"""
+"""Santa, I'm Right Here"""
+"""Santa Looked a Lot Like Daddy"""
+"""Santa Tell Me"""
+"""Santa's a Fat Bitch"""
+"""Santa's Gonna Come in a Pickup Truck"""
+"""Save the Best for Last (Christmas version)"""
+"""The Secret of Christmas"""
+"""Sending You a Little Christmas"""
+"""Shake Hands with Santa Claus"""
+"""Shake Up Christmas"""
+"""Silent Night"""
+"""Silver and Gold"""
+"""Silver Bells"""
+"""Sleigh Ride"""
+"""Slipping Into Christmas"""
+"""Snoopy's Christmas"""
+"""Snow"""
+"""Snowbound For Christmas"""
+"""Snowfall"""
+"""Snowflakes of Love"""
+"""Someday at Christmas"""
+"""Someone Is Missing At Christmas"""
+"""Song for a Winter's Night"""
+"""The Sound of Christmas"""
+"""Step Into Christmas"""
+"""Suzy Snowflake"""
+"""Sweet Little Baby Boy"""
+"""Take Me Back to Toyland"""
+"""Tennessee Christmas"""
+"""Thank God for Kids"""
+"""Thank God It's Christmas"""
+"""That Holiday Feeling"""
+"""That's Christmas to Me"""
+"""That's What I Want for Christmas"""
+"""There Is No Christmas Like a Home Christmas"""
+"""There Won't Be Any Snow (Christmas in the Jungle)"""
+"""(There's No Place Like) Home for the Holidays"""
+"""Thirty-Two Feet â€“ Eight Little Tails"""
+"""This Christmas"""
+"""This Gift"""
+"""This Is Your Gift"""
+"""This One's for the Children"""
+"""This Time of the Year"""
+"""'Til Santa's Gone (Milk and Cookies)"""
+"""Toyland"""
+"""Trains and Winter Rains"""
+"""'Twas the Night After Christmas"""
+"""'Twas The Night Before Christmas (A Visit From St. Nicholas)"""
+"""The Twelve Days of Christmas"""
+"""The Twelve Gifts of Christmas"""
+"""25th of Last December"""
+"""2000 Miles"""
+"""Twinkle Twinkle Little Me"""
+"""Twistin' Bells"""
+"""Underneath the Mistletoe"""
+"""Underneath the Tree"""
+"""Up on the House Top"""
+"""Warm & Fuzzy"""
+"""We Need a Little Christmas"""
+"""We Three Kings (Star of Wonder)"""
+"""We Wish You a Merry Christmas"""
+"""Welcome Christmas"""
+"""What Are You Doing New Year's Eve?"""
+"""What Can You Get a Wookiee for Christmas (When He Already Owns a Comb?)"""
+"""What Child Is This?"""
+"""What Christmas Means to Me"""
+"""What Will Santa Claus Say (When He Finds Everybody Swingin'?)"""
+"""What Will the New Year Bring?"""
+"""Whatever Happened to Christmas?"""
+"""When a Child Is Born"""
+"""When Winter Comes"""
+"""Where Are You Christmas?"""
+"""White Christmas"""
+"""White Is in the Winter Night"""
+"""The White World of Winter"""
+"""Who Took the Merry Out of Christmas"""
+"""Why Couldn't It Be Christmas Every Day?"""
+"""Will Santy Come to Shanty Town"""
+"""Winter"""
+"""Winter Weather"""
+"""Winter Wonderland"""
+"""Wistful Willie"""
+"""Wizards in Winter"""
+"""Wonderful Christmastime"""
+"""The Working Elf Blues"""
+"""Wrapped in Red"""
+"""Yes, Patricia, There Is a Santa Claus"""
+"""Yingle Bells"""
+"""You Make It Feel Like Christmas"""
+"""You're a Mean One, Mr. Grinch"""
+"""You're All I Want for Christmas"" (1)"
+"""You're All I Want for Christmas"" (2)"
+"""'Zat You, Santa Claus?""""Peter, Paul & Mary"
+Associated Glee Clubs of America
+Darlene Love
+Steven Curtis Chapman
+Kenny Chesney
+Spike Jones and his City Slickers
+Carla Thomas
+Vince Vance & The Valiants
+Mariah Carey
+Lonestar
+The Impressions
+Alabama
+Sonicflood
+Prince and The Revolution
+Peerless Quartet
+Reba McEntire
+Arthur Fiedler and the Boston Pops
+Faith Hill
+Dinah Shore and Buddy Clark; Margaret Whiting and Johnny Mercer
+Garth Brooks
+Connie Francis
+Clarence Carter
+Sonny James (The Southern Gentleman)
+Barry Manilow
+Bobby Vinton
+Josh Groban
+Garth Brooks
+Bing Crosby
+Goo Goo Dolls
+Alabama
+Ernest Tubb
+Hugo Winterhalter and his Orchestra
+Jimmy Newman
+Connie Francis
+Mabel Scott
+Amy Grant
+Garth Brooks
+The White Stripes
+Darius Rucker
+John Tesh
+Nat King Cole
+Kenny Loggins
+Neil Diamond
+Bobby Darin
+The Beach Boys
+The Supremes
+The Chipmunks
+"Eddy Arnold, the Tennessee Plowboy and his Guitar"
+The O'Jays
+Tom Petty and the Heartbreakers
+The McGuire Sisters
+"""Weird Al"" Yankovic"
+Root Boy Slim
+The Flaming Lips
+Bobby Darin
+Darlene Love
+Canned Heat
+Dean Martin
+Trans-Siberian Orchestra
+Eddy Arnold and his Guitar
+Amy Grant
+Skip Ewing
+Tex Ritter
+B. B. King
+Amos Milburn
+George Strait
+Eddie Fisher
+Tennessee Ernie Ford
+Stan Freberg with Daws Butler
+Perry Como
+Bobby Vinton
+Savatage
+John Denver
+Pat Benatar
+Alabama
+Run-D.M.C.
+Dennis Day
+Sonny James
+Charley Pride
+Louis Armstrong with the Benny Carter Orchestra
+Jimmy Buffett
+Steve Wariner
+Percy Faith
+Jim Brickman featuring Mark Masri
+Glen Campbell
+Eels
+Louise Mandrell & R.C. Bannon
+Barry Manilow
+Steve Winwood
+Billy Squier
+The Andrews Sisters with Guy Lombardo and His Royal Canadians
+Coldplay
+Johnny Kaye with the Morty Jay Orchestra
+Cary Grant
+The Salsoul Orchestra
+Frank Sinatra
+The Band
+Louis Armstrong with the Benny Carter Orchestra
+"""Two Ton"" Baker the Merry Music Maker"
+Kurtis Blow
+NewSong
+Buck Owens and his Buckaroos
+Dave Matthews Band
+Angel
+The King Cole Trio
+Richard Marx
+Freddy King
+MÃªlÃ©e
+Gloria Estefan
+Bryan Adams
+John Anderson
+Christina Aguilera
+The Beatles
+Vince Guaraldi Trio
+"Ray Parker, Jr."
+Sammy Kershaw
+Dave Barnes with Hillary Scott
+Lady Gaga featuring Space Cowboy
+Mavis Staples
+"Harry Connick, Jr."
+Brenda Lee
+Bobby Goldsboro
+Spinal Tap
+Kenny Rogers and Dolly Parton
+The Waitresses
+Aimee Mann with Michael Penn
+The Smashing Pumpkins
+Michael BublÃ©
+Nitty Gritty Dirt Band
+Jim Brickman
+Louis Armstrong with the Commanders
+Robert Shaw
+Commander Cody
+Bobby Vinton
+Mannheim Steamroller
+Ralph Marterie & His Orchestra
+George Harrison
+Band Aid
+Bing Crosby
+Lou Monte
+Augie Rios
+Celine Dion
+The Killers
+Eddy Duchin and his Orchestra
+Trans-Siberian Orchestra
+Cyndi Lauper
+Jon Anderson
+Destiny's Child
+Barenaked Ladies featuring Michael BublÃ©
+Marty Stuart
+Luther Vandross
+Kay Starr
+William Bell
+Jim Brickman featuring Olivia Jade Archbold
+The Kinks
+JosÃ© Feliciano
+Danny Thomas
+Clay Aiken
+Bill Monroe and his Blue Grass Boys
+Gene Autry and the Cass County Boys
+Sting
+Carla Thomas
+Jim Brickman
+Bill Withers
+The Jackson 5
+Garth Brooks
+Garth Brooks
+Bobby Sherman
+Elmo & Patsy
+The Killers
+Kenny Rogers and Dolly Parton
+Aly & AJ
+Stan Freberg
+David Foster featuring Natalie Cole
+Brooks & Dunn
+Patti Page
+Rosemary Clooney
+"Harry Connick, Jr."
+Bing Crosby
+Judy Garland
+ABBA
+Russ Regan
+John and Yoko and The Plastic Ono Band with the Harlem Community Choir
+Dolly Parton
+Carrie Underwood
+Judy Garland
+Matthew West
+Gene Autry
+Bill Engvall
+James Brown
+Carnie and Wendy Wilson
+Paul & Paula
+Richard Cheese
+Burl Ives
+Daryl Hall & John Oates
+Alan Jackson
+Al Hirt
+Bing Crosby
+Robert Goulet
+Greg Lake
+Margo Guryan
+'N Sync
+The Little Stinkers
+Bing Crosby
+Alan Jackson
+Jimmy Boyd
+Sting
+Gayla Peevey
+Betty Johnson
+Jon Bon Jovi
+Wilson Phillips
+Blink-182
+Yogi Yorgesson with the Johnny Duffy Trio
+Meghan Trainor
+Bing Crosby
+Joe Tex
+Brenda Lee
+Les Brown & His Orchestra
+Elvis Presley with The Jordanaires and The Imperials Quartet
+Merle Haggard
+Daryl Hall & John Oates
+Jim Croce
+Felice Taylor
+Barbara Mandrell
+Sawyer Brown
+Brooks & Dunn
+Vince Gill
+John Tesh
+Perry Como and The Fontane Sisters with Mitchell Ayres & His Orchestra
+Ronnie Milsap
+Sheena Easton
+"Sammy Davis, Jr."
+The Orioles
+Barry Manilow
+The Bellamy Brothers
+Andy Williams
+Josh Groban
+Bobby Helms
+Benny Goodman and his Orchestra
+Bert Kaempfert and his Orchestra
+Mannheim Steamroller
+Clint Black
+Craig Morgan
+Joe Dowell
+Aretha Franklin
+Wham!
+Joe Diffie
+Alan Jackson
+Boyz II Men
+Vaughn Monroe
+Ruby Wright
+Wynonna Judd
+James Brown
+Amos Milburn and his Aladdin Chicken-Shackers
+Bing Crosby
+Amy Grant
+Emmylou Harris
+Ray Bolger
+Vic Dana
+Becky Lamb
+Vera Lynn
+Harry Simeone Chorale
+The Beach Boys
+Jimmy Dean
+Lowell Fulson
+Leza Miller
+Gloria Estefan
+The Beach Boys
+Los del RÃ_o
+Bing Crosby
+Chad Mitchell Trio
+Kenny Rogers with Wynonna
+Harry Belafonte
+Luther
+Harry Harrison
+Bing Crosby with The Andrews Sisters
+Judy Garland
+The Ramones
+Johnny Moore's Three Blazers
+The Carpenters
+Train
+Robert Earl Keen
+'N Sync
+Buckner & Garcia
+Max Headroom
+George Strait
+Dodie Stevens
+Frickin' A
+The Marcels
+Colbie Caillat
+Justin Bieber
+Frank Sinatra
+Isaac Hayes
+Camp Jam Allstars
+Bobby (Boris) Pickett and the Crypt-Kickers
+South Park
+Lorne Greene with the Jimmy Joyce Children's Choir
+Toni Wine
+The Partridge Family
+Herb Alpert & the Tijuana Brass
+George Jones
+Britney Spears
+Harvie June Van
+Alabama with Gretchen Peters
+Rob Thomas
+Milton Cross
+Carly Simon
+Rosemary Clooney & Gene Autry
+"""Weird Al"" Yankovic"
+Joni James
+Bobby Vee
+Arthur Fiedler and the Boston Pops
+Art Mooney and His Orchestra; Vocal by Barry Gordon
+Harry Simeone Chorale
+Twisted Sister
+John Berry
+Mariah Carey
+Vince Guaraldi Trio
+The Vandals
+Enya
+Jim Reeves
+Garth Brooks
+George Strait
+Roger Miller
+Whitney Houston
+Bill Pursell
+Jimmy Wayne
+Vincent Lopez Orchestra
+David Bowie & Bing Crosby
+Charles Brown
+John Denver
+The Charmels
+Bill Anderson and The Po' Boys
+Solomon Burke
+Roy Orbison
+LeAnn Rimes
+Red Foley with The Anita Kerr Singers
+Ray Conniff and The Singers
+Jeff Foxworthy
+Trisha Yearwood
+Dee Mullins
+Jethro Tull
+Barry Manilow
+George Thorogood & the Destroyers
+Brenda Lee
+Carlene Carter
+Gene Autry & the Pinafores
+Chuck Berry
+Dan Fogelberg
+Eartha Kitt with Henri Rene & His Orchestra
+Willa Ford
+Elvis Presley
+Cheech & Chong
+James Brown
+Ella Fitzgerald
+Elvis Presley
+The Tractors
+George Hall and the Hotel Taft Orchestra
+James Brown
+Ray Stevens
+Hilary Duff
+Jeff Carson
+Toby Keith
+Buck Owens
+Ariana Grande
+Insane Clown Posse
+Redneck Carollers
+Vanessa L. Williams
+Bing Crosby
+Jim Brickman featuring Kristy Starling
+Louis Prima & His Orchestra
+Train
+Bing Crosby
+Burl Ives
+Bing Crosby & Carole Richards
+Arthur Fiedler and the Boston Pops
+Leon Russell
+The Royal Guardsmen
+Claudine Longet
+The DeCastro Sisters
+Claude Thornhill and His Orchestra
+Toni Braxton
+Stevie Wonder
+Anne Cochran
+Sarah McLachlan
+Ramsey Lewis Trio
+Elton John
+Rosemary Clooney
+James Brown
+Nat King Cole
+Amy Grant
+Oak Ridge Boys
+Queen
+Steve Lawrence and Eydie Gorme
+Pentatonix
+Nancy Wilson
+Perry Como
+Derrik Roberts
+Perry Como
+Gene Autry
+Donny Hathaway
+98Â°
+John Tesh
+New Kids on the Block
+Brook Benton
+Clint Black
+Doris Day
+Enya
+Jeff Foxworthy
+Fred Waring and His Pennsylvanians
+Mitch Miller and the Gang
+Allan Sherman
+Roberta Flack
+The Pretenders
+The Supremes
+Santo & Johnny
+Blondfire
+Kelly Clarkson
+Kimberley Locke
+Billy Gilman
+Angela Lansbury and Cast
+BlackHawk
+Kenny G
+The Who Village Choir
+The Orioles
+The Star Wars Intergalactic Droid Choir & Chorale
+Mark Chesnutt
+Stevie Wonder
+Louis Prima and his New Orleans Gang
+Donna Fargo
+Frank Sinatra
+Michael Holm
+Artie Shaw & his Orchestra
+Faith Hill
+Bing Crosby
+Enya
+Bing Crosby
+The Staple Singers
+Bianca Ryan
+"Eddy Arnold, the Tennessee Plowboy and his Guitar"
+Spike Jones and his City Slickers
+Benny Goodman
+Guy Lombardo and His Royal Canadians; Ted Weems and His Orchestra
+Jimmie Rodgers
+Trans-Siberian Orchestra
+Paul McCartney
+Daron Norwood
+Kelly Clarkson
+Jimmy Dean
+Yogi Yorgesson
+Neil Diamond
+Thurl Ravenscroft
+Frankie Laine
+Brook Benton
+Garth BrooksJ R R Tolkien
+George R R Martin
+J K Rowling
+Robert Jordan
+C S Lewis
+Terry Pratchett
+Rick Riordan
+Philip Pullman
+Christopher Paolini
+Patrick Rothfuss
+Stephen King
+Jim Butcher
+Terry Goodkind
+Stephenie Meyer
+Cassandra Clare
+Brandon Sanderson
+Charlaine Harris
+David Eddings
+Anne Rice
+Eoin Colfer
+Laurell K Hamilton
+Raymond E Feist
+Diana Gabaldon
+Ursula K Le Guin
+Patricia Briggs
+Kim Harrison
+Cornelia Funke
+Rachel Caine
+Brian Jacques
+Gregory Maguire
+Robin Hobb
+Maggie Stiefvater
+LaHaye &amp; Jenkins
+Kristin Cashore
+Kelley Armstrong
+Christine Feehan
+Piers Anthony
+Terry Brooks
+Garth Nix
+Marion Zimmer Bradley
+Darren Shan
+Joe Abercrombie
+Tamora Pierce
+David Eddings
+Jim Butcher
+Jonathan Stroud
+Jasper Fforde
+Anne McCaffrey
+Steven Erikson
+Angie Sage
+Roger Zelazny
+Brent Weeks
+Lloyd Alexander
+D J MacHale
+Weis &amp; Hickman
+Susan Cooper
+Maria V Snyder
+Suzanne Collins
+R A Salvatore
+Jacqueline Carey
+Tad Williams
+Patricia C Wrede
+Holly Black
+Piers Anthony
+Diana Wynne Jones
+Anne Bishop
+Jenny Nimmo
+Stephen Donaldson
+Christopher Moore
+Laini Taylor
+Orson Scott Card
+Weis &amp; Hickman
+Holly Black
+Trudi Canavan
+Naomi Novik
+Brandon Sanderson
+Simon R Green
+Robert Lynn Asprin
+Frank E Peretti
+Glen Cook
+Robin McKinley
+Juliet Marillier
+Joseph Delaney
+Mary Stewart
+Scott Lynch
+David Eddings
+Mary Norton
+Darren Shan
+Rachel Caine
+Michael Moorcock
+L E Modesitt Jr
+David Gemmell
+Diane Duane
+Steven Brust
+Lian Hearn
+China Mieville
+Charles de Lint
+Mercedes Lackey
+Obert Skye
+Gene WolfeThe Lord of the Rings
+A Song of Ice and Fire
+Harry Potter Series
+The Wheel of Time
+The Chronicles of Narnia
+Discworld
+Percy Jackson and the Olympians
+His Dark Materials
+The Inheritance Cycle
+Kingkiller Chronicle
+The Dark Tower
+Dresden Files
+Sword of Truth
+The Twilight Saga
+The Mortal Instruments
+Mistborn Trilogy
+Sookie Stackhouse
+The Belgariad
+The Vampire Chronicles
+Artemis Fowl Series
+Anita Blake Series
+The Riftwar Saga
+The Outlander Series
+Earthsea Cycle
+Mercy Thompson
+The Hollows
+Inkheart Trilogy
+The Morganville Vampires
+Redwall Series
+The Wicked Years
+The Farseer Trilogy
+The Wolves of Mercy Falls
+Left Behind
+Graceling Realm
+Women of the Otherworld
+Carpathian
+The Magic of Xanth
+Original Shannara Trilogy
+Abhorsen Trilogy
+Avalon
+Cirque du Freak
+The First Law
+Song of the Lioness
+The Malloreon
+Codex Alera
+The Bartimaeus Trilogy
+Thursday Next
+The Dragonriders of Pern
+Malazan Book of the Fallen
+Septimus Heap
+The Chronicles of Amber
+Night Angel
+Chronicles of Prydain
+Pendragon
+The Chronicles Trilogy (Dragonlance)
+The Dark Is Rising
+Study
+Underland Chronicles
+The Dark Elf Trilogy
+Kushiel&#39;s Legacy
+"Memory, Sorrow and Thorn"
+Enchanted Forest Chronicles
+The Spiderwick Chronicles
+Incarnations of Immortality
+Howl&#39;s Moving Castle
+Black Jewels Trilogy
+Children of the Red King
+Thomas Covenant - The Unbeliever
+A Love Story
+Daughter of Smoke and Bone
+Tales of Alvin Maker
+Death Gate Cycle
+Modern Faerie Tales
+Black Magician Trilogy
+Temeraire
+The Stormlight Archive
+Nightside
+Myth Adventures
+Darkness
+The Chronicles of the Black Company
+Damar
+Sevenwaters Trilogy
+The Last Apprentice
+The Arthurian Saga
+Gentleman Bastard
+The Elenium
+The Borrowers
+The Demonata
+Weather Warden
+The Elric Saga
+Saga of Recluce
+Drenai Saga
+Young Wizards
+Vlad Taltos
+Tales of the Otori
+New Crobuzon
+Newford
+The Last Herald-Mage
+Leven Thumps
+The Book of the New SunMiguel de Cervantes
+Leo Tolstoy
+James Joyce
+Marcel Proust
+Feodor Dostoevsky
+Herman Melville
+Gustave Flaubert
+George Eliot
+Thomas Mann
+Murasaki Shikibu
+Jane Austen
+Charles Dickens
+Leo Tolstoy
+Mark Twain
+Henry Fielding
+Charles Dickens
+William Faulkner
+Henry James
+Gabriel Garcia Marquez
+F. Scott Fitzgerald
+Virginia Woolf
+Feodor Dostoevsky
+William Faulkner
+William Makepeace Thackeray
+Ralph Ellison
+James Joyce
+Robert Musil
+Thomas Pynchon
+Henry James
+D. H. Lawrence
+Stendhal
+Laurence Sterne
+Nikolai Gogol
+Thomas Hardy
+Thomas Mann
+Honore de Balzac
+James Joyce
+Emily Bronte
+Gunter Grass
+Samuel Beckett
+Jane Austen
+Nathaniel Hawthorne
+Ivan Turgenev
+Joseph Conrad
+Toni Morrison
+Theodore Dreiser
+Vladimir Nabokov
+Doris Lessing
+Samuel Richardson
+Cao Xueqin
+Franz Kafka
+Charlotte Bronte
+Stephen Crane
+John Steinbeck
+Andrey Bely
+Chinue Achebe
+Madame de Lafayette
+Albert Camus
+Willa Cather
+Andre Gide
+Edith Wharton
+Ford Madox Ford
+Kate Chopin
+E. M. Forster
+Saul Bellow
+Emile Zola
+Henry Roth
+John Dos Passos
+Knut Hamsun
+Alfred Doblin
+&#39;Abd al-Rahman Munif
+Carlos Fuentes
+Ernest Hemingway
+Evelyn Waugh
+Anthony Trollope
+Charles Dickens
+Daniel Defoe
+Johann Wolfgang von Goethe
+Voltaire
+Richard Wright
+Malcolm Lowry
+Ivan Goncharov
+Zora Neale Hurston
+Sir Walter Scott
+Kawabata Yasunari
+George Orwell
+Alessandro Manzoni
+James Fenimore Cooper
+Harriet Beecher Stowe
+Victor Hugo
+Jack Kerouac
+Mary Shelley
+Giuseppe Tomasi di Lampedusa
+J.D. Salinger
+Wilkie Collins
+Jaroslav Hasek
+Bram Stoker
+Alexandre Dumas
+Arthur Conan Doyle
+Margaret MitchellDon Quixote
+War and Peace
+Ulysses
+In Search of Lost Time
+The Brothers Karamazov
+Moby-Dick
+Madame Bovary
+Middlemarch
+The Magic Mountain
+The Tale of Genji
+Emma
+Bleak House
+Anna Karenina
+Adventures of Huckleberry Finn
+Tom Jones
+Great Expectations
+"Absalom, Absalom!"
+The Ambassadors
+One Hundred Years of Solitude
+The Great Gatsby
+To The Lighthouse
+Crime and Punishment
+The Sound and the Fury
+Vanity Fair
+Invisible Man
+Finnegans Wake
+The Man Without Qualities
+Gravity&#39;s Rainbow
+The Portrait of a Lady
+Women in Love
+The Red and the Black
+Tristram Shandy
+Dead Souls
+Tess of the D&#39;Urbervilles
+Buddenbrooks
+Le Pere Goriot
+A Portrait of the Artist as a Young Man
+Wuthering Heights
+The Tin Drum
+Molloy; Malone Dies; The Unnamable
+Pride and Prejudice
+The Scarlet Letter
+Fathers and Sons
+Nostromo
+Beloved
+An American Tragedy
+Lolita
+The Golden Notebook
+Clarissa
+Dream of the Red Chamber
+The Trial
+Jane Eyre
+The Red Badge of Courage
+The Grapes of Wrath
+Petersburg
+Things Fall Apart
+The Princess of Cleves
+The Stranger
+My Antonia
+The Counterfeiters
+The Age of Innocence
+The Good Soldier
+The Awakening
+A Passage to India
+Herzog
+Germinal
+Call It Sleep
+U.S.A. Trilogy
+Hunger
+Berlin Alexanderplatz
+Cities of Salt
+The Death of Artemio Cruz
+A Farewell to Arms
+Brideshead Revisited
+The Last Chronicle of Barset
+The Pickwick Papers
+Robinson Crusoe
+The Sorrows of Young Werther
+Candide
+Native Son
+Under the Volcano
+Oblomov
+Their Eyes Were Watching God
+Waverley
+Snow Country
+Nineteen Eighty-Four
+The Betrothed
+The Last of the Mohicans
+Uncle Tom&#39;s Cabin
+Les Miserables
+On the Road
+Frankenstein
+The Leopard
+The Catcher in the Rye
+The Woman in White
+The Good Soldier Svejk
+Dracula
+The Three Musketeers
+The Hound of Baskervilles
+Gone with the WindThe 6th Day
+Amazone
+Battlefield Earth
+The Cell
+Escaflowne
+Godzilla vs. Megaguirus
+Happy Accidents
+Hollow Man
+I.K.U.
+The Last Man
+Mission to Mars
+Pitch Black
+Possible Worlds
+Red Planet
+Space Cowboys
+Supernova
+Thomas In Love
+Titan A.E.
+What Planet Are You From?
+X-Men
+A.I. Artificial Intelligence
+Atlantis: The Lost Empire
+Avalon
+The American Astronaut
+Donnie Darko
+Electric Dragon 80.000 V
+Evolution
+Final
+Final Fantasy: The Spirits Within
+Ghosts of Mars
+"Godzilla, Mothra and King Ghidorah: Giant Monsters All-Out Attack"
+"Hey, Happy!"
+Jurassic Park III
+K-PAX
+The Lost Skeleton of Cadavra
+Metropolis
+Mind Storm
+Nabi
+The One
+Planet of the Apes
+The Princess Blade
+Replicant
+The Strange Case of SeÃ±or Computer
+Vanilla Sky
+28 Days Later
+2009 Lost Memories
+The Adventures of Pluto Nash
+Clockstoppers
+Cowboy Bebop: The Movie
+Cube 2: Hypercube
+Cypher
+Dead or Alive: Final
+Eight Legged Freaks
+Equilibrium
+Godzilla Against Mechagodzilla
+Happy Here and Now
+Impostor
+Jason X
+Men in Black II
+Minority Report
+Project Viper
+Reign of Fire
+Resident Evil
+Returner
+Rollerball
+S1m0ne
+Science Fiction
+Scorcher
+Signs
+So Close
+Solaris
+Spider-Man
+Star Trek Nemesis
+Star Wars: Episode II â€“ Attack of the Clones
+Tamala 2010: A Punk Cat In Space
+Teknolust
+Treasure Planet
+The Time Machine
+Timequest
+Trancers 6
+2009: Lost Memories
+Absolon
+Alien Hunter
+The Big Empty
+Code 46
+The Core
+Dragon Head
+Dreamcatcher
+Godzilla: Tokyo SOS
+Good Boy!
+Hulk
+Interstella 5555: The 5tory of the 5ecret 5tar 5ystem
+It&#39;s All About Love
+Koi... Mil Gaya
+The Matrix Reloaded
+The Matrix Revolutions
+Mimic 3: Sentinel
+Moon Child
+Natural City
+Paycheck
+Robot Stories
+Save the Green Planet!
+Terminator 3: Rise of the Machines
+Timeline
+Undead
+Wonderful Days
+WXIII: Patlabor the Movie 3
+X2
+2046
+After the Apocalypse
+Alien vs. Predator
+Appleseed
+The Butterfly Effect
+Casshern
+The Chronicles of Riddick
+Cube Zero
+The Day After Tomorrow
+Dead Leaves
+Decoys
+District 13
+Eternal Sunshine of the Spotless Mind
+FAQ: Frequently Asked Questions
+The Final Cut
+The Forgotten
+Godsend
+Godzilla: Final Wars
+G.O.R.A.
+"I, Robot"
+Immortel (ad vitam)
+Innocence: Ghost in the Shell
+Night Watch
+Paranoia 1.0
+Phil the Alien
+The Place Promised in Our Early Days
+Post Impact
+Primer
+Resident Evil: Apocalypse
+Six: The Mark Unleashed
+Sky Captain and the World of Tomorrow
+Spider-Man 2
+The Stepford Wives
+Thunderbirds
+Ã†on Flux
+Allegro
+Alien Abduction
+The Cave
+Chicken Little
+The Dark Hours
+Doom
+Evil Aliens
+Fantastic Four
+Final Fantasy VII Advent Children
+The Girl From Monday
+Headspace
+H.G. Wells&#39; The War of the Worlds
+The Hitchhiker&#39;s Guide to the Galaxy
+The Island
+The Jacket
+Man with the Screaming Brain
+Meatball Machine
+Planetfall
+Puzzlehead
+Robots
+Serenity
+Slipstream
+A Sound of Thunder
+Star Wars: Episode III â€“ Revenge of the Sith
+Stealth
+Steamboy
+War of the Worlds
+The Wild Blue Yonder
+Zathura: A Space Adventure
+A Scanner Darkly
+Aachi &amp; Ssipak
+AINOA
+Alien Autopsy
+Altered
+Aziris Nuna
+Children of Men
+The Cloud
+Daft Punk&#39;s Electroma
+The Dark Hour
+Day Watch
+DÃ©jÃ  Vu
+Displaced
+Evil Behind You
+The Fountain
+Gamera the Brave
+The Girl Who Leapt Through Time
+The Host
+Idiocracy
+Japan Sinks
+The Kovak Box
+Krrish
+Lifted
+Paprika
+The Ugly Swans
+Renaissance
+Southland Tales
+Slither
+Superman Returns
+Ultraviolet
+Unidentified
+V for Vendetta
+X-Men: The Last Stand
+Zerophilia
+Aliens vs. Predator: Requiem
+Appleseed Ex Machina
+28 Weeks Later
+Big Man Japan
+Chrysalis
+Eden Log
+Fantastic Four: Rise of the Silver Surfer
+Flatland The Film
+I Am Legend
+Illegal Aliens
+The Invasion
+The Last Mimzy
+Meet the Robinsons
+The Mist
+Next
+"Paragraf 78, Punkt 1"
+Resident Evil: Extinction
+Sex and Death 101
+Spider-Man 3
+Sunshine
+Timecrimes
+TMNT
+Transformers
+The Man from Earth
+Underdog
+Vexille
+20th Century Boys
+Alien Raiders
+Babylon A.D.
+Blindness
+City of Ember
+CJ7
+The Clone Returns Home
+Cloverfield
+Cyborg Soldier
+Dante 01
+Dasavathaaram
+The Day the Earth Stood Still
+Death Race
+Doomsday
+Eagle Eye
+Far Cry
+Franklyn
+The Happening
+The Inhabited Island
+The Incredible Hulk
+Iron Man
+Jumper
+Love Story 2050
+Meet Dave
+The Mutant Chronicles
+Outlander
+PROXIMA
+Sleep Dealer
+Star Wars: The Clone Wars
+Tokyo Gore Police
+WALL-E
+The X-Files: I Want to Believe
+20th Century Boys 2: The Last Hope
+20th Century Boys 3: Redemption
+2012
+9
+Alien Trespass
+Astroboy
+Avatar
+Battle for Terra
+The Box
+Cargo
+District 9
+Frequently Asked Questions About Time Travel
+Gamer
+G.I. Joe: The Rise of Cobra
+Kenny Begins
+Knowing
+Land of the Lost
+Metropia
+Mock-Up on Mu
+Monsters vs. Aliens
+Moon
+Mr.Nobody
+Pandorum
+Planet 51
+Push
+Race to Witch Mountain
+Redline
+The Road
+Robo-geisha
+Screamers: The Hunting
+Space Battleship Yamato: Resurrection
+Splice
+Star Trek
+Stingray Sam
+Surrogates
+Terminator Salvation
+Tetsuo: The Bullet Man
+The Time Traveler&#39;s Wife
+Transformers: Revenge of the Fallen
+WatchmenRoger Spottiswoode
+Philippe de Broca
+Roger Christian
+Tarsem Singh
+Kazuki Akane
+Masaaki Tezuka
+Brad Anderson
+Paul Verhoeven
+Shu Lea Cheang
+Harry Ralston
+Brian De Palma
+David N. Twohy
+Robert Lepage
+Antony Hoffman
+Clint Eastwood
+Thomas Lee
+Pierre-Paul Renders
+"Don Bluth, Gary Goldman"
+Mike Nichols
+Bryan Singer
+Steven Spielberg
+"Gary Trousdale, Kirk Wise"
+Mamoru Oshii
+Cory McAbee
+Richard Kelly
+Sogo Ishii
+Ivan Reitman
+Campbell Scott
+"Hironobu Sakaguchi, Motonori Sakakibara"
+John Carpenter
+Shusuke Kaneko
+Noam Gonick
+Joe Johnston
+Iain Softley
+Larry Blamire
+Rintaro
+Richard Pepin
+Moon Seung-wook
+James Wong
+Tim Burton
+Shinsuke Sato
+Ringo Lam
+Tom Sawyer (filmmaker)
+Cameron Crowe
+Danny Boyle
+Lee Si-myung
+Ron Underwood
+Jonathan Frakes
+"Shinichiro Watanabe, Yoshiyuki Takei"
+Andrzej SekuÅ‚a
+Vincenzo Natali
+Takashi Miike
+Ellory Elkayem
+Kurt Wimmer
+Masaaki Tezuka
+Michael Almereyda
+Gary Fleder
+James Isaac
+Barry Sonnenfeld
+Steven Spielberg
+Jay Andrews
+Rob Bowman
+Paul W.S. Anderson
+Takashi Yamazaki
+John McTiernan
+Andrew Niccol
+Danny Deprez
+James Seale
+M. Night Shyamalan
+Corey Yuen
+Steven Soderbergh
+Sam Raimi
+Stuart Baird
+George Lucas
+t. o. L.
+Lynn Hershman Leeson
+"Ron Clements, John Musker"
+Simon Wells
+Robert Dyke
+Jay Woelfel
+Lee Si-Myung
+David Barto
+Ron Krauss
+Steve Anderson
+Michael Winterbottom
+Jon Amiel
+JÃ´ji Iida
+Lawrence Kasdan
+Masaaki Tezuka
+John Hoffman
+Ang Lee
+Kazuhisa Takenouchi
+Thomas Vinterberg
+Rakesh Roshan
+"Andy Wachowski, Larry Wachowski"
+"Andy Wachowski, Larry Wachowski"
+JT Petty
+Takahisa Zeze
+Min Byeong-cheon
+John Woo
+Greg Pak
+Jang Joon-hwan
+Jonathan Mostow
+Richard Donner
+"Michael Spierig, Peter Spierig"
+"Sunmin Park, Kim Moon-saeng"
+
+Bryan Singer
+Wong Kar-wai
+Yasuaki Nakajima
+Paul W.S. Anderson
+Shinji Aramaki
+"Eric Bress, J. Mackye Gruber"
+Kiriya Kazuaki
+David N. Twohy
+Ernie Barbarash
+Roland Emmerich
+Hiroyuki Imaishi
+Matthew Hastings
+Pierre Morel
+Michel Gondry
+Carlos Atanes
+Omar Naim
+Joseph Ruben
+Nick Hamm
+Ryuhei Kitamura
+Ã–mer Faruk Sorak
+Alex Proyas
+Enki Bilal
+Mamoru Oshii
+Timur Bekmambetov
+"Jeff Renfroe, Marteinn Thorsson"
+Rob Stefaniuk
+Makoto Shinkai
+Christoph Schrewe
+Shane Carruth
+Alexander Witt
+Kevin Downes
+Kerry Conran
+Sam Raimi
+Frank Oz
+Jonathan Frakes
+Karyn Kusama
+Christoffer Boe
+Eric Forsberg
+Bruce Hunt
+Mark Dindal
+Paul Fox
+Andrzej Bartkowiak
+Jake West
+Tim Story
+"Tetsuya Nomura, Takeshi Nozue"
+Hal Hartley
+Andrew van den Houten
+Timothy Hines
+Garth Jennings
+Michael Bay
+John Maybury
+Bruce Campbell
+"YÅ«dai Yamaguchi, Junichi Yamamoto"
+Michael J. Heagle
+James Bai
+"Chris Wedge, Carlos Saldanha"
+Joss Whedon
+David Van Eyssen
+Peter Hyams
+George Lucas
+Rob Cohen
+Katsuhiro Otomo
+Steven Spielberg
+Werner Herzog
+Jon Favreau
+Richard Linklater
+Joe Bum-Jim
+Marco Kalantari
+Jonny Campbell
+Eduardo Sanchez
+Oleg Kompasov
+Alfonso CuarÃ_n
+Gregor Schnitzler
+Daft Punk
+Elio Quiroga
+Timur Bekmambetov
+Tony Scott
+Martin Holland
+"Jim Carroll, Jason Kerr"
+Darren Aronofsky
+Ryuta Tasaki
+Mamoru Hosoda
+Bong Joon-ho
+Mike Judge
+Shinji Higuchi
+Daniel MonzÃ_n
+Rakesh Roshan
+Gary Rydstrom
+Satoshi Kon
+Konstantin Lopushansky
+Christian Volckman
+Richard Kelly
+James Gunn
+Bryan Singer
+Kurt Wimmer
+Rich Christiano
+James McTeigue
+Brett Ratner
+Martin Curland
+"Greg Strause, Colin Strause"
+Shinji Aramaki
+Juan Carlos Fresnadillo
+Hitoshi Matsumoto
+Julien Leclercq
+Franck Vestiel
+Tim Story
+Ladd Ehlinger Jr.
+Francis Lawrence
+David Giancola
+Oliver Hirschbiegel
+Bob Shaye
+Stephen Anderson
+Frank Darabont
+Lee Tamahori
+Mikhail Khleborodov
+Russell Mulcahy
+Daniel Waters
+Sam Raimi
+Danny Boyle
+Nacho Vigalondo
+Kevin Munroe
+Michael Bay
+
+Frederik Du Chau
+Fumihiko Sori
+Yukihiko Tsutsumi
+Ben Rock
+Mathieu Kassovitz
+Fernando Meirelles
+Gil Kenan
+Stephen Chow
+Kanji Nakajima
+Matt Reeves
+John Stead
+Marc Caro
+K.S.Ravikumar
+Scott Derrickson
+Paul W. S. Anderson
+Neil Marshall
+D.J. Caruso
+Uwe Boll
+Gerald McMorrow
+M. Night Shyamalan
+Fyodor Bondarchuk
+Louis Leterrier
+Jon Favreau
+Doug Liman
+Harry Baweja
+Brian Robbins
+Simon Hunter
+Howard McCain
+Carlos Atanes
+Alex Rivera
+Dave Filoni
+Yoshihiro Nishimura
+Andrew Stanton
+Chris Carter
+Yukihiko Tsutsumi
+Yukihiko Tsutsumi
+Roland Emmerich
+Shane Acker
+R. W. Goodwin
+David Bowers
+James Cameron
+Keith Calder
+Richard Kelly
+"Ivan Engler, Ralph Etter"
+Neill Blomkamp
+Gareth Carrivick
+"Mark Neveldine, Brian Taylor"
+Stephen Sommers
+"Carl Ã…strand, Mats Lindberg"
+Alex Proyas
+Brad Silberling
+Tarik Saleh
+Craig Baldwin
+"Conrad Vernon, Rob Letterman"
+Duncan Jones
+Jaco Van Dormael
+Christian Alvart
+Jorge Blanco
+Paul McGuigan
+Andy Fickman
+Takeshi Koike
+John Hillcoat
+Noboru Iguchi
+Sheldon Wilson
+
+Vincenzo Natali
+J. J. Abrams
+Cory McAbee
+Jonathan Mostow
+McG
+Shinya Tsukamoto
+Robert Schwentke
+Michael Bay
+Zack SnyderAltitude
+Alien vs Ninja
+Arctic Blast
+Beyond the Black Rainbow
+The Book of Eli
+The Crazies
+Daybreakers
+Denizen
+Despicable Me
+The Disappearance of Haruhi Suzumiya
+Downstream
+Enthiran
+Future X-Cops
+Growth
+Hot Tub Time Machine
+Hunter Prey
+Inception
+Iron Man 2
+Kaboom
+Die kommenden Tage
+Mardock Scramble: The First Compression
+Megamind
+Monsters
+Mutant Girls Squad
+Never Let Me Go
+Predators
+Repo Men
+Resident Evil: Afterlife
+Shank
+Skyline
+Space Battleship Yamato
+Tron: Legacy
+Universal Soldier: Regeneration
+Womb
+51
+7aam Arivu
+The Adjustment Bureau
+Another Earth
+Apollo 18
+Area Q
+Atlas Shrugged: Part I
+Attack the Block
+Battle: Los Angeles
+Captain America: The First Avenger
+Contagion
+Cowboys &amp; Aliens
+The Darkest Hour
+EVA
+Extraterrestre
+Gantz
+Gantz: Perfect Answer
+Generation P
+Green Lantern
+Hanna
+Hell
+O Homem do Futuro (The Man from the Future)
+I Am Number Four
+In Time
+Limitless
+Love
+Mardock Scramble: The Second Combustion
+Mars Needs Moms
+Melancholia
+Paul
+Phase 7
+Priest
+The Prodigies
+Quarantine 2: Terminal
+Ra.One
+Real Steel
+Rise of the Planet of the Apes
+Source Code
+Super 8
+The Thing
+Thor
+Transformers: Dark of the Moon
+X-Men: First Class
+009 Re:Cyborg
+Alien Origin
+The Amazing Spider-Man
+The Avengers
+Battleship
+Branded
+Chronicle
+Cloud Atlas
+Dredd
+The Divide
+Grabbers
+The Hunger Games
+Iron Sky
+John Carter
+Lockout
+Looper
+Mardock Scramble: The Third Exhaust
+Mars et Avril
+Men in Black 3
+Prometheus
+Resident Evil: Retribution
+Robot &amp; Frank
+Safety Not Guaranteed
+Seeking a Friend for the End of the World
+Strange Frame
+Starship Troopers: Invasion
+Storage 24
+Total Recall
+Thermae Romae
+Upside Down
+The Watch
+After Earth
+The A.R.K. Report
+The Colony
+The Congress
+The Cosmonaut
+Dark Skies
+Despicable Me 2
+Elysium
+Escape from Planet Earth
+Europa Report
+Ender&#39;s Game
+G.I. Joe: Retaliation
+Gatchaman
+Gravity
+Hard to Be a God
+Her
+The Hunger Games: Catching Fire
+Independence Daysaster
+The Host
+Iron Man 3
+Krrish 3
+The Last Days
+The Last Days on Mars
+Man of Steel
+Oblivion
+Pacific Rim
+The Purge
+Riddick
+Snowpiercer
+Space Pirate Captain Harlock
+Star Trek Into Darkness
+Thor: The Dark World
+The Wolverine
+World War Z
+The World&#39;s End
+Young Ones
+The Zero Theorem
+The Amazing Spider-Man 2
+The Anomaly
+Armor Hero Atlas
+AutÃ_mata
+Beyond
+Big Hero 6
+Bodacious Space Pirates: Abyss of Hyperspace
+Bugs
+Captain America: The Winter Soldier
+Coherence
+Dawn of the Planet of the Apes
+The Device
+Divergent
+Earth to Echo
+Edge of Tomorrow
+Ejecta
+Expelled from Paradise
+The Giver
+Die Gstettensaga: The Rise of Echsenfriedl
+Godzilla
+Guardians of the Galaxy
+The Hunger Games: Mockingjay â€“ Part 1
+Interstellar
+Lucy
+The Maze Runner
+Outpost 37
+Mr. Peabody &amp; Sherman
+Parasyte: Part 1
+Predestination
+The Purge: Anarchy
+The Quiet Hour
+RoboCop
+The Signal
+Space Station 76
+Teenage Mutant Ninja Turtles
+Time Lapse
+Transcendence
+Transformers: Age of Extinction
+Space Battleship Yamato 2199: Star-Voyaging Ark
+Space Battleship Yamato 2199: Voyage of Remembrance
+Calculator
+Under the Skin
+X-Men: Days of Future Past
+Aliens: Zone-X
+Ant-Man
+Avengers: Age of Ultron
+Chappie
+The Divergent Series: Insurgent
+The End of the World and the Cat&#39;s Disappearance
+Ex Machina
+Fantastic Four
+Ghost in the Shell
+The Hunger Games: Mockingjay â€“ Part 2
+Infini
+Jupiter Ascending
+Jurassic World
+Mad Max: Fury Road
+The Martian
+Maze Runner: The Scorch Trials
+Monsters: Dark Continent
+On Line
+Pixels
+Project Almanac
+Psycho-Pass: The Movie
+Selfless
+Spring
+Star Wars: The Force Awakens
+Terminator Genisys
+Tomorrowland
+Vice
+The 5th Wave
+10 Cloverfield LaneKaare Andrews
+Seiji Chiba
+Brian Trenchard-Smith
+Panos Cosmatos
+"Albert Hughes, Allen Hughes"
+Breck Eisner
+"Peter Spierig, Michael Spierig"
+J.A. Steel
+Pierre Coffin Chris Renaud
+"Tatsuya Ishihara, Yasuhiro Takemoto"
+"Simone Bartesaghi, Philip Kim"
+S. Shankar
+Wong Jing
+Gabriel Cowan
+"Sean Anders, John Morris"
+Sandy Collora
+Christopher Nolan
+Jon Favreau
+Gregg Araki
+Lars Kraume
+Susumu Kudo
+Tom McGarth
+Gareth Edwards
+"Noboru Iguchi, Yoshihiro Nishimura, Tak Sakaguchi"
+Mark Romanek
+NimrÃ_d Antal
+Miguel Sapochnik
+Paul W.S. Anderson
+Mo Ali
+"Colin Strause, Greg Strause"
+Takashi Yamazaki
+Joseph Kosinski
+John Hyams
+Benedek Fliegauf
+Jason Connery
+A. R. Murugadoss
+George Nolfi
+Mike Cahill
+Gonzalo LÃ_pez-Gallego
+Gerson Sanginitto
+Paul Johansson
+Joe Cornish
+Jonathan Liebesman
+Joe Johnston
+Steven Soderbergh
+Jon Favreau
+Chris Gorak
+Kike MaÃ_llo
+Nacho Vigalondo
+Shinsuke Sato
+Shinsuke Sato
+Victor Ginzburg
+Martin Campbell
+Joe Wright
+Tim Fehlbaum
+ClÃ¡udio Torres
+D. J. Caruso
+Andrew Niccol
+Neil Burger
+William Eubank
+Susumu Kudo
+Simon Wells
+Lars von Trier
+Greg Mottola
+NicolÃ¡s Goldbart
+Scott Stewart
+Antoine Charreyron
+John Pogue
+Anubhav Sinha
+Shawn Levy
+Rupert Wyatt
+Duncan Jones
+J. J. Abrams
+Matthijs van Heijningen Jr.
+Kenneth Branagh
+Michael Bay
+Matthew Vaughn
+Kenji Kamiyama
+Mark Atkins
+Marc Webb
+Joss Whedon
+Peter Berg
+"Jamie Bradshaw, Alexander Doulerain"
+Josh Trank
+"Tom Tykwer, The Wachowskis"
+Pete Travis
+Xavier Gens
+Jon Wright
+Gary Ross
+Timo Vuorensola
+Andrew Stanton
+"James Mather, Stephen St. Leger"
+Rian Johnson
+Susumu Kudo
+Martin Villeneuve
+Barry Sonnenfeld
+Ridley Scott
+Paul W.S. Anderson
+Jake Schreier
+Colin Trevorrow
+Lorene Scafaria
+GB Hajim
+Shinji Aramaki
+Johannes Roberts
+Len Wiseman
+Hideki Takeuchi
+Juan Diego Solanas
+Akiva Schaffer
+M. Night Shyamalan
+Shmuel Hoffman
+Jeff Renfroe
+Ari Folman
+NicolÃ¡s AlcalÃ¡
+Scott Stewart
+Pierre Coffin Chris Renaud
+Neill Blomkamp
+Cal Brunker
+SebastiÃ¡n Cordero
+Gavin Hood
+Jon M. Chu
+TÅçya SatÅç
+Alfonso CuarÃ_n
+Aleksey German
+Spike Jonze
+Francis Lawrence
+W.D. Hogan
+Andrew Niccol
+Shane Black
+Rakesh Roshan
+"David Pastor, Ã€lex Pastor"
+RuairÃ_ Robinson
+Zack Snyder
+Joseph Kosinski
+Guillermo del Toro
+James DeMonaco
+David Twohy
+Bong Joon-ho
+Shinji Aramaki
+J. J. Abrams
+Alan Taylor
+James Mangold
+Marc Forster
+Edgar Wright
+Jake Paltrow
+Terry Gilliam
+Marc Webb
+Noel Clarke
+Zheng Guowei
+Gabe IbÃ¡Ã±ez
+Joseph Baker and Tom Large
+Don Hall
+Tatsuo SatÅç
+Yan Jia
+Josphe and Anthony Russo
+James Ward Byrkit
+Matt Reeves
+Jeremy Berg
+Neil Burger
+Dave Green
+Doug Liman
+"Chad Archibald, Matt Wiele"
+Seiji Mizushima
+Phillip Noyce
+Johannes Grenzfurthner
+Gareth Edwards
+James Gunn
+Francis Lawrence
+Christopher Nolan
+Luc Besson
+Wes Ball
+Jabbar Raisani
+Rob Minkoff
+Takashi Yamazaki
+"Peter Spierig, Michael Spierig"
+James DeMonaco
+StÃ©phanie Joalland
+JosÃ© Padilha
+William Eubank
+Jack Plotnick
+Jonathan Liebesman
+Bradley D. King
+Wally Pfister
+Michael Bay
+
+
+Dmitriy Grachev
+Jonathan Glazer
+Bryan Singer
+Thomas R. Dickens
+Peyton Reed
+Joss Whedon
+Neill Blomkamp
+Robert Schwentke
+Michihiro Takeuchi
+Alex Garland
+Josh Trank
+
+Francis Lawrence
+Shane Abbess
+The Wachowskis
+Colin Trevorrow
+George Miller
+Ridley Scott
+Wes Ball
+Tom Green
+Li Changxin
+Chris Columbus
+Dean Israelite
+Naoyoshi Shiotani
+Tarsem Singh
+Aaron Scott Moorhead
+J. J. Abrams
+Alan Taylor
+Brad Bird
+Brian A Miller
+J Blakeson
+Mary Elizabeth WinsteadHarvard University
+Stanford University
+Massachusetts Institute of Technology
+University of Cambridge
+University of Oxford
+Columbia University
+"University of California, Berkeley"
+University of Chicago
+Princeton University
+Cornell University
+Yale University
+California Institute of Technology
+University of Tokyo
+University of Pennsylvania
+"University of California, Los Angeles"
+Johns Hopkins University
+Kyoto University
+New York University
+"University of Michigan, Ann Arbor"
+Swiss Federal Institute of Technology in Zurich
+"University of California, San Diego"
+Northwestern University
+Hebrew University of Jerusalem
+Seoul National University
+University of Wisconsinâ€“Madison
+"University of California, San Francisco"
+University College London
+Duke University
+Rockefeller University
+University of Texas at Austin
+University of Washington - Seattle
+University of Toronto
+University of Illinois at Urbanaâ€“Champaign
+Keio University
+Imperial College London
+Ã‰cole Polytechnique
+Ã‰cole normale supÃ©rieure - Paris
+Waseda University
+Weizmann Institute of Science
+University of North Carolina at Chapel Hill
+University of Virginia
+McGill University
+"Purdue University, West Lafayette"
+Dartmouth College
+Osaka University
+University of Pittsburgh - Pittsburgh Campus
+"Pennsylvania State University, University Park"
+"University of Minnesota, Twin Cities"
+"Ohio State University, Columbus"
+Rutgers University-New Brunswick
+University of Southern California
+Washington University in St. Louis
+"University of California, Davis"
+University of Colorado Boulder
+University of Edinburgh
+Peking University
+National Taiwan University
+University of Paris-Sud
+Lomonosov Moscow State University
+University of Florida
+Carnegie Mellon University
+University of British Columbia
+Pierre-and-Marie-Curie University
+"University of California, Santa Barbara"
+National University of Singapore
+Boston University
+University of Manchester
+University of Arizona
+Vanderbilt University
+University of Utah
+Karolinska Institute
+"University of Maryland, College Park"
+Tohoku University
+University of Copenhagen
+University of Texas Southwestern Medical Center
+Ruprecht Karl University of Heidelberg
+University of Notre Dame
+Tsinghua University
+Ludwig Maximilian University of Munich
+Georgia Institute of Technology
+University of Rochester
+Katholieke Universiteit Leuven
+Brown University
+Emory University
+Erasmus University Rotterdam
+Tel Aviv University
+Utrecht University
+University of Sydney
+"University of California, Irvine"
+University of Texas MD Anderson Cancer Center
+Swiss Federal Institute of Technology in Lausanne
+University of Geneva
+University of Melbourne
+King's College London
+Tufts University
+University of Zurich
+Arizona State University
+Yonsei University
+University of Oslo
+Kyushu University
+Technical University of Munich
+"Texas A&M University, College Station"
+University of Queensland
+Mines ParisTech
+Case Western Reserve University
+Indiana University - Bloomington
+University of Alberta
+Leiden University
+Tokyo Institute of Technology
+University of Groningen
+University of Helsinki
+Sapienza University of Rome
+Georgetown University
+University of Amsterdam
+Korea University
+University of Barcelona
+Lund University
+Michigan State University
+Ghent University
+Rice University
+Baylor College of Medicine
+Aarhus University
+University of Bristol
+Uppsala University
+Nagoya University
+Royal Institute of Technology
+University of Colorado Denver
+University of Glasgow
+VU University Amsterdam
+University of New South Wales
+Paris Diderot University - Paris 7
+University of SÃ£o Paulo
+Western University (The University of Western Ontario)
+Radboud University Nijmegen
+Nanyang Technological University
+Technion â€“ Israel Institute of Technology
+University of Miami
+Stony Brook University
+University of Texas at Dallas
+University of Nottingham
+University of Iowa
+Southern Methodist University
+Icahn School of Medicine at Mount Sinai
+Korea Advanced Institute of Science and Technology (KAIST)
+Monash University
+University of Alabama at Birmingham
+Free University of Berlin
+University of Southampton
+University of the Witwatersrand
+McMaster University
+University of Montreal
+University of Birmingham
+Humboldt University of Berlin
+"University of California, Santa Cruz"
+Albert Ludwig University of Freiburg
+University of TÃ_bingen
+University of Cincinnati
+University of Bonn
+Wake Forest University
+University of Basel
+University of Leeds
+University of Hamburg
+UniversitÃ© libre de Bruxelles
+Indiana University-Purdue University Indianapolis
+Pohang University of Science and Technology
+Oregon Health & Science University
+University of Calgary
+Stockholm University
+University of Padua
+University of Hong Kong
+Yeshiva University
+University of Milan
+University of Sheffield
+Technical University of Denmark
+"University of Maryland, Baltimore"
+Goethe University Frankfurt
+University of GÃ¶ttingen
+Hokkaido University
+Australian National University
+Shanghai Jiao Tong University
+University of New Mexico
+University of Strasbourg
+University of Massachusetts Medical School
+University of Houston
+"Trinity College, Dublin"
+University of Lausanne
+Iowa State University
+Joseph Fourier University
+Wayne State University
+University of South Florida - Tampa
+Zhejiang University
+Hanyang University
+University of Ottawa
+University of Missouriâ€“Columbia
+Fudan University
+University of Kansas
+University of Cologne
+University of Georgia
+University of Liverpool
+University of Bern
+Cardiff University
+George Washington University
+University of Illinois at Chicago
+University of Erlangen-Nuremberg
+University of MÃ_nster
+Aix-Marseille University
+Claude Bernard University Lyon 1
+University of Bologna
+Queen Mary University of London
+Dresden University of Technology
+Sungkyunkwan University
+Newcastle University
+Karlsruhe Institute of Technology
+"University of California, Riverside"
+University of Kiel
+University of Western Australia
+Paris Descartes University
+University of Connecticut
+University of Massachusetts Amherst
+Chinese University of Hong Kong
+University of Turin
+University of Manitoba
+University of Vienna
+University of Montpellier
+Maastricht University
+National Cheng Kung University
+"University of Tennessee, Knoxville"
+Complutense University of Madrid
+Laval University
+RWTH Aachen University
+UniversitÃ© catholique de Louvain
+North Carolina State University
+Johannes Gutenberg University of Mainz
+University of Texas Health Science Center at San Antonio
+Julius-Maximilian's University of WÃ_rzburg
+Paul Sabatier University - Toulouse III
+University of Gothenburg
+University College Dublin
+University of Science and Technology of China
+University of Leicester
+Autonomous University of Barcelona
+University of Dundee
+Norwegian University of Science and Technology
+Nanjing University
+Okayama University
+London School of Hygiene & Tropical Medicine
+University of Florence
+University of Cape Town
+University of Texas Health Science Center at Houston
+Moscow Institute of Physics and Technology
+University of DÃ_sseldorf
+Florida State University
+University of Sussex
+Thomas Jefferson University
+Delft University of Technology
+Virginia Polytechnic Institute and State University
+University of Lisbon
+Drexel University
+Virginia Commonwealth University
+Oregon State University
+Durham University
+University of Tsukuba
+University of Reading
+Lehigh University
+Medical University of Vienna
+University of Auckland
+University of Kentucky
+University of Naples Federico II
+University of Waterloo
+Charles University in Prague
+Colorado State University - Fort Collins
+Tulane University
+"University at Buffalo, The State University of New York"
+Brandeis University
+Northeastern University
+Wageningen University and Research Centre
+Sun Yat-sen University
+University of Ulm
+London School of Economics
+Vrije Universiteit Brussel
+University of Delaware
+Rensselaer Polytechnic Institute
+University of Bergen
+Queen's University
+University of Aberdeen
+Dalhousie University
+UmeÃ¥ University
+University of Duisburg-Essen
+City College of New York
+Hiroshima University
+University of Texas at San Antonio
+Hannover Medical School
+University of Warwick
+University of Valencia
+University of Pisa
+Ruhr University Bochum
+Medical College of Wisconsin
+University of Louisville
+University of Bordeaux
+University of South Carolina - Columbia
+National and Kapodistrian University of Athens
+Leipzig University
+Medical University of South Carolina
+Autonomous University of Madrid
+Dalian University of Technology
+Stellenbosch University
+Kyungpook National University
+University of Porto
+University of St Andrews
+Gwangju Institute of Science and Technology
+Chulalongkorn University
+University of Antwerp
+Xiamen University
+University of Nebraskaâ€“Lincoln
+Nankai University
+University of Stuttgart
+University of Rome Tor Vergata
+University of Regensburg
+Hong Kong University of Science and Technology
+Kobe University
+University of LiÃ¨ge
+Federal University of Rio de Janeiro
+Rush University
+University of Vermont
+University of York
+Boston College
+University of Pavia
+University of Jena
+Vita-Salute San Raffaele University
+University of Genoa
+Tianjin University
+Louisiana State University - Baton Rouge
+University of Exeter
+National Autonomous University of Mexico
+University of Adelaide
+University of East Anglia
+York University
+University of Navarra
+University of Oregon
+"St George's, University of London"
+Indian Institute of Technology Delhi
+University of Trieste
+Queen's University Belfast
+University of Perugia
+Technical University of Berlin
+University of Marburg
+University of Innsbruck
+Eindhoven University of Technology
+Ben-Gurion University of the Negev
+University of Oklahoma - Norman Campus
+Wesleyan University
+University of Victoria
+Kansas State University
+Hong Kong Polytechnic University
+LinkÃ¶ping University
+University of Southern Denmark
+University of Otago
+Justus Liebig University Giessen
+University of New Hampshire
+College of William and Mary
+San Diego State University
+Simon Fraser University
+University of Santiago de Compostela
+Saint Louis University
+Colorado School of Mines
+University of Eastern Finland
+University of Buenos Aires
+University of Guelph
+University of Ferrara
+Polytechnic University of Catalonia
+Versailles Saint-Quentin-en-Yvelines University
+Saarland University
+City University of Hong Kong
+Darmstadt University of Technology
+Pompeu Fabra University
+Pontifical Catholic University of Chile
+University of Bari Aldo Moro
+University of Texas Medical Branch at Galveston
+University of Delhi
+"Washington State University, Pullman"
+Temple University
+University of Milan - Bicocca
+University of Turku
+Chonnam National University
+University of Lorraine
+National Chiao Tung University
+Catholic University of the Sacred Heart
+"University at Albany, SUNY"
+Xi'an Jiaotong University
+Ewha Womans University
+Jilin University
+Tokyo Medical and Dental University
+Scuola Normale Superiore di Pisa
+University of Central Florida
+Innsbruck Medical University
+Beijing Normal University
+Polytechnic University of Milan
+University of Seville
+University of Nebraska Medical Center
+Huazhong University of Science and Technology
+Kyung Hee University
+Chalmers University of Technology
+Brigham Young University
+University of Campinas
+University of Bath
+Saint Petersburg State University
+National Tsing Hua University
+University of Twente
+University of Alabama - Tuscaloosa
+Harbin Institute of Technology
+University of Verona
+Oklahoma State Universityâ€“Stillwater
+Shandong University
+George Mason University
+Wuhan University
+Swedish University of Agricultural Sciences
+Concordia University
+Chiba University
+Kumamoto University
+Tongji University
+Aalto University
+Chonbuk National University
+Peking Union Medical College
+Georgia Regents University
+University of Chile
+Lancaster University
+Vienna University of Technology
+University of Denver
+University of Arkansas for Medical Sciences
+Grenoble Institute of Technology
+University of Granada
+University of Modena and Reggio Emilia
+Ajou University
+Gyeongsang National University
+Technical University of Madrid
+University College Cork
+Loyola University Chicago
+Central South University
+South China University of Technology
+Polytechnic University of Valencia
+West Virginia University
+University of Tampere
+Southeast University
+Miami University
+University of Dayton
+University of Siena
+University of Oulu
+Indian Institute of Science
+Macquarie University
+University of Rostock
+Jagiellonian University
+Pusan National University
+University of Strathclyde
+"University of Nevada, Reno"
+University of Saskatchewan
+University of Parma
+Kanazawa University
+EÃ¶tvÃ¶s LorÃ¡nd University
+Aristotle University of Thessaloniki
+Ohio University
+University of Iceland
+University of Warsaw
+Syracuse University
+Bielefeld University
+Juntendo University
+University of Wyoming
+University of Wollongong
+Niigata University
+Texas Tech University (TTU)
+Middle East Technical University
+Ã‰cole normale supÃ©rieure de Lyon
+Brunel University
+Nihon University
+Osaka City University
+University of Rennes 1
+University of Oklahoma Health Sciences Center
+East China University of Science and Technology
+University of KwaZulu-Natal
+Sichuan University
+Illinois Institute of Technology
+Tokyo University of Science
+"University of Science, Malaysia"
+Clemson University
+University of Zaragoza
+University of the Basque Country
+Nagasaki University
+Technical University of Dortmund
+University of Hawaii at Manoa
+University of Nebraska Omaha
+University of Konstanz
+Panjab University
+University of Hanover
+"University of Maryland, Baltimore County"
+University of Newcastle
+University of Ulsan
+Renmin University of China
+Martin Luther University of Halle-Wittenberg
+University of Malaya
+University of Savoy
+University of Udine
+Tokyo Metropolitan University
+University of Sherbrooke
+University of Brescia
+University of Ljubljana
+University of Nice Sophia Antipolis
+University of Hull
+University of Coimbra
+Creighton University
+Georgia State University
+University of Wisconsinâ€“Milwaukee
+Catholic University of Korea
+University of Tokushima
+Yokohama City University
+Lanzhou University
+University of Crete
+SUNY Downstate Medical Center
+University of Potsdam
+Yokohama National University
+New Mexico State University
+University of Bayreuth
+Bar-Ilan University
+University of Mississippi - Oxford Campus
+University of Tasmania
+Graduate University for Advanced Studies
+University of Surrey
+Federal University of Minas Gerais
+University of TromsÃ¸ - The Arctic University of Norway
+University of Palermo
+Shinshu University
+University of Science and Technology Beijing
+University of Catania
+Mahidol University
+University of Canterbury
+Indian Institute of Technology Madras
+University of Bremen
+Otto-von-Guericke University Magdeburg
+University of Tartu
+University of Windsor
+University of Nantes
+"Royal Holloway, University of London"
+James Cook University
+National Yang-Ming University
+University of Akron
+National Chung Hsing University
+City University London
+New York Medical College
+Nara Institute of Science and Technology
+Ã‰cole Centrale Paris
+Auburn University
+University of Arkansas - Fayetteville
+University of Zagreb
+University of LÃ_beck
+Hunan University
+University of Missouriâ€“Kansas City
+Tokyo Women's Medical University
+Montana State University - Bozeman
+University of Aveiro
+"National University of Ireland, Galway"
+University of Oviedo
+Dongguk University
+University of Trento
+University Lille 1: Sciences and Technologies
+Chang Gung University
+National Central University
+Aalborg University
+Utah State University
+Baylor University
+Bangor University
+King Saud University
+University of Cagliari
+Kent State University
+Central China Normal University
+University of Fribourg
+Medical University of Graz
+Second University of Naples
+International School for Advanced Studies
+Tampere University of Technology
+Inha University
+Deakin University
+National Polytechnic Institute of Toulouse
+Sogang University
+University of Ioannina
+Federal University of Rio Grande do Sul
+University of Graz
+University of Montana - Missoula
+East China Normal University
+Plymouth University
+Victoria University of Wellington
+Federal University of SÃ£o Paulo
+Southern Illinois University Carbondale
+University of Alaska Fairbanks
+University of Toledo
+Carleton University
+Cranfield University
+Curtin University
+Indian Institute of Technology Bombay
+University of Portsmouth
+Osaka Prefecture University
+Nagoya City University
+LSU Health Sciences Center New Orleans
+Tata Institute of Fundamental Research
+Konkuk University
+University of La Laguna
+University of Hertfordshire
+Florida International University
+University of Rhode Island
+Mississippi State University
+Gunma University
+University of New Orleans
+"Putra University, Malaysia"
+Memorial University of Newfoundland
+Universidade Nova de Lisboa
+Griffith University
+Indian Institute of Technology Kharagpur
+Soochow University (Suzhou)
+Texas A&M Health Science Center
+Semmelweis University
+Lille 2 University of Health and Law
+Kagoshima University
+Flinders University
+Queensland University of Technology
+Tokai University
+Istanbul University
+Tokyo University of Agriculture and Technology
+Louisiana Tech University
+University of Texas at Arlington
+China Agricultural University
+Chungnam National University
+University of Minho
+"University of Eastern Piedmont ""Amedeo Avogadro"""
+Open University (UK)
+University of Essex
+Paris-Est CrÃ©teil Val-de-Marne University
+Hacettepe University
+State University of New York Upstate Medical University
+Braunschweig University of Technology
+University of Salamanca
+Indian Institute of Technology Roorkee
+Ã–rebro University
+Northeast Normal University
+University of Patras
+Beijing University of Chemical Technology
+Northern Illinois University
+Rovira i Virgili University
+La Trobe University
+Warsaw University of Technology
+Binghamton University
+Shizuoka University
+Hong Kong Baptist University
+Albany Medical College
+Ehime University
+University of Los Andes (Colombia)
+Polytechnic University of Turin
+University of Burgundy
+University of Idaho
+Old Dominion University
+Yamaguchi University
+Massey University
+Donghua University
+University of the Balearic Islands
+Portland State University
+Marche Polytechnic University
+University of QuÃ©bec at Montreal
+"UNESP, SÃ£o Paulo State University"
+Loma Linda University
+University of Toyama
+University of Debrecen
+"University of Maine, Orono"
+Graz University of Technology
+Gifu University
+University of JyvÃ_skylÃ_
+University of Paris 13
+University of Girona
+Keele University
+University of Poitiers
+University of Insubria
+Wuhan University of Technology
+University of Pretoria
+Banaras Hindu University
+University of L'Aquila
+University of Alicante
+American University of Beirut
+University of Ulster
+Shanghai University
+Comenius University in Bratislava
+University of Vigo
+"University of Nevada, Las Vegas"
+Swinburne University of Technology
+Tilburg University
+University of Messina
+Kaiserslautern University of Technology
+University of Kent
+University of MÃ¡laga
+Loughborough University
+National Technical University of Athens
+Liverpool John Moores University
+Sharif University of Technology
+"Birkbeck, University of London"
+"University FranÃ§ois Rabelais, Tours"
+University of Haifa
+Roma Tre University
+Masaryk University
+University of Salerno
+King Abdullah University of Science and Technology
+Beihang University
+Fuzhou University
+Heriot-Watt University
+China Medical University (Taiwan)
+University of Cantabria
+Rochester Institute of Technology
+Royal College of Surgeons in Ireland
+San Francisco State University
+Sapporo Medical University
+Indian Institute of Technology Kanpur
+Johannes Kepler University of Linz
+Czech Technical University in Prague
+Marquette University
+Missouri University of Science and Technology
+Howard University
+Aston University
+Ã‰cole normale supÃ©rieure de Cachan
+Jichi Medical University
+"Rutgers, The State University of New Jersey - Newark"
+"PalackÃ_ University, Olomouc"
+Ankara University
+University of Belgrade
+Toho University
+Kyoto Prefectural University of Medicine
+Swansea University
+UniversitÃ© de Namur
+University of Szeged
+Kitasato University
+Hasselt University
+University of CÃ_rdoba (Spain)
+Ã…bo Akademi University
+Tottori University
+Kindai University
+University of Castillaâ€“La Mancha
+University of Augsburg
+"Paul ValÃ©ry University, Montpellier III"
+University of Mons
+Istanbul Technical University
+"University of Natural Resources and Life Sciences, Vienna"
+National University of La Plata
+University of Calabria
+University of Memphis
+"G. d'Annunzio University, Chieti-Pescara"
+University of Missouriâ€“St. Louis
+Beijing Institute of Technology
+University of Ã‰vry Val d'Essonne
+University of South Australia
+University of Alabama in Huntsville
+University of Salzburg
+University of Mississippi Medical Center
+National Research Nuclear University MEPhI
+Chung-Ang University
+Kaohsiung Medical University
+University of NeuchÃ¢tel
+University of Yamanashi
+Yamagata University
+New Jersey Institute of Technology
+East Carolina University
+University of Hyogo
+University of Picardie Jules Verne
+University of Salento
+Northern Arizona University
+Miguel HernÃ¡ndez University of Elche
+University of Tehran
+Blaise Pascal University
+Yeungnam University
+Kurume University
+Institut national des sciences AppliquÃ©es de Lyon
+Saga University
+Chongqing University
+Jikei University School of Medicine
+Second Military Medical University
+Jawaharlal Nehru Centre for Advanced Scientific Research
+"University of North Texas, Denton"
+Ege University
+Mie University
+Ã‰cole Polytechnique de MontrÃ©al
+AGH University of Science and Technology
+University of Electronic Science and Technology of China
+University of Stirling
+University of Greifswald
+National Polytechnic Institute
+Jacobs University Bremen
+Capital Medical University
+Norwegian University of Life Sciences
+Michigan Technological University
+Vilnius University
+North Dakota State University - Main Campus
+University of Hohenheim
+University of North Carolina at Charlotte
+Zhengzhou University
+Cairo University
+University of Caen Lower Normandy
+Saitama Medical University
+University of Murcia
+Showa University
+University of Oldenburg
+Magna GrÃ_cia University of Catanzaro
+National Sun Yat-sen University
+Nanjing University of Science and Technology
+University of ConcepciÃ_n
+Chungbuk National University
+Taipei Medical University
+Jaume I University
+Bowling Green State University
+Nanjing University of Technology
+University of New England (Australia)
+Kangwon National University
+Inje University
+Aberystwyth University
+"University of Technology, Sydney"
+University of Franche-ComtÃ©
+University of Sassari
+Chiang Mai University
+Budapest University of Technology and Economics
+University of Maribor
+University of Bradford
+University of Perpignan Via Domitia
+Florida Institute of Technology
+University of Brighton
+University of Massachusetts Boston
+Rio de Janeiro State University
+Nagoya Institute of Technology
+Jiangnan University
+Murdoch University
+"University of Wales, Trinity Saint David"
+University of Rouen
+The Catholic University of America
+Wright State University - Dayton
+Dankook University
+Clarkson University
+University of Regina
+BoÄŸaziÃ§i University
+KÅçchi University
+University of Miyazaki
+University of Electro-Communications
+University of Valladolid
+Bilkent University
+Dublin City University
+University of South Alabama
+Sofia University
+Ocean University of China
+King Fahd University of Petroleum and Minerals
+University of Veterinary Medicine Vienna
+University of AlcalÃ¡
+Hunter College
+"All India Institute of Medical Sciences, New Delhi"
+Gazi University
+"National University of Ireland, Maynooth"
+Tehran University of Medical Sciences
+University of the Ryukyus
+Florida Atlantic University
+University of Siegen
+Huazhong Agricultural University
+University of Angers
+University of Seoul
+Brock University
+Fukuoka University
+Hamamatsu University School of Medicine
+Nanjing Normal University
+National Chung Cheng University
+Nanjing Agricultural University
+University of the Republic (Uruguay)
+Sejong University
+Makerere University
+University of New Brunswick
+Northeastern University (China)
+University of Extremadura
+RMIT University
+"Royal Veterinary College, University of London"
+Chung Yuan Christian University
+University of OsnabrÃ_ck
+Northwest University (China)
+Chosun University
+University of OrlÃ©ans
+Jean Monnet University
+Ã‰cole centrale de Lyon
+University of Western Sydney
+Hefei University of Technology
+University of Massachusetts Lowell
+Manchester Metropolitan University
+Nanjing Medical University
+Kyoto Institute of Technology
+Shanghai Normal University
+Southwest University
+Adam Mickiewicz University in PoznaÅ„
+University of Calcutta
+University of PÃ©cs
+"Queens College, City University of New York"
+University of Lleida
+Nanjing University of Aeronautics and Astronautics
+University of Western Brittany
+University of North Carolina at Greensboro
+Pukyong National University
+Fourth Military Medical University
+University of Fukui
+University of Southern Mississippi
+University of Mannheim
+Shimane University
+China University of Geosciences (Wuhan)
+University of Thessaly
+Oakland University
+Wilfrid Laurier University
+Teikyo University
+Saitama University
+Trent University
+Nicolaus Copernicus University in ToruÅ„
+Tarbiat Modares University
+University of North Dakota
+Isfahan University of Technology
+Fluminense Federal University
+National Taiwan University of Science and Technology
+University of Lethbridge
+Federal University of Santa Catarina
+University of Camerino
+University of BrasÃ_lia
+University of WrocÅ‚aw
+University of Basilicata
+Jadavpur University
+South China Normal University
+University of Hyderabad
+Ritsumeikan University
+Carlos III University of Madrid
+University of Cyprus
+University of Texas at El Paso
+University of CÃ¡diz
+Shahid Beheshti University of Medical Sciences
+National Taiwan Normal University
+National University of CÃ_rdoba
+Federal University of ParanÃ¡
+University of JaÃ©n
+"University of California, Merced"
+University of Waikato
+University of Central Lancashire
+Federal University of Pernambuco
+University of AlmerÃ_a
+Federal University of SÃ£o Carlos
+Charles Darwin University
+Yangzhou University
+WrocÅ‚aw University of Technology
+Hirosaki University
+National Taiwan Ocean University
+Jiangsu University
+Northwestern Polytechnical University
+Xiangtan University
+United Arab Emirates University
+Gachon University
+Hallym University
+Harbin Engineering University
+Dokuz EylÃ_l University
+Jinan University
+Shiraz University
+Third Military Medical University
+Amirkabir University of Technology
+Public University of Navarre
+Federico Santa MarÃ_a Technical University
+Federal University of ABC
+University of Puerto Rico at MayagÃ_ez
+Southern Medical University
+University of Silesia
+Ain Shams University
+University of Valenciennes and Hainaut-Cambresis
+Chung Shan Medical University
+National University of Colombia
+South China Agricultural University
+Ibaraki University
+Fu Jen Catholic University
+Hunan Normal University
+Ulsan National Institute of Science and Technology
+Federal University of Santa Maria
+Shenzhen University
+Tianjin Medical University
+Beijing University of Technology
+University of Reims Champagne-Ardenne
+Yuan Ze University
+"University of Chemistry and Technology, Prague"
+University of Limerick
+China Medical University (PRC)
+Feng Chia University
+Zhejiang University of Technology
+Novosibirsk State University
+University of Bucharest
+BabeÈ™-Bolyai University
+Mansoura University
+University of Pau and Pays de l'Adour
+Henan Normal University
+Xidian University
+Federal University of Bahia
+Southwest Jiaotong University
+Ryerson University
+King Abdulaziz University
+University of the Algarve
+Alexandria University
+Federal University of CearÃ¡
+University of A CoruÃ±a
+China Pharmaceutical University
