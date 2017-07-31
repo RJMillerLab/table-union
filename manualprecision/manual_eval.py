@@ -69,7 +69,7 @@ class CandidateFactory:
         prev_candidate_table_name = None
         alignment = []
         c = self.conn.cursor()
-        rows = c.execute("SELECT * FROM %s WHERE n <= 5 ORDER BY query_table, candidate_table, n;" % (self.table_name))
+        rows = c.execute("SELECT * FROM %s WHERE n <= 5 and (select count(name) from query_tables where name = query_table) > 0 ORDER BY query_table, candidate_table, n;" % (self.table_name))
         for row in rows:
             # Set local varaibles from database
             query_table_name = row['query_table']
@@ -139,8 +139,8 @@ class Evaluation:
                  is_correct))
         self.conn.commit()
 
-evaluation = Evaluation('./manual_eval.sqlite', 'jaccard')
-iterator = CandidateFactory('/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only', './query_results.sqlite', 'jaccard', evaluation).iterator()
+evaluation = Evaluation('./manual_eval.sqlite', 'ont_jaccard')
+iterator = CandidateFactory('/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only', './query_results.sqlite', 'ont_jaccard', evaluation).iterator()
 candidate = None
 
 def get():
