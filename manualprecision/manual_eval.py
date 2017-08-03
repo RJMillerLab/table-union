@@ -139,7 +139,7 @@ class Evaluation:
                  is_correct))
         self.conn.commit()
 
-evaluation = Evaluation('./manual_eval.sqlite', 't2')
+evaluation = Evaluation('./manual_eval.demo.sqlite', 't2')
 iterator = CandidateFactory('/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only', './query_results.sqlite', 't2', evaluation).iterator()
 candidate = None
 
