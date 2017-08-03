@@ -43,7 +43,7 @@ parser.add_argument("-output", "--output", default="plots/precision_recall.pdf")
 args = parser.parse_args(sys.argv[1:])
 #
 benchmarkPath = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4"
-measures = ["Set", "Sem-Set", "Sem", "NL", "DasSarma"]
+measures = ["Set", "Sem-Set", "Sem", "NL", "EC"]
 dbs = [os.path.join(benchmarkPath, "jaccard-experiments.sqlite"), os.path.join(benchmarkPath, "ont-jaccard-experiments.sqlite"), os.path.join(benchmarkPath, "ont-jaccard-experiments.sqlite"), os.path.join(benchmarkPath, "emb-experiments.sqlite"), os.path.join(benchmarkPath, "sarma.sqlite")]
 tables = ["jaccard_fixedn_backup", "ontology_fixedn_backup", "pure_ontology_fixedn_backup", "t2_fixedn_backup", "topk_sarma"]
 #
@@ -56,19 +56,19 @@ for i in range(len(dbs)):
     ps.append(p)
     rs.append(r)
 #
-fs = 7
+fs = 12
 dist = 0.05
-cs = ['g','r','b','y','k','orchid']
-fig, ax = plt.subplots(1, 1, figsize=(2.2, 2.2))
+cs = ['g', 'c','r','m','k','orchid']
+fig, ax = plt.subplots(1, 1, figsize=(3, 3))
 ax.tick_params(axis='both', which='major', labelsize=fs)
-ax.grid(linestyle='--')
+ax.grid()
 ax.set_xlabel('Recall', fontsize=fs)
 ax.set_ylabel('Precision', fontsize=fs)
 ax.set_xlim([0,1])
 ax.set_ylim([0,1])
 ax.set_axisbelow(True)
 for i in range(len(dbs)):
-    plt.scatter(rs[i], ps[i], color=cs[i], edgecolor = 'black', marker='o', alpha=0.5, s=10**2, label = measures[i])
+    plt.scatter(rs[i], ps[i], color=cs[i], edgecolor = 'black', marker='o', s=10**2, label = measures[i])
     if i == 0:
         ax.annotate(measures[i], (rs[i]-dist,ps[i]-dist), ha="right", va="bottom", fontsize=fs)
     if i == 2:
@@ -78,7 +78,7 @@ for i in range(len(dbs)):
     if i == 3:
         ax.annotate(measures[i], (rs[i]+3*dist,ps[i]-dist), ha="right", va="bottom", fontsize=fs)
     if i == 4:
-        ax.annotate(measures[i], (rs[i]+7*dist, ps[i]+dist), ha="right", va="bottom", fontsize=fs)
+        ax.annotate(measures[i], (rs[i]+2.5*dist, ps[i]+dist), ha="right", va="bottom", fontsize=fs)
 plt.savefig(args.output, bbox_inches='tight', pad_inches=0.02)
 plt.close()
 #

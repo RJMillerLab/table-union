@@ -14,21 +14,23 @@ args = parser.parse_args(sys.argv[1:])
 db = sqlite3.connect(args.dbname)
 cursor = db.cursor()
 tablename = args.tablename
-# plot the distribution of expansion
-fig, ax = plt.subplots(figsize=(10, 10))
-ax.set_title('Jaccard vs. the Cumulative Distribution of Hypergeometric in OD', fontsize=18)
-ax.set_xlabel('Jaccard', fontsize=18)
-ax.set_ylabel('F(k)', fontsize=18)
 jaccards = []
 hypergeos = []
-for j, hg in cursor.execute("select jaccard, hypergeometric from " + tablename + ";").fetchall():
+for j, hg in cursor.execute("select jaccard, hypergeometric from " + tablename + " where hypergeometric <= 1.0 order by random();").fetchall():
+    if len(jaccards) == 500:
+        break
     if j < 0.35 and hg > 0.99:
         continue
     jaccards.append(j)
     hypergeos.append(hg)
-print("Number of jaccard pairs: %d" % len(hypergeos))
-print("Plotting...")
-ax.scatter(jaccards, hypergeos, color='y', marker='o', edgecolor='black', alpha=0.5, rasterized=True)
-plt.savefig(args.outputa)
+
+fig, ax = plt.subplots(figsize=(3, 3))
+ax.grid()
+ax.set_xlabel('Jaccard')
+ax.set_ylabel('$U_{set}$')
+ax.set_xlim(0.0,1.0)
+ax.set_ylim(0.0,1.0)
+ax.scatter(jaccards, hypergeos, marker='o', alpha=0.5, rasterized=True)
+plt.tight_layout()
+plt.savefig(args.outputa, bbox_inches='tight', pad_inches=0.02)
 print("Done")
-#

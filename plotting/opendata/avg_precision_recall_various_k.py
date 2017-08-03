@@ -55,9 +55,14 @@ legends = []
 all_ps = []
 all_rs = []
 benchmarkPath = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4"
-measures = ["Set", "Sem-Set", "NL", "Sem"]
-dbs = [os.path.join(benchmarkPath, "jaccard-experiments.sqlite"), os.path.join(benchmarkPath, "ont-jaccard-experiments.sqlite"), os.path.join(benchmarkPath, "emb-experiments.sqlite"), os.path.join(benchmarkPath,"ont-jaccard-experiments.sqlite")]
-tables = ["jaccard_fixedn", "ontology_fixedn", "t2_fixedn_backup", "pure_ontology_fixedn"]
+measures = ["Set", "Sem", "Sem-Set", "NL"]
+dbs = [
+        os.path.join(benchmarkPath, "jaccard-experiments.sqlite"),
+        os.path.join(benchmarkPath, "ont-jaccard-experiments.sqlite"),
+        os.path.join(benchmarkPath, "ont-jaccard-experiments.sqlite"),
+        os.path.join(benchmarkPath, "emb-experiments.sqlite"),
+        ]
+tables = ["jaccard_fixedn", "pure_ontology_fixedn", "ontology_fixedn", "t2_fixedn_backup"]
 markers = ["x", "+", "*", "o"]
 
 answeredQueries = get_answered_queries(dbs, tables)
@@ -67,24 +72,24 @@ for i in range(len(dbs)):
     all_ps.append(ps)
     all_rs.append(rs)
 
-fs = 7
+fs = 12
 dist = 0.05
-markersize = 1.5
-lw = 1
-linestyles = ["-+", "-x", "-*", "-o"]
+#markersize = 3
+lw = 2.5
+linestyles = ["-+", "-x", "--", "-"]
 cs = ['g','r','c','m','y','k','orchid']
-fig, ax = plt.subplots(1, 1, figsize=(2.2, 2.2))
+fig, ax = plt.subplots(1, 1, figsize=(3, 3))
 ax.tick_params(axis='both', which='major', labelsize=fs)
-ax.grid(linestyle='--')
+ax.grid()
 ax.set_xlabel('Recall', fontsize=fs)
 ax.set_ylabel('Precision', fontsize=fs)
 ax.set_xlim([0,1])
-ax.set_ylim([0.5,1])
+ax.set_ylim([0.7,1])
 ax.set_axisbelow(True)
 
 for i in range(len(dbs)):
-    ax.plot(all_rs[i], all_ps[i], linestyles[i], label=measures[i],  markersize=markersize, color = cs[i], linewidth=lw)
-lgd = plt.legend(ncol=1, loc="lower right", bbox_transform=plt.gcf().transFigure, fontsize=fs)
+    ax.plot(all_rs[i], all_ps[i], linestyles[i], label=measures[i], color = cs[i], linewidth=lw, markevery=5)
+lgd = plt.legend(ncol=1, loc="best", bbox_transform=plt.gcf().transFigure, fontsize=fs, fancybox=True, framealpha=0.5)
 plt.savefig(args.outputa, bbox_extra_artists=(lgd,), bbox_inches='tight', pad_inches=0.02)
 plt.close()
 print("Done.")
