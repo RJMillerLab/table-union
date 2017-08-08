@@ -36,7 +36,7 @@ type domainAnnotation struct {
 }
 
 func InitSarma() {
-	//entityToClass = loadEntityClasses()
+	entityToClass = loadEntityClasses()
 }
 
 func InitAnnotator() {
@@ -70,7 +70,28 @@ func AnnotateDomainsFromEntityFiles(files <-chan string, fanout int, ext string)
 	return out
 }
 
-func getSubjectColumn(tableName string) int {
+func getSubjectColumn(tablename string) int {
+	db, err := sql.Open("sqlite3", AnnotationDB)
+	if err != nil {
+		panic(err)
+	}
+	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT subject_column FROM %s where table_name="%s";`, AllAnnotationTable, tablename))
+	if err != nil {
+		panic(err)
+	}
+	//
+	subjectColumn := -1
+	for rows.Next() {
+		err := rows.Scan(&subjectColumn)
+		if err != nil {
+			panic(err)
+		}
+	}
+	db.Close()
+	return subjectColumn
+}
+
+func getSubjectColumnPlus(tableName string) int {
 	// assuming the first text column (non-numerical and non-date)
 	// with annotations as subject column
 	textDomains := getTextDomains(tableName)
@@ -290,9 +311,7 @@ func bucketize(queryFilename string) <-chan string {
 		if err != nil {
 			panic(err)
 		}
-		//defer db.Close()
-		//rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT a2.table_name as candidate_table FROM %s a1, %s a2 WHERE a1.table_name="%s" AND (a1.column_name=a2.column_name OR a1.class=a2.class);`, AllAnnotationTable, AllAnnotationTable, queryFilename))
-		rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT a2.table_name as candidate_table FROM %s a2, (SELECT * FROM %s WHERE table_name="%s" ORDER BY class_frequncy limit 20) a1 WHERE a2.subject_column=a2.column_index and (a1.column_name=a2.column_name OR a1.class=a2.class);`, AllAnnotationTable, AllAnnotationTable, queryFilename))
+		rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT a2.table_name as candidate_table FROM %s a2, (SELECT * FROM %s WHERE table_name="%s") a1 WHERE a2.subject_column=a2.column_index and (a1.column_name=a2.column_name OR a1.class=a2.class);`, AllAnnotationTable, AllAnnotationTable, queryFilename))
 		if err != nil {
 			panic(err)
 		}
@@ -311,7 +330,6 @@ func bucketize(queryFilename string) <-chan string {
 		rows.Close()
 		db.Close()
 		close(candidateTables)
-		//wg.Done()
 	}()
 	return candidateTables
 
@@ -340,8 +358,8 @@ func readEntities(tableName string, columnIndex int) []string {
 }
 
 func shareEntities(queryFilename, candidateFilename string, queryTextColumns, candidateTextColumns []int) bool {
-	queryEntities := readEntities(queryFilename, queryTextColumns[0])
-	candidateEntities := readEntities(candidateFilename, candidateTextColumns[0])
+	queryEntities := readEntities(queryFilename, getSubjectColumn(queryFilename))
+	candidateEntities := readEntities(candidateFilename, getSubjectColumn(candidateFilename))
 	for _, e1 := range queryEntities {
 		for _, e2 := range candidateEntities {
 			if strings.ToLower(e1) == strings.ToLower(e2) {
@@ -412,34 +430,38 @@ func makeDomainAnnotationCounterFromDB(tableName string, columnIndex int) *count
 	}
 	defer db.Close()
 	// read and tokenize the labels of the query
-	rows, err := db.Query(fmt.Sprintf(`SELECT column_name, class FROM %s WHERE table_name = "%s" AND        column_index = %d ORDER BY class_frequncy LIMIT 20;`, AllAnnotationTable, tableName, columnIndex))
+	rows, err := db.Query(fmt.Sprintf(`SELECT column_name, class FROM %s WHERE table_name = "%s" AND        column_index = %d;`, AllAnnotationTable, tableName, columnIndex))
 	if err != nil {
 		panic(err)
 	}
-	//
+	// Get the name of the column
+	var cName string
 	domainCounter := counter.NewCounter()
 	for rows.Next() {
 		var anno string
 		var columnName string
 		err := rows.Scan(&columnName, &anno)
-		domainCounter.Update(columnName)
-		words := tokenizeAnnotation(anno)
 		if err != nil {
 			panic(err)
 		}
-		for word := range words {
-			domainCounter.Update(word)
+		if cName == "" {
+			domainCounter.Update(columnName)
+			cName = columnName
 		}
+		//words := tokenizeAnnotation(anno)
+		//for word := range words {
+		//	domainCounter.Update(word)
+		//}
+		domainCounter.Update(anno)
 	}
 	rows.Close()
 	return domainCounter
 }
 
 func makeDomainEntityCounter(tableName string, columnIndex int) (*counter.Counter, error) {
-	filepath := path.Join(OutputDir, "domains", tableName, fmt.Sprintf("%d.entities", columnIndex))
+	filepath := path.Join(OutputDir, "domains", tableName, fmt.Sprintf("%d.entities-l0", columnIndex))
 	f, err := os.Open(filepath)
 	if err != nil {
-		//log.Printf("error loading %s", filepath)
 		return nil, err
 	}
 	//defer f.Close()
@@ -465,20 +487,19 @@ func computeLabelsFuzzyJaccard(queryFilename string, queryColumnIndex int, candi
 	return float64(intersectCardinality) / float64(queryCounter.Unique()+candidateCounter.Unique()-intersectCardinality)
 }
 
-func annotateEntityCounter(counter *counter.Counter, yg *yago.Yago) map[string]int {
-	elems, _ := counter.Freqs()
-	annotations := make(map[string]int)
-	for _, value := range elems {
-		foundEntities := yg.MatchEntity(value.(string), 3)
-		for _, entity := range foundEntities {
-			if _, ok := annotations[entity]; !ok {
-				annotations[entity] = 1
+func annotateEntityCounter(counter *counter.Counter) map[string]int {
+	elems, freqs := counter.Freqs()
+	classes := make(map[string]int)
+	for i, entity := range elems {
+		for _, c := range entityToClass[strings.ToLower(entity.(string))] {
+			if _, ok := classes[c]; !ok {
+				classes[c] = freqs[i]
 			} else {
-				annotations[entity] = annotations[entity] + 1
+				classes[c] = classes[c] + freqs[i]
 			}
 		}
 	}
-	return annotations
+	return classes
 }
 func annotateEntityCounterPlus(counter *counter.Counter) map[string]int {
 	classes := make(map[string]int)
@@ -499,20 +520,18 @@ func annotateEntityCounterPlus(counter *counter.Counter) map[string]int {
 	return classes
 }
 
-func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, queryTextColumns, candidateTextColumns []int, yg *yago.Yago) float64 {
+func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, queryTextColumns, candidateTextColumns []int) float64 {
 	db, err := sql.Open("sqlite3", AnnotationDB)
 	if err != nil {
 		panic(err)
 	}
 	defer db.Close()
 	// computing w(X,c)
-	//rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class, class_frequncy, num_entities FROM %s WHERE table_name="%s";`, SubjectAnnotationTable, queryTable))
 	querySubjectCol := getSubjectColumn(queryTable)
 	candidateSubjectCol := getSubjectColumn(candidateTable)
 	if querySubjectCol == -1 || candidateSubjectCol == -1 {
 		return 0.0
 	}
-	//rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class, class_frequncy, num_entities FROM %s WHERE table_name="%s";`, AllAnnotationTable, queryTable))
 	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT class, class_frequncy, num_entities FROM %s WHERE table_name="%s" AND column_index=%d;`, AllAnnotationTable, queryTable, querySubjectCol))
 	if err != nil {
 		panic(err)
@@ -531,28 +550,38 @@ func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, que
 	}
 	rows.Close()
 	// finding Y\X classes
-	//queryEntityCounter, err := makeDomainEntityCounter(queryTable, queryTextColumns[0])
 	queryEntityCounter, err := makeDomainEntityCounter(queryTable, querySubjectCol)
 	if err != nil {
 		return 0.0
 	}
-	//candidateEntityCounter, err := makeDomainEntityCounter(candidateTable, candidateTextColumns[0])
 	candidateEntityCounter, err := makeDomainEntityCounter(candidateTable, candidateSubjectCol)
 	if err != nil {
 		return 0.0
 	}
 	differenceEntityCounter := candidateEntityCounter.Difference(queryEntityCounter)
 	// annotate the difference
-	candidateAnnotations := annotateEntityCounter(differenceEntityCounter, yg)
+	candidateAnnotations := annotateEntityCounter(differenceEntityCounter)
+	//if candidateEntityCounter.Unique() != differenceEntityCounter.Unique() {
+	//	log.Printf("c %d q %d f %d", candidateEntityCounter.Unique(), queryEntityCounter.Unique(), differenceEntityCounter.Unique())
+	//}
 	candidateClassScores := make(map[string]float64)
 	entityCard := candidateEntityCounter.Unique()
 	for class, freq := range candidateAnnotations {
 		candidateClassScores[class] = math.Pow(float64(freq), n2) / math.Pow(float64(entityCard), m2)
 	}
+	d1 := queryTable[:strings.LastIndex(queryTable, "____")]
+	d2 := candidateTable[:strings.LastIndex(candidateTable, "____")]
+	if d1 == d2 {
+		log.Printf("candidateEntityCounter: %v", candidateEntityCounter)
+		//log.Printf("len(candidateClassScores): %d and candidateEntityCounter.Unique(): %d and differenceEntityCounter.Unique(): %d", len(candidateClassScores), candidateEntityCounter.Unique(), differenceEntityCounter.Unique())
+		//log.Printf("len(queryClassScores): %d", len(queryClassScores))
+		//if len(candidateClassScores) != 0 && len(queryClassScores) != 0 {
+		//	log.Printf("candidateClassScores: %v", candidateClassScores)
+		//	log.Printf("queryClassScores: %v", queryClassScores)
+		//}
+	}
 	// computing L(X).L(Y\X)
 	SEP := 0.0
-	log.Printf("len(candidateClassScores): %d", len(candidateClassScores))
-	log.Printf("len(queryClassScores): %d", len(queryClassScores))
 	for c, w := range candidateClassScores {
 		if s, ok := queryClassScores[c]; ok {
 			SEP += s * w
@@ -561,21 +590,23 @@ func computeEntityConsistencyAndExpansion(queryTable, candidateTable string, que
 	return SEP
 }
 
-func computeSarmaUnionabilityScores(queryFilename, candidateFilename string, queryTextColumns, candidateTextColumns []int, yg *yago.Yago) (float64, float64) {
-	ece := computeEntityConsistencyAndExpansion(queryFilename, candidateFilename, queryTextColumns, candidateTextColumns, yg)
+func computeSarmaUnionabilityScores(queryFilename, candidateFilename string, queryTextColumns, candidateTextColumns []int) (float64, float64) {
+	ece := computeEntityConsistencyAndExpansion(queryFilename, candidateFilename, queryTextColumns, candidateTextColumns)
 	sc := 0.0
 	if ece > 0.0 {
-		log.Printf("non negative entity criterion, computing schema consistency!")
 		sc = computeSchemaConsistency(queryFilename, candidateFilename, queryTextColumns, candidateTextColumns)
 	}
 	sarma := ece * sc
-	//if sarma != 0.0 {
-	log.Printf("query: %s and candidate: %s has ece: %f * sc: %f = sarma: %f", queryFilename, candidateFilename, ece, sc, sarma)
-	//}
+	d1 := queryFilename[:strings.LastIndex(queryFilename, "____")]
+	d2 := candidateFilename[:strings.LastIndex(candidateFilename, "____")]
+	if d1 == d2 {
+		//if sarma != 0.0 {
+		log.Printf("query: %s and candidate: %s has ece: %f * sc: %f = sarma: %f", queryFilename, candidateFilename, ece, sc, sarma)
+	}
 	return ece, sc
 }
 
-func DoFindSarmaUnionableTables(files <-chan string, fanout int, yg *yago.Yago) <-chan *sarmaResult {
+func DoFindSarmaUnionableTables(files <-chan string, fanout int) <-chan *sarmaResult {
 	out := make(chan *sarmaResult, 10000)
 	wg := &sync.WaitGroup{}
 	wg.Add(fanout)
@@ -583,7 +614,7 @@ func DoFindSarmaUnionableTables(files <-chan string, fanout int, yg *yago.Yago) 
 		go func() {
 			for queryTable := range files {
 				start := GetNow()
-				findSarmaUnionableTables(queryTable, out, yg)
+				findSarmaUnionableTables(queryTable, out)
 				fmt.Printf("Processed the query in %.2f seconds\n", GetNow()-start)
 			}
 			wg.Done()
@@ -616,7 +647,6 @@ func DoSaveSarmaScores(scores <-chan *sarmaResult) <-chan ProgressCounter {
 	progress := make(chan ProgressCounter)
 	go func() {
 		for score := range scores {
-			log.Printf("score is : %f", score.entityConsistencyAndExpansion)
 			//log.Printf("saving the score of %s", score.queryTable)
 			_, err = stmt.Exec(score.queryTable, score.candidateTable, score.entityConsistencyAndExpansion, score.schemaConsistency, score.entityConsistencyAndExpansion*score.schemaConsistency)
 			if err != nil {
@@ -641,21 +671,19 @@ type sarmaResult struct {
 	schemaConsistency             float64
 }
 
-func findSarmaUnionableTables(queryTable string, out chan *sarmaResult, yg *yago.Yago) {
+func findSarmaUnionableTables(queryTable string, out chan *sarmaResult) {
 	resultBucket := bucketize(queryTable)
 	wg := &sync.WaitGroup{}
-	wg.Add(3)
-	for i := 0; i < 3; i++ {
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
 		go func() {
 			for candidateTable := range resultBucket {
-				log.Printf("cand: %s and query: %s", candidateTable, queryTable)
 				queryTextColumns := getTextDomains(queryTable)
 				candidateTextColumns := getTextDomains(candidateTable)
-				//log.Printf("len(queryTextColumns): %d and len(candidateTextColumns): %d", len(queryTextColumns), len(candidateTextColumns))
 				if len(queryTextColumns) == 0 || len(candidateTextColumns) == 0 {
 					continue
 				}
-				ece, sc := computeSarmaUnionabilityScores(queryTable, candidateTable, queryTextColumns, candidateTextColumns, yg.Copy())
+				ece, sc := computeSarmaUnionabilityScores(queryTable, candidateTable, queryTextColumns, candidateTextColumns) //, yg.Copy())
 				if ece*sc != 0.0 {
 					out <- &sarmaResult{
 						queryTable:                    queryTable,
@@ -674,7 +702,6 @@ func findSarmaUnionableTables(queryTable string, out chan *sarmaResult, yg *yago
 }
 
 func computeValueConsistency(queryTable, candidateTable string, queryColumnIndex, candidateColumnIndex int) float64 {
-	return 1.0
 	valueConsistency := 0.0
 	numPairs := 0
 	wg := &sync.WaitGroup{}
@@ -712,6 +739,7 @@ func makeDomainValuePairs(queryTable, candidateTable string, queryColumnIndex, c
 	if err != nil {
 		panic(err)
 	}
+	maxPairNum := 4000
 	out := make(chan valuePair)
 	go func() {
 		seenPairs := make(map[valuePair]bool)
@@ -730,6 +758,9 @@ func makeDomainValuePairs(queryTable, candidateTable string, queryColumnIndex, c
 					seenPairs[p1] = true
 					seenPairs[p2] = true
 				}
+			}
+			if len(seenPairs) == maxPairNum {
+				break
 			}
 		}
 		close(out)
@@ -789,7 +820,6 @@ func GetOntDomain(yg *yago.Yago, values []string, numHash int, entityClass map[s
 	// Get the unique values
 	uniqueValues := unique(values)
 	cardinality := len(uniqueValues)
-	log.Printf("len(uniqueValues): %d", len(uniqueValues))
 	// Match unique data values with YAGO entities
 	for _, value := range uniqueValues {
 		foundEntities := yg.MatchEntity(value, 3)

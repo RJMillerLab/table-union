@@ -60,10 +60,11 @@ func minhashDomainWords(file string, index int, out chan *DomainSketch, ext stri
 	scanner := bufio.NewScanner(f)
 
 	for scanner.Scan() {
-		words := wordsFromLine(scanner.Text())
-		for _, word := range words {
-			mh.Push([]byte(word))
-		}
+		mh.Push([]byte(normalize(scanner.Text())))
+		//words := wordsFromLine(scanner.Text())
+		//for _, word := range words {
+		//	mh.Push([]byte(word))
+		//}
 	}
 	out <- &DomainSketch{
 		Filename: file,
@@ -244,7 +245,9 @@ func ReadMinhashSignature(filename string, numHash int) ([]uint64, error) {
 func GetDomainMinhash(tokenFun func(string) []string, transFun func(string) string, column []string, numHash int) []uint64 {
 	values := TokenizedValues(column, tokenFun, transFun)
 	mh := minhashlsh.NewMinhash(seed, numHash)
-
+	//for _, value := range column {
+	//	mh.Push([]byte(normalize(value)))
+	//}
 	for tokens := range values {
 		for _, word := range tokens {
 			mh.Push([]byte(word))

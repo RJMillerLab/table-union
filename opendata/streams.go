@@ -174,7 +174,7 @@ func makeDomains(filenames <-chan string, out chan *Domain) {
 	for filename := range filenames {
 		f, err := os.Open(Filepath(filename))
 		if err != nil {
-			//panic(err)
+			panic(err)
 			f.Close()
 			continue
 		}
@@ -630,6 +630,7 @@ func StreamQueryFilenames() <-chan string {
 	output := make(chan string)
 	go func() {
 		f, err := os.Open(QueryList)
+		log.Printf("QL: %s", QueryList)
 		if err != nil {
 			panic(err)
 		}
