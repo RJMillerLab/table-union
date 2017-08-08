@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/ekzhu/counter"
@@ -21,7 +22,7 @@ import (
 
 var (
 	ByteOrder = binary.BigEndian
-	batchSize = 1000
+	batchSize = 3000
 )
 
 type SearchResult struct {
@@ -112,8 +113,8 @@ func (a alignment) hasSeenBetter(pair Pair) bool {
 	if a.hasCompleted(pair.CandTableID) {
 		return true
 	}
-	return a.partialAlign[pair.CandTableID].Has(pair.CandColIndex) ||
-		a.reverseAlign[pair.CandTableID].Has(pair.QueryColIndex)
+	return a.partialAlign[pair.CandTableID].Has(strconv.Itoa(pair.CandColIndex)) ||
+		a.reverseAlign[pair.CandTableID].Has(strconv.Itoa(pair.QueryColIndex))
 }
 
 // Produces an alignment
@@ -142,8 +143,8 @@ func (a alignment) processPairsEmbedding(pairQueue *pqueue.TopKQueue, out chan<-
 			// because we are using priority queue
 			continue
 		}
-		a.partialAlign[pair.CandTableID].Update(pair.CandColIndex)
-		a.reverseAlign[pair.CandTableID].Update(pair.QueryColIndex)
+		a.partialAlign[pair.CandTableID].Update(strconv.Itoa(pair.CandColIndex))
+		a.reverseAlign[pair.CandTableID].Update(strconv.Itoa(pair.QueryColIndex))
 		a.tableQueues[pair.CandTableID].Push(pair, pair.Cosine)
 		// When we get k unique column alignments for a candidate table
 		if a.tableQueues[pair.CandTableID].Size() == a.k {
@@ -166,8 +167,8 @@ func (a alignment) processPairsEmbedding(pairQueue *pqueue.TopKQueue, out chan<-
 }
 
 func (index *UnionIndex) QueryOrderAll(query, queryCovar [][]float64, N, K int, queryCardinality []int) <-chan SearchResult {
-	log.Printf("Started querying the index with %d columns.", len(query))
-	start := getNow()
+	//log.Printf("Started querying the index with %d columns.", len(query))
+	//start := getNow()
 	results := make(chan SearchResult)
 	go func() {
 		defer close(results)
@@ -186,7 +187,7 @@ func (index *UnionIndex) QueryOrderAll(query, queryCovar [][]float64, N, K int, 
 				if e.Cosine != 0.0 {
 					batch.Push(e, e.Cosine)
 					//batch.Push(e, -1.0*e.T2)
-					log.Printf("scores: c: %f t2: %f", e.Cosine, e.T2)
+					//log.Printf("scores: c: %f t2: %f", e.Cosine, e.T2)
 					if e.Cosine > 0.9 && e.T2 > 100 {
 						log.Printf("anomaly: c: %f t2: %f", e.Cosine, e.T2)
 					}
@@ -197,43 +198,16 @@ func (index *UnionIndex) QueryOrderAll(query, queryCovar [][]float64, N, K int, 
 			}
 			// Process the batch
 			if finished := alignment.processPairsEmbedding(batch, results); finished {
-				log.Printf("elapse time: %f", getNow()-start)
+				//log.Printf("elapse time: %f", getNow()-start)
 				return
 			}
 		}
 		// Don't forget remaining pairs in the queue
 		if !batch.Empty() {
 			alignment.processPairsEmbedding(batch, results)
-			log.Printf("elapse time: %f", getNow()-start)
 		}
 	}()
 	return results
-}
-
-func getColumnPair(candTableID, domainDir string, candColIndex, queryColIndex int, query []float64) Pair {
-	// getting the embedding of the candidate column
-	//embFilename := getEmbFilename(candTableID, domainDir, candColIndex)
-	embFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-sum", candTableID, candColIndex))
-	//embFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-mean", candTableID, candColIndex))
-	if _, err := os.Stat(embFilename); os.IsNotExist(err) {
-		log.Printf("Embedding file %s does not exist.", embFilename)
-		panic(err)
-	}
-	vec, err := embedding.ReadVecFromDisk(embFilename, ByteOrder)
-	if err != nil {
-		log.Printf("Error in reading %s from disk.", embFilename)
-		panic(err)
-	}
-	// inserting the pair into its corresponding priority queue
-	cosine := embedding.Cosine(vec, query)
-	p := Pair{
-		QueryColIndex: queryColIndex,
-		CandTableID:   candTableID,
-		CandColIndex:  candColIndex,
-		Cosine:        cosine,
-		Sim:           cosine,
-	}
-	return p
 }
 
 func getColumnPairPlus(candTableID, domainDir string, candColIndex, queryColIndex int, queryMean, queryCovar []float64, queryCardinality int) Pair {
@@ -271,7 +245,7 @@ func getColumnPairPlus(candTableID, domainDir string, candColIndex, queryColInde
 		Cosine:           cosine,
 		T2:               math.Abs(ht2),
 		F:                math.Abs(f),
-		Sim:              math.Abs(ht2),
+		Sim:              cosine,
 		QueryCardinality: queryCardinality,
 		CandCardinality:  card,
 	}
@@ -381,7 +355,6 @@ func getT2StatisticsPlus(m1, m2 []float64, cv1, cv2 []float64, card1, card2 int)
 
 func getCovarMatrix(variance []float64) []float64 {
 	dim := len(variance)
-	log.Printf("len(covar) :%d", dim)
 	covariance := make([]float64, dim*dim)
 	for i := 0; i < len(variance); i++ {
 		for j := 0; j < len(variance); j++ {

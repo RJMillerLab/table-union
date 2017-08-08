@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/ekzhu/counter"
@@ -113,8 +114,8 @@ func (a alignment) processPairsSyntactic(pairQueue *pqueue.TopKQueue, out chan<-
 			// because we are using priority queue
 			continue
 		}
-		a.partialAlign[pair.CandTableID].Update(pair.CandColIndex)
-		a.reverseAlign[pair.CandTableID].Update(pair.QueryColIndex)
+		a.partialAlign[pair.CandTableID].Update(strconv.Itoa(pair.CandColIndex))
+		a.reverseAlign[pair.CandTableID].Update(strconv.Itoa(pair.QueryColIndex))
 		a.tableQueues[pair.CandTableID].Push(pair, pair.Hypergeometric)
 		// When we get k unique column alignments for a candidate table
 		if a.tableQueues[pair.CandTableID].Size() == a.k {
@@ -139,10 +140,10 @@ func (a alignment) processPairsSyntactic(pairQueue *pqueue.TopKQueue, out chan<-
 func getColumnPairJaccardPlus(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, query [][]uint64, queryCardinality int) Pair {
 	// getting the embedding of the candidate column
 	minhashFilename := getMinhashFilename(candTableID, domainDir, candColIndex)
-	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
-		log.Printf("Minhash file %s does not exist.", minhashFilename)
-		panic(err)
-	}
+	//if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
+	//	log.Printf("Minhash file %s does not exist.", minhashFilename)
+	//	panic(err)
+	//}
 	vec, err := opendata.ReadMinhashSignature(minhashFilename, numHash)
 	if err != nil {
 		log.Printf("Error in reading %s from disk.", minhashFilename)
@@ -164,7 +165,8 @@ func getColumnPairJaccardPlus(candTableID, domainDir string, candColIndex, query
 		Jaccard:        jaccard,
 		Containment:    containment,
 		Hypergeometric: sig,
-		Sim:            sig,
+		//Sim:            sig,
+		Sim: jaccard,
 	}
 	return p
 }
@@ -219,7 +221,7 @@ func sameDomainProb(estimatedJaccard float64, nA, nB int) float64 {
 		k = int(math.Min(float64(nA), float64(nB)))
 	}
 	F_k_A_B := 0.0
-	for i := 0; i < k; i++ {
+	for i := 1; i < k; i++ {
 		F_k_A_B += math.Exp(logHyperGeometricProb(i, nA, nB, N))
 	}
 	if F_k_A_B > 2.0 {

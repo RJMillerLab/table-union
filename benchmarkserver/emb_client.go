@@ -22,8 +22,10 @@ import (
 )
 
 var (
-	domainDir   = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3/domains"
-	opendataDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v3/csvfiles"
+	domainDir   = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/domains"
+	opendataDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/csvfiles"
+	//domainDir   = "/home/fnargesian/TABLE_UNION_OUTPUT/domains"
+	//opendataDir = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
 )
 
 type Client struct {
@@ -104,7 +106,7 @@ func (c *Client) QueryWithFixedK(queryCSVFilename string, k, maxN int) []QueryRe
 		if classifyValues(col) == "text" {
 			vec, err := embedding.GetDomainEmbSum(c.ft, c.tokenFun, c.transFun, col)
 			if err != nil {
-				log.Printf("Embedding not found for column %d", i)
+				//log.Printf("Embedding not found for column %d", i)
 				continue
 			}
 			if len(vec) != 0 {
@@ -128,7 +130,9 @@ func (c *Client) QueryWithFixedK(queryCSVFilename string, k, maxN int) []QueryRe
 		result.TableUnion.QueryHeader = queryHeaders
 		result.TableUnion.QueryTextHeader = queryTextHeaders
 		// Retrive header index
+		//log.Printf("query: %s and candidate: %s", queryCSVFilename, result.TableUnion.CandTableID)
 		for i, pair := range result.TableUnion.Alignment {
+			//		log.Printf("%s %d %d -> %s %d %d: %f", queryTextHeaders[pair.QueryColIndex], len(queryTextHeaders), pair.QueryColIndex, result.TableUnion.CandTextHeader[pair.CandColIndex], len(result.TableUnion.CandTextHeader), pair.CandColIndex, pair.Sim)
 			pair.QueryColIndex = textToAllHeaders[pair.QueryColIndex]
 			result.TableUnion.Alignment[i] = pair
 		}
@@ -141,7 +145,7 @@ func (c *Client) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryRe
 	results := make([]QueryResult, 0)
 	f, err := os.Open(queryCSVFilename)
 	if err != nil {
-		log.Printf("dataset file not found")
+		//log.Printf("dataset file not found")
 		return results
 		//panic(err)
 	}
@@ -150,7 +154,7 @@ func (c *Client) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryRe
 	queryTable, err := datatable.FromCSV(reader)
 	queryHeaders := queryTable.GetRow(0)
 	if err != nil {
-		log.Printf("error in reading datasets.")
+		//log.Printf("error in reading datasets.")
 		return results
 		//panic(err)
 	}
@@ -167,7 +171,7 @@ func (c *Client) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryRe
 			//mean, err := embedding.GetDomainEmbSum(c.ft, c.tokenFun, c.transFun, col)
 			mean, covar, err := getDomainEmbMeanCovar(queryCSVFilename, i)
 			if err != nil {
-				log.Printf("Embedding not found for column %d", i)
+				//log.Printf("Embedding not found for column %d", i)
 				continue
 			}
 			if len(mean) != 0 && len(covar) != 0 && !containsNan(covar) && !containsNan(mean) {
@@ -192,6 +196,7 @@ func (c *Client) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryRe
 		return results
 	}
 	for _, kp := range ks {
+		log.Printf("k: %d", kp)
 		resp := c.mkReq(QueryRequest{Vecs: means, Covars: covars, K: kp, N: n, Cards: cards})
 		//resp := c.mkReq(QueryRequest{Vecs: means, K: kp, N: n, Cards: cards})
 		//resp := c.mkReq(QueryRequest{Vecs: means, K: kp, N: n})
@@ -199,14 +204,18 @@ func (c *Client) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryRe
 		if resp.Result == nil || len(resp.Result) == 0 {
 			log.Printf("No result found for %s.", queryCSVFilename)
 		}
+		//log.Printf("query: %s", queryCSVFilename)
 		for _, result := range resp.Result {
+			log.Printf("candidate: %s", result.TableUnion.CandTableID)
 			result.TableUnion.QueryHeader = queryHeaders
 			result.TableUnion.QueryTextHeader = queryTextHeaders
 			// Retrive header index
 			for i, pair := range result.TableUnion.Alignment {
+				//log.Printf("%s -> %s : %f", queryTextHeaders[pair.QueryColIndex], result.TableUnion.CandHeader[pair.CandColIndex], pair.Sim)
 				pair.QueryColIndex = textToAllHeaders[pair.QueryColIndex]
 				result.TableUnion.Alignment[i] = pair
 			}
+			log.Printf("--------------------------")
 			results = append(results, result)
 		}
 	}
@@ -226,23 +235,23 @@ func getDomainEmbMeanCovar(tableID string, colIndex int) ([]float64, []float64, 
 	tableID = strings.Replace(tableID, opendataDir, "", -1)
 	meanFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-mean", tableID, colIndex))
 	if _, err := os.Stat(meanFilename); os.IsNotExist(err) {
-		log.Printf("Mean embedding file %s does not exist.", meanFilename)
+		//log.Printf("Mean embedding file %s does not exist.", meanFilename)
 		return nil, nil, err
 	}
 	mean, err := embedding.ReadVecFromDisk(meanFilename, ByteOrder)
 	if err != nil {
-		log.Printf("Error in reading %s from disk.", meanFilename)
+		//log.Printf("Error in reading %s from disk.", meanFilename)
 		return nil, nil, err
 	}
 	// reading covariance matrix
 	covarFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-covar", tableID, colIndex))
 	if _, err := os.Stat(covarFilename); os.IsNotExist(err) {
-		log.Printf("Embedding file %s does not exist.", covarFilename)
+		//log.Printf("Embedding file %s does not exist.", covarFilename)
 		return nil, nil, err
 	}
 	covar, err := embedding.ReadVecFromDisk(covarFilename, ByteOrder)
 	if err != nil {
-		log.Printf("Error in reading %s from disk.", covarFilename)
+		//log.Printf("Error in reading %s from disk.", covarFilename)
 		return nil, nil, err
 	}
 	return mean, covar, nil

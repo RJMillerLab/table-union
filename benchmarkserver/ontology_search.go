@@ -19,8 +19,6 @@ func (index *JaccardUnionIndex) OntBuild() error {
 	log.Printf("ont build")
 	domainfilenames := opendata.StreamFilenames()
 	minhashFilenames := opendata.StreamMinhashVectors(10, "ont-minhash-l1", domainfilenames)
-	//minhashFilenames := opendata.StreamMinhashVectors(10, "ont-minhash-l2", domainfilenames)
-	//minhashFilenames := opendata.StreamMinhashVectors(10, "entities-minhash", domainfilenames)
 	count := 0
 	for file := range minhashFilenames {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
@@ -96,13 +94,13 @@ func (server *OntologyJaccardServer) OntQueryOrderAll(noOntQuery, ontQuery, quer
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
-		for pair := range server.ui.lsh.QueryPlus(noOntQuerySigs, done1) {
-			tableID, columnIndex := fromColumnID(pair.CandidateKey)
-			e := getColumnPairOntJaccardPlus(tableID, server.ui.domainDir, columnIndex, pair.QueryIndex, server.ui.numHash, query[pair.QueryIndex], ontQuery[pair.QueryIndex], noOntQuery[pair.QueryIndex], queryCard[pair.QueryIndex], ontQueryCard[pair.QueryIndex], noOntQueryCard[pair.QueryIndex])
-			if e.Sim != 0.0 {
-				reduceBatch <- e
-			}
-		}
+		//for pair := range server.ui.lsh.QueryPlus(noOntQuerySigs, done1) {
+		//	tableID, columnIndex := fromColumnID(pair.CandidateKey)
+		//	e := getColumnPairOntJaccardPlus(tableID, server.ui.domainDir, columnIndex, pair.QueryIndex, server.ui.numHash, query[pair.QueryIndex], ontQuery[pair.QueryIndex], noOntQuery[pair.QueryIndex], queryCard[pair.QueryIndex], ontQueryCard[pair.QueryIndex], noOntQueryCard[pair.QueryIndex])
+		//	if e.Sim != 0.0 {
+		//		reduceBatch <- e
+		//	}
+		//}
 		wg.Done()
 	}()
 	go func() {
@@ -239,7 +237,7 @@ func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, qu
 	noA, nA := getOntDomainCardinality(candTableID, domainDir, candColIndex)
 	nB := ontQueryCard
 	noB := noOntQueryCard
-	coverage := float64(queryCard-noOntQueryCard) / float64(queryCard)
+	//	coverage := float64(queryCard-noOntQueryCard) / float64(queryCard)
 	jaccardProb := sameDomainProb(jaccard, noA, noB)
 	ontProb := sameDomainProb(ontJaccard, nA, nB)
 	//log.Printf("tableID: %s.%d, annB: %d, noannB: %d, annA: %d, noAnnA: %d, j: %f, h: %f, oj: %f, oh: %f coverage sim: %f maxsim: %f", candTableID, candColIndex, nB, noB, nA, noA, jaccard, jaccardProb, ontJaccard, ontProb, (1-coverage)*jaccardProb+coverage*ontProb, math.Max(jaccardProb, ontProb))
@@ -251,10 +249,10 @@ func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, qu
 		Hypergeometric:         jaccardProb,
 		OntologyJaccard:        ontJaccard,
 		OntologyHypergeometric: ontProb,
-		Sim: (1-coverage)*jaccardProb + coverage*ontProb,
-		//Sim: ontProb,
+		//Sim: (1-coverage)*jaccardProb + coverage*ontProb,
+		Sim: ontProb,
 		//Sim: jaccardProb,
-		//Sim: ontProb + jaccardProb,
+		//Sim: ontProb + jaccardProb - ontProb*jaccardProb,
 		//Sim: ontProb * jaccardProb,
 		//Sim: math.Max(jaccardProb, ontProb),
 	}
