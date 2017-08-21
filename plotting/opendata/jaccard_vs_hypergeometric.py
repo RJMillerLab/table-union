@@ -17,7 +17,7 @@ tablename = args.tablename
 jaccards = []
 hypergeos = []
 for j, hg in cursor.execute("select jaccard, hypergeometric from " + tablename + " where hypergeometric <= 1.0 order by random();").fetchall():
-    if len(jaccards) == 500:
+    if len(jaccards) == 7500:
         break
     if j < 0.35 and hg > 0.99:
         continue
@@ -29,8 +29,8 @@ ax.grid()
 ax.set_xlabel('Jaccard')
 ax.set_ylabel('$U_{set}$')
 ax.set_xlim(0.0,1.0)
-ax.set_ylim(0.0,1.0)
-ax.scatter(jaccards, hypergeos, marker='o', alpha=0.5, rasterized=True)
+ax.set_ylim(0.0,1.2)
+ax.scatter(jaccards, hypergeos, marker='o', alpha=0.2, rasterized=True)
 plt.tight_layout()
 plt.savefig(args.outputa, bbox_inches='tight', pad_inches=0.02)
 print("Done")

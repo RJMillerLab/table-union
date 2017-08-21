@@ -102,6 +102,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer od.Close()
 	// Cleaning cached tables
 	log.Print("Cleaning previously generated tables...")
 	cached, err := od.CachedTables()
