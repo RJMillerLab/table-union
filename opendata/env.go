@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -46,9 +45,10 @@ var AllAnnotationTable = os.Getenv("ALL_ANNOTATION_TABLE")
 var SarmaTable = os.Getenv("SARMA_TABLE")
 var SarmaDB = os.Getenv("SARMA_DB")
 var AllAnnotationTableL2 = os.Getenv("ALL_ANNOTATION_TABLE_L2")
+var OctopusTable = os.Getenv("OCTOPUS_TABLE")
+var OctopusDB = os.Getenv("OCTOPUS_DB")
 
 func CheckEnv() {
-	log.Printf("yago db: %s", Yago_db)
 }
 
 func Filepath(filename string) string {

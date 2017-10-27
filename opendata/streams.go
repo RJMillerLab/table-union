@@ -197,6 +197,9 @@ func makeDomains(filenames <-chan string, out chan *Domain) {
 		out <- headerDomain
 		var cells [][]string
 		for {
+			// adding this line because US tables do not have headers
+
+			//
 			row, err := rdr.Read()
 			if err == io.EOF {
 				// at the end-of-file, we output the domains from the
@@ -415,6 +418,62 @@ func DoClassifyDomainsFromFiles(fanout int, files <-chan string) <-chan int {
 	return out
 }
 
+func getNonNumericDomains(file string) (indices []int) {
+	typesFile := path.Join(OutputDir, "domains", file, "types")
+	f, err := os.Open(typesFile)
+	defer f.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		parts := strings.SplitN(scanner.Text(), " ", 2)
+		if len(parts) == 2 {
+			index, err := strconv.Atoi(parts[0])
+			if err != nil {
+				log.Printf("error in types of file: %s", file)
+				panic(err)
+			}
+			if parts[1] != "numeric" {
+				indices = append(indices, index)
+			}
+		} else {
+			log.Printf("get text domains not 2: %v %s", parts, file)
+		}
+	}
+	return
+}
+
+func getAllDomains(file string) (indices []int) {
+	typesFile := path.Join(OutputDir, "domains", file, "types")
+	f, err := os.Open(typesFile)
+	defer f.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		parts := strings.SplitN(scanner.Text(), " ", 2)
+		if len(parts) == 2 {
+			index, err := strconv.Atoi(parts[0])
+			if err != nil {
+				log.Printf("error in types of file: %s", file)
+				panic(err)
+			}
+			if parts[1] == "text" {
+				indices = append(indices, index)
+			} else {
+				indices = append(indices, -1)
+			}
+		} else {
+			log.Printf("get text domains not 2: %v %s", parts, file)
+		}
+	}
+	return
+}
+
 func getTextDomains(file string) (indices []int) {
 	typesFile := path.Join(OutputDir, "domains", file, "types")
 	f, err := os.Open(typesFile)
@@ -597,6 +656,54 @@ func StreamValueFreqFromCache(fanout int, filenames <-chan string) <-chan *Value
 	return out
 }
 
+func StreamAllODEmbVectors(fanout int, filenames <-chan string) <-chan string {
+	dfilename := "us.data.gov/t_0033d0e05a7f31a3.csv"
+	dindex := 0
+	out := make(chan string)
+	wg := &sync.WaitGroup{}
+	wg.Add(fanout)
+	for i := 0; i < fanout; i++ {
+		go func(id int, out chan<- string) {
+			for filename := range filenames {
+				if strings.Contains(filename, "us.data.gov") == true {
+					for _, index := range getAllDomains(filename) {
+						d := &Domain{Filename: "", Index: 0}
+						if index == -1 {
+							d = &Domain{
+								Filename: dfilename,
+								Index:    dindex,
+							}
+						} else {
+							d = &Domain{
+								Filename: filename,
+								Index:    index,
+							}
+						}
+						embFilename := d.PhysicalFilename("ft-mean")
+						out <- embFilename
+					}
+				} else {
+					for _, index := range getTextDomains(filename) {
+						d := &Domain{
+							Filename: filename,
+							Index:    index,
+						}
+						embFilename := d.PhysicalFilename("ft-mean")
+						out <- embFilename
+					}
+				}
+			}
+			wg.Done()
+		}(i, out)
+
+	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+}
+
 func StreamEmbVectors(fanout int, filenames <-chan string) <-chan string {
 	out := make(chan string)
 	wg := &sync.WaitGroup{}
@@ -604,6 +711,7 @@ func StreamEmbVectors(fanout int, filenames <-chan string) <-chan string {
 	for i := 0; i < fanout; i++ {
 		go func(id int, out chan<- string) {
 			for filename := range filenames {
+				//for _, index := range getNonNumericDomains(filename) {
 				for _, index := range getTextDomains(filename) {
 					d := &Domain{
 						Filename: filename,
