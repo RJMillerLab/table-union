@@ -2,6 +2,7 @@ package opendata
 
 import (
 	"bufio"
+	"database/sql"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -9,8 +10,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/RJMillerLab/table-union/embedding"
 )
@@ -19,67 +22,117 @@ var (
 	ByteOrder = binary.BigEndian
 )
 
-type attributeUnion struct {
+type AttributeUnion struct {
+	queryTable  string
+	candTable   string
 	queryColumn int
 	candColumn  int
 	score       float64
 	measure     []string
 }
 
-func ComputeUnionabilityScores(queryTable, candidateTable, domainDir string) []attributeUnion {
-	seen := make(map[string]bool)
-	union := make([]attributeUnion, 0)
-	for _, qindex := range getTextDomains(queryTable) {
-		for _, cindex := range getTextDomains(candidateTable) {
-			if _, ok := seen[string(qindex)+" "+string(cindex)]; !ok {
-				if _, ok := seen[string(cindex)+" "+string(qindex)]; !ok {
-					seen[string(cindex)+" "+string(qindex)] = true
-					seen[string(qindex)+" "+string(cindex)] = true
-					score, measure := getAttUnionability(domainDir, queryTable, candidateTable, qindex, cindex)
-					attunion := attributeUnion{
-						queryColumn: qindex,
-						candColumn:  cindex,
-						score:       score,
-						measure:     measure,
-					}
-					union = append(union, attunion)
-				}
+type TableUnion struct {
+	queryTable string
+	candTable  string
+	alignment  []AttributeUnion
+	score      float64
+}
+
+func ComputeAttUnionabilityScores(queryTable, candidateTable string) ([]AttributeUnion, int, int) {
+	union := make([]AttributeUnion, 0)
+	queryTextDomains := getTextDomains(queryTable)
+	candTextDomains := getTextDomains(candidateTable)
+	queryColNum := len(queryTextDomains)
+	candColNum := len(candTextDomains)
+	for _, qindex := range queryTextDomains {
+		for _, cindex := range candTextDomains {
+			score, measure := getAttUnionability(queryTable, candidateTable, qindex, cindex)
+			attunion := AttributeUnion{
+				queryTable:  queryTable,
+				candTable:   candidateTable,
+				queryColumn: qindex,
+				candColumn:  cindex,
+				score:       score,
+				measure:     measure,
 			}
+			union = append(union, attunion)
 		}
 
 	}
-	return union
+	return union, queryColNum, candColNum
 }
 
-func getAttUnionability(domainDir, queryTable, candidateTable string, queryIndex, candIndex int) (float64, []string) {
+func ComputeTableUnionability(queryTable, candTable string, attunions []AttributeUnion, queryColNum, candColNum int) TableUnion {
+	bestAlignment := make([]AttributeUnion, 0)
+	scores := make([]float64, 0)
+	for _, au := range attunions {
+		scores = append(scores, au.score)
+	}
+	s := NewSlice(scores...)
+	sort.Sort(s)
+	m := int(math.Min(float64(queryColNum), float64(candColNum)))
+	var matchNum int
+	covered := make(map[string]bool)
+	for _, ix := range s.idx {
+		qIndex := attunions[ix].queryColumn
+		cIndex := attunions[ix].candColumn
+		if attunions[ix].score == 0.0 {
+			continue
+		}
+		if _, ok := covered[queryTable+string(qIndex)]; !ok {
+			if _, ok := covered[candTable+string(cIndex)]; !ok {
+				bestAlignment = append(bestAlignment, attunions[ix])
+				matchNum += 1
+				covered[queryTable+string(qIndex)] = true
+				covered[candTable+string(cIndex)] = true
+			}
+		}
+
+		if matchNum == m {
+			break
+		}
+	}
+	return TableUnion{
+		queryTable: queryTable,
+		candTable:  candTable,
+		alignment:  bestAlignment,
+	}
+}
+
+func getAttUnionability(queryTable, candidateTable string, queryIndex, candIndex int) (float64, []string) {
 	var uScore float64
 	uMeasure := make([]string, 0)
-	uSet := setUnionability(domainDir, queryTable, candidateTable, queryIndex, candIndex)
+	uSet := setUnionability(queryTable, candidateTable, queryIndex, candIndex)
 	uScore = uSet
 	uMeasure = append(uMeasure, "set")
-	uNL := nlUnionability(domainDir, queryTable, candidateTable, queryIndex, candIndex)
+	uNL := nlUnionability(queryTable, candidateTable, queryIndex, candIndex)
 	if uNL > uScore {
 		uScore = uNL
 		uMeasure = make([]string, 0)
 		uMeasure = append(uMeasure, "nl")
-	}
-	if uNL == uScore {
+	} else if uNL == uScore {
 		uMeasure = append(uMeasure, "nl")
 	}
-	uSemSet := semSetUnionability(domainDir, queryTable, candidateTable, queryIndex, candIndex)
+	uSem, uSemSet := semSetUnionability(queryTable, candidateTable, queryIndex, candIndex)
 	if uSemSet > uScore {
 		uScore = uSemSet
 		uMeasure = make([]string, 0)
 		uMeasure = append(uMeasure, "semset")
-	}
-	if uSemSet == uScore {
+	} else if uSemSet == uScore {
 		uMeasure = append(uMeasure, "semset")
+	}
+	if uSem > uScore {
+		uScore = uSem
+		uMeasure = make([]string, 0)
+		uMeasure = append(uMeasure, "sem")
+	} else if uSem == uScore {
+		uMeasure = append(uMeasure, "sem")
 	}
 	return uScore, uMeasure
 }
 
-func semUnionability(domainDir, queryTable, candidateTable string, queryIndex, candIndex int) float64 {
-	ontMinhashFilename := getOntMinhashFilename(candidateTable, domainDir, candIndex)
+func semUnionability(queryTable, candidateTable string, queryIndex, candIndex int) float64 {
+	ontMinhashFilename := getOntMinhashFilename(candidateTable, candIndex)
 	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
 		return 0.0
 	}
@@ -87,7 +140,7 @@ func semUnionability(domainDir, queryTable, candidateTable string, queryIndex, c
 	if err != nil {
 		return 0.0
 	}
-	ontMinhashFilename = getOntMinhashFilename(queryTable, domainDir, queryIndex)
+	ontMinhashFilename = getOntMinhashFilename(queryTable, queryIndex)
 	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
 		return 0.0
 	}
@@ -96,58 +149,57 @@ func semUnionability(domainDir, queryTable, candidateTable string, queryIndex, c
 		return 0.0
 	}
 	ontJaccard := estimateJaccard(coVec, qoVec)
-	_, nA := getOntDomainCardinality(candidateTable, domainDir, candIndex)
-	_, nB := getOntDomainCardinality(queryTable, domainDir, queryIndex)
+	_, nA := getOntDomainCardinality(candidateTable, candIndex)
+	_, nB := getOntDomainCardinality(queryTable, queryIndex)
 	ontProb := sameDomainProb(ontJaccard, nA, nB)
 	return ontProb
 }
 
-func semSetUnionability(domainDir, queryTable, candidateTable string, queryIndex, candIndex int) float64 {
-	minhashFilename := getUnannotatedMinhashFilename(candidateTable, domainDir, candIndex)
+func semSetUnionability(queryTable, candidateTable string, queryIndex, candIndex int) (float64, float64) {
+	minhashFilename := getUnannotatedMinhashFilename(candidateTable, candIndex)
 	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
-		return 0.0
+		return 0.0, 0.0
 	}
 	cuaVec, err := ReadMinhashSignature(minhashFilename, numHash)
 	if err != nil {
-		return 0.0
+		return 0.0, 0.0
 	}
-	minhashFilename = getUnannotatedMinhashFilename(queryTable, domainDir, queryIndex)
+	minhashFilename = getUnannotatedMinhashFilename(queryTable, queryIndex)
 	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
-		return 0.0
+		return 0.0, 0.0
 	}
 	quaVec, err := ReadMinhashSignature(minhashFilename, numHash)
 	if err != nil {
-		return 0.0
+		return 0.0, 0.0
 	}
 	jaccard := estimateJaccard(quaVec, cuaVec)
 	// computing ontology jaccard
-	ontMinhashFilename := getOntMinhashFilename(candidateTable, domainDir, candIndex)
+	ontMinhashFilename := getOntMinhashFilename(candidateTable, candIndex)
 	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
-		return 0.0
+		return 0.0, 0.0
 	}
 	coVec, err := ReadMinhashSignature(ontMinhashFilename, numHash)
 	if err != nil {
-		return 0.0
+		return 0.0, 0.0
 	}
-	ontMinhashFilename = getOntMinhashFilename(queryTable, domainDir, queryIndex)
+	ontMinhashFilename = getOntMinhashFilename(queryTable, queryIndex)
 	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
-		return 0.0
+		return 0.0, 0.0
 	}
 	qoVec, err := ReadMinhashSignature(ontMinhashFilename, numHash)
 	if err != nil {
-		return 0.0
+		return 0.0, 0.0
 	}
 	ontJaccard := estimateJaccard(coVec, qoVec)
-	noA, nA := getOntDomainCardinality(candidateTable, domainDir, candIndex)
-	noB, nB := getOntDomainCardinality(queryTable, domainDir, queryIndex)
-	//	coverage := float64(queryCard-noOntQueryCard) / float64(queryCard)
+	noA, nA := getOntDomainCardinality(candidateTable, candIndex)
+	noB, nB := getOntDomainCardinality(queryTable, queryIndex)
 	noOntProb := sameDomainProb(jaccard, noA, noB)
 	ontProb := sameDomainProb(ontJaccard, nA, nB)
-	return noOntProb + ontProb - ontProb*noOntProb
+	return ontProb, noOntProb + ontProb - ontProb*noOntProb
 }
 
-func nlUnionability(domainDir, queryTable, candidateTable string, queryIndex, candIndex int) float64 {
-	meanFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-mean", candidateTable, candIndex))
+func nlUnionability(queryTable, candidateTable string, queryIndex, candIndex int) float64 {
+	meanFilename := filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.ft-mean", candidateTable, candIndex))
 	if _, err := os.Stat(meanFilename); os.IsNotExist(err) {
 		log.Printf("Mean embedding file %s does not exist.", meanFilename)
 		panic(err)
@@ -157,7 +209,7 @@ func nlUnionability(domainDir, queryTable, candidateTable string, queryIndex, ca
 		log.Printf("Error in reading %s from disk.", meanFilename)
 		panic(err)
 	}
-	meanFilename = filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-mean", queryTable, queryIndex))
+	meanFilename = filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.ft-mean", queryTable, queryIndex))
 	if _, err := os.Stat(meanFilename); os.IsNotExist(err) {
 		log.Printf("Mean embedding file %s does not exist.", meanFilename)
 		panic(err)
@@ -181,14 +233,13 @@ func nlUnionability(domainDir, queryTable, candidateTable string, queryIndex, ca
 	//cCard := getDomainSize(candidateTable, domainDir, candIndex)
 	//qCard := getDomainSize(queryTable, domainDir, queryIndex)
 	cosine := embedding.Cosine(qMean, cMean)
-	// inserting the pair into its corresponding priority queue
 	//ht2, f := getT2Statistics(mean, queryMean, covar, queryCovar, card, queryCardinality)
 	return cosine
 }
 
-func setUnionability(domainDir, queryTable, candidateTable string, queryIndex, candIndex int) float64 {
+func setUnionability(queryTable, candidateTable string, queryIndex, candIndex int) float64 {
 	// getting the embedding of the candidate column
-	minhashFilename := getMinhashFilename(candidateTable, domainDir, candIndex)
+	minhashFilename := getMinhashFilename(candidateTable, candIndex)
 	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
 		log.Printf("Embedding file %s does not exist.", minhashFilename)
 		panic(err)
@@ -198,7 +249,7 @@ func setUnionability(domainDir, queryTable, candidateTable string, queryIndex, c
 		log.Printf("Error in reading %s from disk.", minhashFilename)
 		panic(err)
 	}
-	minhashFilename = getMinhashFilename(queryTable, domainDir, queryIndex)
+	minhashFilename = getMinhashFilename(queryTable, queryIndex)
 	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
 		log.Printf("Embedding file %s does not exist.", minhashFilename)
 		panic(err)
@@ -210,14 +261,14 @@ func setUnionability(domainDir, queryTable, candidateTable string, queryIndex, c
 	}
 	// inserting the pair into its corresponding priority queue
 	jaccard := estimateJaccard(cVec, qVec)
-	nB := getDomainCardinality(candidateTable, domainDir, candIndex)
-	nA := getDomainCardinality(queryTable, domainDir, queryIndex)
+	nB := getDomainCardinality(candidateTable, candIndex)
+	nA := getDomainCardinality(queryTable, queryIndex)
 	uSet := sameDomainProb(jaccard, nA, nB)
 	return uSet
 }
 
-func getDomainCardinality(tableID, domainDir string, index int) int {
-	cardpath := path.Join(domainDir, tableID)
+func getDomainCardinality(tableID string, index int) int {
+	cardpath := path.Join(OutputDir, "domains", tableID)
 	cardpath = path.Join(cardpath, fmt.Sprintf("%d.%s", index, "card"))
 	f, err := os.Open(cardpath)
 	defer f.Close()
@@ -284,14 +335,14 @@ func logCombination(m, n int) float64 {
 
 }
 
-func getMinhashFilename(tableID, domainDir string, index int) string {
-	fullpath := path.Join(domainDir, tableID)
+func getMinhashFilename(tableID string, index int) string {
+	fullpath := path.Join(OutputDir, "domains", tableID)
 	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "minhash"))
 	return fullpath
 }
 
-func getDomainSize(tableID, domainDir string, index int) int {
-	cardpath := path.Join(domainDir, tableID)
+func getDomainSize(tableID string, index int) int {
+	cardpath := path.Join(OutputDir, "domains", tableID)
 	cardpath = path.Join(cardpath, fmt.Sprintf("%d.%s", index, "size"))
 	f, err := os.Open(cardpath)
 	defer f.Close()
@@ -313,21 +364,21 @@ func getDomainSize(tableID, domainDir string, index int) int {
 	return card
 }
 
-func getUnannotatedMinhashFilename(tableID, domainDir string, index int) string {
-	fullpath := path.Join(domainDir, tableID)
+func getUnannotatedMinhashFilename(tableID string, index int) string {
+	fullpath := path.Join(OutputDir, "domains", tableID)
 	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "noann-minhash"))
 	return fullpath
 }
 
-func getOntMinhashFilename(tableID, domainDir string, index int) string {
-	fullpath := path.Join(domainDir, tableID)
+func getOntMinhashFilename(tableID string, index int) string {
+	fullpath := path.Join(OutputDir, tableID)
 	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "ont-minhash-l1"))
 	//fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "ont-minhash-l2"))
 	return fullpath
 }
 
-func getOntDomainCardinality(tableID, domainDir string, index int) (int, int) {
-	cardpath := path.Join(domainDir, tableID)
+func getOntDomainCardinality(tableID string, index int) (int, int) {
+	cardpath := path.Join(OutputDir, "domains", tableID)
 	cardpath = path.Join(cardpath, fmt.Sprintf("%d.%s", index, "ont-noann-card"))
 	log.Printf("cardpath: %s", cardpath)
 	f, err := os.Open(cardpath)
@@ -355,7 +406,7 @@ func getOntDomainCardinality(tableID, domainDir string, index int) (int, int) {
 		//	lineIndex += 1
 		//}
 	}
-	ontCardpath := path.Join(domainDir, tableID)
+	ontCardpath := path.Join(OutputDir, "domains", tableID)
 	ontCardpath = path.Join(ontCardpath, fmt.Sprintf("%d.%s", index, "ont-card"))
 	fo, err := os.Open(ontCardpath)
 	defer fo.Close()
@@ -376,4 +427,73 @@ func getOntDomainCardinality(tableID, domainDir string, index int) (int, int) {
 		lineIndex += 1
 	}
 	return card, ocard
+}
+
+func DoSaveAttScores(scores []AttributeUnion, progress chan ProgressCounter) {
+	db, err := sql.Open("sqlite3", AttStatsDB)
+	if err != nil {
+		panic(err)
+	}
+	// Create table
+	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (query_table text,query_column int, candidate_table text,candidate_column int, score real, measure text);`, AttStatsTable, AttStatsTable))
+	if err != nil {
+		panic(err)
+	}
+	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(query_table, query_column, candidate_table, candidate_column, score, measure) values(?, ?, ?, ?, ?, ?);`, AttStatsTable))
+	if err != nil {
+		panic(err)
+	}
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		for _, score := range scores {
+			for _, m := range score.measure {
+				_, err = stmt.Exec(score.queryTable, score.queryColumn, score.candTable, score.candColumn, score.score, m)
+				if err != nil {
+					panic(err)
+				}
+				progress <- ProgressCounter{1}
+			}
+		}
+		wg.Done()
+	}()
+	go func() {
+		wg.Wait()
+		db.Close()
+	}()
+}
+
+func DoSaveTableScores(union TableUnion, progress chan ProgressCounter) {
+	log.Printf("saving table unions")
+	db, err := sql.Open("sqlite3", TableStatsDB)
+	if err != nil {
+		panic(err)
+	}
+	// Create table
+	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (query_table text, candidate_table text, query_column int, candidate_column int, score real, measure text);`, TableStatsTable, TableStatsTable))
+	if err != nil {
+		panic(err)
+	}
+	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(query_table, candidate_table, query_column, candidate_column, score, measure) values(?, ?, ?, ?, ?, ?);`, TableStatsTable))
+	if err != nil {
+		panic(err)
+	}
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		for _, p := range union.alignment {
+			for _, m := range p.measure {
+				_, err = stmt.Exec(union.queryTable, union.candTable, p.queryColumn, p.candColumn, p.score, m)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+		progress <- ProgressCounter{1}
+		wg.Done()
+	}()
+	go func() {
+		wg.Wait()
+		db.Close()
+	}()
 }

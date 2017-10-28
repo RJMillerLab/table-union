@@ -47,6 +47,10 @@ var SarmaDB = os.Getenv("SARMA_DB")
 var AllAnnotationTableL2 = os.Getenv("ALL_ANNOTATION_TABLE_L2")
 var OctopusTable = os.Getenv("OCTOPUS_TABLE")
 var OctopusDB = os.Getenv("OCTOPUS_DB")
+var AttStatsTable = os.Getenv("ATT_STATS_TABLE")
+var AttStatsDB = os.Getenv("ATT_STATS_DB")
+var TableStatsTable = os.Getenv("TABLE_STATS_TABLE")
+var TableStatsDB = os.Getenv("TABLE_STATS_DB")
 
 func CheckEnv() {
 }

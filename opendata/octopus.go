@@ -128,15 +128,17 @@ func ComputeColumnTextClusterScore(t1name, t2name string, tfidfs1, tfidfs2 []map
 	sort.Sort(s)
 	m := int(math.Min(float64(len(tfidfs1)), float64(len(tfidfs2))))
 	var matchNum int
-	covered := make(map[int]bool)
+	covered := make(map[string]bool)
 	var score float64
 	for jx, ix := range s.idx {
 		i, _ := strconv.Atoi(strings.Split(colpairs[ix], " ")[0])
 		j, _ := strconv.Atoi(strings.Split(colpairs[ix], " ")[1])
-		if _, ok := covered[i]; !ok {
-			if _, ok := covered[j]; !ok {
+		if _, ok := covered[t1name+string(i)]; !ok {
+			if _, ok := covered[t2name+string(j)]; !ok {
 				score += 1.0 - s.Float64Slice[jx]
 				matchNum += 1
+				covered[t1name+string(i)] = true
+				covered[t2name+string(j)] = true
 			}
 		}
 
