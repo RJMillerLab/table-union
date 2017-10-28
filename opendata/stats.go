@@ -202,22 +202,22 @@ func nlUnionability(queryTable, candidateTable string, queryIndex, candIndex int
 	meanFilename := filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.ft-mean", candidateTable, candIndex))
 	if _, err := os.Stat(meanFilename); os.IsNotExist(err) {
 		log.Printf("Mean embedding file %s does not exist.", meanFilename)
-		panic(err)
+		return -1.0
 	}
 	cMean, err := embedding.ReadVecFromDisk(meanFilename, ByteOrder)
 	if err != nil {
 		log.Printf("Error in reading %s from disk.", meanFilename)
-		panic(err)
+		return -1.0
 	}
 	meanFilename = filepath.Join(OutputDir, "domains", fmt.Sprintf("%s/%d.ft-mean", queryTable, queryIndex))
 	if _, err := os.Stat(meanFilename); os.IsNotExist(err) {
 		log.Printf("Mean embedding file %s does not exist.", meanFilename)
-		panic(err)
+		return -1.0
 	}
 	qMean, err := embedding.ReadVecFromDisk(meanFilename, ByteOrder)
 	if err != nil {
 		log.Printf("Error in reading %s from disk.", meanFilename)
-		panic(err)
+		return -1.0
 	}
 	// reading covariance matrix
 	//covarFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-covar", candTableID, candColIndex))
@@ -242,22 +242,22 @@ func setUnionability(queryTable, candidateTable string, queryIndex, candIndex in
 	minhashFilename := getMinhashFilename(candidateTable, candIndex)
 	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
 		log.Printf("Embedding file %s does not exist.", minhashFilename)
-		panic(err)
+		return -1.0
 	}
 	cVec, err := ReadMinhashSignature(minhashFilename, numHash)
 	if err != nil {
 		log.Printf("Error in reading %s from disk.", minhashFilename)
-		panic(err)
+		return -1.0
 	}
 	minhashFilename = getMinhashFilename(queryTable, queryIndex)
 	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
 		log.Printf("Embedding file %s does not exist.", minhashFilename)
-		panic(err)
+		return -1.0
 	}
 	qVec, err := ReadMinhashSignature(minhashFilename, numHash)
 	if err != nil {
 		log.Printf("Error in reading %s from disk.", minhashFilename)
-		panic(err)
+		return -1.0
 	}
 	// inserting the pair into its corresponding priority queue
 	jaccard := estimateJaccard(cVec, qVec)

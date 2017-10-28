@@ -9,10 +9,8 @@ import (
 )
 
 type pair struct {
-	t1name  string
-	t2name  string
-	colens1 []float64
-	colens2 []float64
+	t1name string
+	t2name string
 }
 
 func main() {
@@ -22,33 +20,45 @@ func main() {
 	queryFilenames := StreamQueryFilenames()
 	attProgress := make(chan ProgressCounter)
 	tableProgress := make(chan ProgressCounter)
-	allAttUnions := make(chan []AttributeUnion)
-	allTableUnions := make(chan TableUnion)
+	allAttUnions := make(chan []AttributeUnion, 500)
+	allTableUnions := make(chan TableUnion, 500)
+	tablePairs := make(chan pair)
+	seen := make(map[string]bool)
 	go func() {
-		seen := make(map[string]bool)
 		for query := range queryFilenames {
 			candFilenames := StreamQueryFilenames()
-			wg := &sync.WaitGroup{}
-			for i := 0; i < 30; i++ {
-				wg.Add(1)
-				go func() {
-					for cand := range candFilenames {
-						if _, ok := seen[query+" "+cand]; !ok {
-							if _, ok := seen[cand+" "+query]; !ok {
-								seen[cand+" "+query] = true
-								seen[query+" "+cand] = true
-								attUnions, qColNum, cColNm := ComputeAttUnionabilityScores(query, cand)
-								allAttUnions <- attUnions
-								tableUnion := ComputeTableUnionability(query, cand, attUnions, qColNum, cColNm)
-								allTableUnions <- tableUnion
-							}
+			for cand := range candFilenames {
+				if _, ok := seen[query+" "+cand]; !ok {
+					if _, ok := seen[cand+" "+query]; !ok {
+						seen[cand+" "+query] = true
+						seen[query+" "+cand] = true
+						tablePairs <- pair{
+							t1name: query,
+							t2name: cand,
 						}
 					}
-					wg.Done()
-				}()
+				}
 			}
-			wg.Wait()
 		}
+		close(tablePairs)
+	}()
+	go func() {
+		wg := &sync.WaitGroup{}
+		for i := 0; i < 35; i++ {
+			wg.Add(1)
+			go func() {
+				for p := range tablePairs {
+					query := p.t1name
+					cand := p.t2name
+					attUnions, qColNum, cColNm := ComputeAttUnionabilityScores(query, cand)
+					allAttUnions <- attUnions
+					tableUnion := ComputeTableUnionability(query, cand, attUnions, qColNum, cColNm)
+					allTableUnions <- tableUnion
+				}
+				wg.Done()
+			}()
+		}
+		wg.Wait()
 	}()
 	swg := &sync.WaitGroup{}
 	swg.Add(4)
