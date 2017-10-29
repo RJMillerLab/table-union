@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/RJMillerLab/table-union/embedding"
 )
@@ -47,6 +46,9 @@ func ComputeAttUnionabilityScores(queryTable, candidateTable string) ([]Attribut
 	for _, qindex := range queryTextDomains {
 		for _, cindex := range candTextDomains {
 			score, measure := getAttUnionability(queryTable, candidateTable, qindex, cindex)
+			if score == -1.0 {
+				continue
+			}
 			attunion := AttributeUnion{
 				queryTable:  queryTable,
 				candTable:   candidateTable,
@@ -131,68 +133,47 @@ func getAttUnionability(queryTable, candidateTable string, queryIndex, candIndex
 	return uScore, uMeasure
 }
 
-func semUnionability(queryTable, candidateTable string, queryIndex, candIndex int) float64 {
-	ontMinhashFilename := getOntMinhashFilename(candidateTable, candIndex)
-	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
-		return 0.0
-	}
-	coVec, err := ReadMinhashSignature(ontMinhashFilename, numHash)
-	if err != nil {
-		return 0.0
-	}
-	ontMinhashFilename = getOntMinhashFilename(queryTable, queryIndex)
-	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
-		return 0.0
-	}
-	qoVec, err := ReadMinhashSignature(ontMinhashFilename, numHash)
-	if err != nil {
-		return 0.0
-	}
-	ontJaccard := estimateJaccard(coVec, qoVec)
-	_, nA := getOntDomainCardinality(candidateTable, candIndex)
-	_, nB := getOntDomainCardinality(queryTable, queryIndex)
-	ontProb := sameDomainProb(ontJaccard, nA, nB)
-	return ontProb
-}
-
 func semSetUnionability(queryTable, candidateTable string, queryIndex, candIndex int) (float64, float64) {
 	minhashFilename := getUnannotatedMinhashFilename(candidateTable, candIndex)
 	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
-		return 0.0, 0.0
+		return -1.0, -1.0
 	}
 	cuaVec, err := ReadMinhashSignature(minhashFilename, numHash)
 	if err != nil {
-		return 0.0, 0.0
+		return -1.0, -1.0
 	}
 	minhashFilename = getUnannotatedMinhashFilename(queryTable, queryIndex)
 	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
-		return 0.0, 0.0
+		return -1.0, -1.0
 	}
 	quaVec, err := ReadMinhashSignature(minhashFilename, numHash)
 	if err != nil {
-		return 0.0, 0.0
+		return -1.0, -1.0
 	}
 	jaccard := estimateJaccard(quaVec, cuaVec)
 	// computing ontology jaccard
 	ontMinhashFilename := getOntMinhashFilename(candidateTable, candIndex)
 	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
-		return 0.0, 0.0
+		return -1.0, -1.0
 	}
 	coVec, err := ReadMinhashSignature(ontMinhashFilename, numHash)
 	if err != nil {
-		return 0.0, 0.0
+		return -1.0, -1.0
 	}
 	ontMinhashFilename = getOntMinhashFilename(queryTable, queryIndex)
 	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
-		return 0.0, 0.0
+		return -1.0, -1.0
 	}
 	qoVec, err := ReadMinhashSignature(ontMinhashFilename, numHash)
 	if err != nil {
-		return 0.0, 0.0
+		return -1.0, -1.0
 	}
 	ontJaccard := estimateJaccard(coVec, qoVec)
 	noA, nA := getOntDomainCardinality(candidateTable, candIndex)
 	noB, nB := getOntDomainCardinality(queryTable, queryIndex)
+	if noA == -1.0 || nA == -1.0 || noB == -1.0 || nB == -1.0 {
+		return -1.0, -1.0
+	}
 	noOntProb := sameDomainProb(jaccard, noA, noB)
 	ontProb := sameDomainProb(ontJaccard, nA, nB)
 	return ontProb, noOntProb + ontProb - ontProb*noOntProb
@@ -263,6 +244,9 @@ func setUnionability(queryTable, candidateTable string, queryIndex, candIndex in
 	jaccard := estimateJaccard(cVec, qVec)
 	nB := getDomainCardinality(candidateTable, candIndex)
 	nA := getDomainCardinality(queryTable, queryIndex)
+	if nB == -1.0 || nA == -1.0 {
+		return -1.0
+	}
 	uSet := sameDomainProb(jaccard, nA, nB)
 	return uSet
 }
@@ -273,7 +257,7 @@ func getDomainCardinality(tableID string, index int) int {
 	f, err := os.Open(cardpath)
 	defer f.Close()
 	if err != nil {
-		return 0.0
+		return -1.0
 	}
 	card := 0
 	scanner := bufio.NewScanner(f)
@@ -384,7 +368,7 @@ func getOntDomainCardinality(tableID string, index int) (int, int) {
 	f, err := os.Open(cardpath)
 	defer f.Close()
 	if err != nil {
-		return 0.0, 0.0
+		return -1.0, -1.0
 	}
 	card := 0
 	ocard := 0
@@ -411,7 +395,7 @@ func getOntDomainCardinality(tableID string, index int) (int, int) {
 	fo, err := os.Open(ontCardpath)
 	defer fo.Close()
 	if err != nil {
-		return 0.0, 0.0
+		return -1.0, -1.0
 	}
 	scanner = bufio.NewScanner(fo)
 	lineIndex = 0
@@ -429,7 +413,7 @@ func getOntDomainCardinality(tableID string, index int) (int, int) {
 	return card, ocard
 }
 
-func DoSaveAttScores(scores []AttributeUnion, progress chan ProgressCounter) {
+func DoSaveAttScores(allScores chan []AttributeUnion, progress chan ProgressCounter) {
 	db, err := sql.Open("sqlite3", AttStatsDB)
 	if err != nil {
 		panic(err)
@@ -443,9 +427,10 @@ func DoSaveAttScores(scores []AttributeUnion, progress chan ProgressCounter) {
 	if err != nil {
 		panic(err)
 	}
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
+	//wg := &sync.WaitGroup{}
+	//wg.Add(1)
+	//go func() {
+	for scores := range allScores {
 		for _, score := range scores {
 			for _, m := range score.measure {
 				_, err = stmt.Exec(score.queryTable, score.queryColumn, score.candTable, score.candColumn, score.score, m)
@@ -455,15 +440,17 @@ func DoSaveAttScores(scores []AttributeUnion, progress chan ProgressCounter) {
 				progress <- ProgressCounter{1}
 			}
 		}
-		wg.Done()
-	}()
-	go func() {
-		wg.Wait()
-		db.Close()
-	}()
+	}
+	db.Close()
+	//	wg.Done()
+	//}()
+	//go func() {
+	//	wg.Wait()
+	//	db.Close()
+	//}()
 }
 
-func DoSaveTableScores(union TableUnion, progress chan ProgressCounter) {
+func DoSaveTableScores(unions chan TableUnion, progress chan ProgressCounter) {
 	log.Printf("saving table unions")
 	db, err := sql.Open("sqlite3", TableStatsDB)
 	if err != nil {
@@ -478,9 +465,10 @@ func DoSaveTableScores(union TableUnion, progress chan ProgressCounter) {
 	if err != nil {
 		panic(err)
 	}
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
+	//wg := &sync.WaitGroup{}
+	//wg.Add(1)
+	//go func() {
+	for union := range unions {
 		for _, p := range union.alignment {
 			for _, m := range p.measure {
 				_, err = stmt.Exec(union.queryTable, union.candTable, p.queryColumn, p.candColumn, p.score, m)
@@ -490,10 +478,12 @@ func DoSaveTableScores(union TableUnion, progress chan ProgressCounter) {
 			}
 		}
 		progress <- ProgressCounter{1}
-		wg.Done()
-	}()
-	go func() {
-		wg.Wait()
-		db.Close()
-	}()
+	}
+	db.Close()
+	//	wg.Done()
+	//}()
+	//go func() {
+	//	wg.Wait()
+	//	db.Close()
+	//}()
 }
