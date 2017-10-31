@@ -4,7 +4,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import sqlite3
 import numpy as np
-from scipy.interpolate import UnivariateSpline
+#from scipy.interpolate import UnivariateSpline
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-dbname", "--dbname", default="/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/attstats.sqlite")
@@ -36,8 +36,9 @@ n = int(len(ps)/10)
 p, x = np.histogram(probs, bins=n) # bin it into n = N/10 bins
 x = x[:-1] + (x[1] - x[0])/2   # convert bin edges to centers
 p = [float(c) / float(10000) for c in p]
-f = UnivariateSpline(x, p, s=n)
-plt.plot(x, f(x))
+#f = UnivariateSpline(x, p, s=n)
+#plt.plot(x, f(x))
+plt.plot(x, p)
 #ax.scatter(xs, ys, color='y', marker='o', edgecolor='black', alpha=0.5, rasterized=True)
 plt.savefig(args.outputa)
 #
