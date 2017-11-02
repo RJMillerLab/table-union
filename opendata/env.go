@@ -51,6 +51,10 @@ var AttStatsTable = os.Getenv("ATT_STATS_TABLE")
 var AttStatsDB = os.Getenv("ATT_STATS_DB")
 var TableStatsTable = os.Getenv("TABLE_STATS_TABLE")
 var TableStatsDB = os.Getenv("TABLE_STATS_DB")
+var CTableStatsDB = os.Getenv("C_TABLE_STATS_DB")
+var CTableStatsTable = os.Getenv("C_TABLE_STATS_TABLE")
+var AttCDFTable = os.Getenv("ATT_CDF_TABLE")
+var TableCDFTable = os.Getenv("TABLE_CDF_TABLE")
 
 func CheckEnv() {
 }

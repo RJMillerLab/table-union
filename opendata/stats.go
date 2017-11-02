@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/RJMillerLab/table-union/embedding"
 )
@@ -20,6 +21,13 @@ import (
 var (
 	ByteOrder = binary.BigEndian
 )
+
+type tableCUnion struct {
+	queryTable     string
+	candidateTable string
+	cScores        map[int]float64
+	diffScores     map[int]float64
+}
 
 type AttributeUnion struct {
 	queryTable  string
@@ -35,6 +43,11 @@ type TableUnion struct {
 	candTable  string
 	alignment  []AttributeUnion
 	score      float64
+}
+
+type bin struct {
+	lowerBound float64
+	upperBound float64
 }
 
 func ComputeAttUnionabilityScores(queryTable, candidateTable string) ([]AttributeUnion, int, int) {
@@ -486,4 +499,191 @@ func DoSaveTableScores(unions chan TableUnion, progress chan ProgressCounter) {
 	//	wg.Wait()
 	//	db.Close()
 	//}()
+}
+
+func ComputeTableUnionabilityVariousC() {
+	log.Printf("ComputeTableUnionabilityVariousC")
+	tableUnions := make(chan tableCUnion)
+	db, err := sql.Open("sqlite3", AttStatsDB)
+	if err != nil {
+		panic(err)
+	}
+	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT query_table, candidate_table FROM %s LIMIT 10000;`, AttStatsTable))
+	if err != nil {
+		panic(err)
+	}
+	//
+	tablePairs := make([]string, 0)
+	for rows.Next() {
+		var queryTable string
+		var candidateTable string
+		err := rows.Scan(&queryTable, &candidateTable)
+		if err != nil {
+			panic(err)
+		}
+		tablePairs = append(tablePairs, queryTable+" "+candidateTable)
+	}
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		for _, pair := range tablePairs {
+			rows, err = db.Query(fmt.Sprintf(`SELECT DISTINCT score FROM %s WHERE query_table='%s' AND candidate_table='%s' ORDER BY score DESC;`, AttStatsTable, strings.Split(pair, " ")[0], strings.Split(pair, " ")[1]))
+			if err != nil {
+				panic(err)
+			}
+			cUnionabilityScores := make(map[int]float64)
+			unionabilityDiffs := make(map[int]float64)
+			c := 1
+			for rows.Next() {
+				var score float64
+				err := rows.Scan(&score)
+				if err != nil {
+					panic(err)
+				}
+				if c == 1 {
+					cUnionabilityScores[c] = score
+					unionabilityDiffs[c] = 1.0 - score
+				} else {
+					cUnionabilityScores[c] = cUnionabilityScores[c-1] * score
+					unionabilityDiffs[c] = cUnionabilityScores[c-1] - cUnionabilityScores[c]
+				}
+				c += 1
+			}
+			cus := tableCUnion{
+				queryTable:     strings.Split(pair, " ")[0],
+				candidateTable: strings.Split(pair, " ")[1],
+				cScores:        cUnionabilityScores,
+				diffScores:     unionabilityDiffs,
+			}
+			tableUnions <- cus
+		}
+		db.Close()
+		close(tableUnions)
+		wg.Done()
+	}()
+	go func() {
+		saveTableUnionabilityVariousC(tableUnions)
+		wg.Done()
+	}()
+	wg.Wait()
+}
+
+func saveTableUnionabilityVariousC(unions chan tableCUnion) {
+	log.Printf(TableStatsDB)
+	db, err := sql.Open("sqlite3", TableStatsDB)
+	if err != nil {
+		panic(err)
+	}
+	// Create table
+	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (query_table text, candidate_table text, c int, score real, difference real);`, CTableStatsTable, CTableStatsTable))
+	if err != nil {
+		panic(err)
+	}
+	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(query_table, candidate_table, c, score, difference) values(?, ?, ?, ?, ?);`, CTableStatsTable))
+	if err != nil {
+		panic(err)
+	}
+	count := 0
+	for cus := range unions {
+		queryTable := cus.queryTable
+		candidateTable := cus.candidateTable
+		for c, score := range cus.cScores {
+			_, err = stmt.Exec(queryTable, candidateTable, c, score, cus.diffScores[c])
+			if err != nil {
+				panic(err)
+			}
+		}
+		count += 1
+		if count%50 == 0 {
+			log.Printf("Saved %d table unionability.", count)
+		}
+	}
+	db.Close()
+}
+
+func ComputeTableUnionabilityPercentile(numBins int) {
+	bins, binSize := computePercentile(numBins, TableStatsDB, TableStatsTable)
+	saveBins(bins, binSize, TableStatsDB, TableCDFTable)
+}
+
+func ComputeAttUnionabilityPercentile(numBins int) {
+	bins, binSize := computePercentile(numBins, AttStatsDB, AttStatsTable)
+	saveBins(bins, binSize, AttStatsDB, AttCDFTable)
+}
+
+func computePercentile(numBins int, dbName, tableName string) (map[int]bin, int) {
+	bins := make(map[int]bin)
+	db, err := sql.Open("sqlite3", dbName)
+	if err != nil {
+		panic(err)
+	}
+	rows, err := db.Query(fmt.Sprintf(`SELECT COUNT(*) as numAtts FROM (SELECT DISTINCT query_table, candidate_table, query_column, candidate_column FROM %s);`, tableName))
+	if err != nil {
+		panic(err)
+	}
+	//
+	var numAtts int
+	for rows.Next() {
+		err := rows.Scan(&numAtts)
+		if err != nil {
+			panic(err)
+		}
+	}
+	binSize := int(numAtts / numBins)
+	for i := 0; i < numBins; i++ {
+		//rows, err := db.Query(fmt.Sprintf(`SELECT MIN(score) as minScore, MAX(score) as maxScore FROM %s ORDER BY score ASC LIMIT %s, %s;`, tableName, strconv.Itoa(i*numAtts), strconv.Itoa(binSize)))
+		rows, err := db.Query(fmt.Sprintf(`SELECT score FROM %s ORDER BY score ASC;`, tableName))
+		if err != nil {
+			panic(err)
+		}
+		var minScore float64
+		var maxScore float64
+		var i int
+		var j int
+		for rows.Next() {
+			var score float64
+			err = rows.Scan(&score)
+			if err != nil {
+				panic(err)
+			}
+			if j == i*binSize {
+				minScore = score
+			} else if j == ((i+1)*binSize - 1) {
+				maxScore = score
+				b := bin{
+					lowerBound: minScore,
+					upperBound: maxScore,
+				}
+				bins[i] = b
+				i += 1
+				log.Printf("Built bin %d.", i)
+			}
+			j += 1
+		}
+	}
+	db.Close()
+	return bins, binSize
+}
+
+func saveBins(bins map[int]bin, binSize int, dbName, tableName string) {
+	db, err := sql.Open("sqlite3", dbName)
+	if err != nil {
+		panic(err)
+	}
+	// Create table
+	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (lower_bound real, upper_bound real, population_size int);`, tableName, tableName))
+	if err != nil {
+		panic(err)
+	}
+	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(bin_num int, lower_bound, upper_bound, population_size) values(?, ?, ?, ?);`, tableName))
+	if err != nil {
+		panic(err)
+	}
+	for i, b := range bins {
+		_, err = stmt.Exec(i, b.lowerBound, b.upperBound, binSize)
+		if err != nil {
+			panic(err)
+		}
+	}
+	db.Close()
 }
