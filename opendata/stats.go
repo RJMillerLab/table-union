@@ -22,6 +22,11 @@ var (
 	ByteOrder = binary.BigEndian
 )
 
+type CDF struct {
+	Histogram []Bin
+	Width     float64
+}
+
 type tableCUnion struct {
 	queryTable     string
 	candidateTable string
@@ -45,9 +50,13 @@ type TableUnion struct {
 	score      float64
 }
 
-type bin struct {
-	lowerBound float64
-	upperBound float64
+type Bin struct {
+	LowerBound        float64
+	UpperBound        float64
+	Count             int
+	AccumulativeCount int
+	Percentile        float64
+	Total             int
 }
 
 func ComputeAttUnionabilityScores(queryTable, candidateTable string) ([]AttributeUnion, int, int) {
@@ -601,89 +610,146 @@ func saveTableUnionabilityVariousC(unions chan tableCUnion) {
 	db.Close()
 }
 
-func ComputeTableUnionabilityPercentile(numBins int) {
-	bins, binSize := computePercentile(numBins, TableStatsDB, TableStatsTable)
-	saveBins(bins, binSize, TableStatsDB, TableCDFTable)
+func ComputeTableUnionabilityCDF(numBins int) {
+	cdf := computeCDFEquiWidth(numBins, TableStatsDB, TableStatsTable)
+	saveCDF(cdf, TableStatsDB, TableCDFTable)
 }
 
-func ComputeAttUnionabilityPercentile(numBins int) {
-	bins, binSize := computePercentile(numBins, AttStatsDB, AttStatsTable)
-	saveBins(bins, binSize, AttStatsDB, AttCDFTable)
+func ComputeAttUnionabilityCDF(numBins int) {
+	cdf := computeCDFEquiWidth(numBins, AttStatsDB, AttStatsTable)
+	saveCDF(cdf, AttStatsDB, AttCDFTable)
 }
 
-func computePercentile(numBins int, dbName, tableName string) (map[int]bin, int) {
-	bins := make(map[int]bin)
+func computeCDFEquiWidth(numBins int, dbName, tableName string) []Bin {
+	cdf := make([]Bin, 0)
+	var total int
 	db, err := sql.Open("sqlite3", dbName)
 	if err != nil {
 		panic(err)
 	}
-	rows, err := db.Query(fmt.Sprintf(`SELECT COUNT(*) as numAtts FROM (SELECT DISTINCT query_table, candidate_table, query_column, candidate_column FROM %s);`, tableName))
+	rows, err := db.Query(fmt.Sprintf(`SELECT count(*) as count FROM %s;`, tableName))
 	if err != nil {
 		panic(err)
 	}
-	//
-	var numAtts int
 	for rows.Next() {
-		err := rows.Scan(&numAtts)
+		err = rows.Scan(&total)
 		if err != nil {
 			panic(err)
 		}
 	}
-	binSize := int(numAtts / numBins)
-	for i := 0; i < numBins; i++ {
-		//rows, err := db.Query(fmt.Sprintf(`SELECT MIN(score) as minScore, MAX(score) as maxScore FROM %s ORDER BY score ASC LIMIT %s, %s;`, tableName, strconv.Itoa(i*numAtts), strconv.Itoa(binSize)))
-		rows, err := db.Query(fmt.Sprintf(`SELECT score FROM %s ORDER BY score ASC;`, tableName))
+	binWidth := 1.0 / float64(numBins)
+	rows, err = db.Query(fmt.Sprintf(`SELECT score, count(*) as count FROM %s GROUP BY score ORDER BY score ASC;`, tableName))
+	if err != nil {
+		panic(err)
+	}
+	var i int
+	var j int
+	var binSize int
+	b := Bin{
+		LowerBound:        0.0,
+		UpperBound:        binWidth,
+		Count:             binSize,
+		AccumulativeCount: 0,
+		Percentile:        0.0,
+		Total:             total,
+	}
+	cdf = append(cdf, b)
+	for rows.Next() {
+		var score float64
+		var count int
+		err = rows.Scan(&score, &count)
 		if err != nil {
 			panic(err)
 		}
-		var minScore float64
-		var maxScore float64
-		var i int
-		var j int
-		for rows.Next() {
-			var score float64
-			err = rows.Scan(&score)
-			if err != nil {
-				panic(err)
+		if score == float64(i+1)*binWidth {
+			i += 1
+			b := Bin{
+				LowerBound:        float64(i) * binWidth,
+				UpperBound:        float64(i+1) * binWidth,
+				AccumulativeCount: j,
+				Percentile:        float64(j) / float64(total),
+				Total:             total,
 			}
-			if j == i*binSize {
-				minScore = score
-			} else if j == ((i+1)*binSize - 1) {
-				maxScore = score
-				b := bin{
-					lowerBound: minScore,
-					upperBound: maxScore,
-				}
-				bins[i] = b
-				i += 1
-				log.Printf("Built bin %d.", i)
-			}
-			j += 1
+			cdf[len(cdf)-1].Count = binSize
+			cdf = append(cdf, b)
+			binSize = 0
+			log.Printf("Built a bin with size %d.", j)
 		}
+		binSize += count
+		j += count
 	}
+	cdf[len(cdf)-1].Count = binSize
+	log.Printf("Number of bins %d.", i)
 	db.Close()
-	return bins, binSize
+	return cdf
 }
 
-func saveBins(bins map[int]bin, binSize int, dbName, tableName string) {
+func saveCDF(bins []Bin, dbName, tableName string) {
 	db, err := sql.Open("sqlite3", dbName)
 	if err != nil {
 		panic(err)
 	}
 	// Create table
-	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (lower_bound real, upper_bound real, population_size int);`, tableName, tableName))
+	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (bin_num int, lower_bound real, upper_bound real, b_count int, accumulative_count int, percentile real, total int);`, tableName, tableName))
 	if err != nil {
 		panic(err)
 	}
-	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(bin_num int, lower_bound, upper_bound, population_size) values(?, ?, ?, ?);`, tableName))
+	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(bin_num, lower_bound, upper_bound, b_count, accumulative_count, percentile, total) values(?, ?, ?, ?, ?, ?, ?);`, tableName))
 	if err != nil {
 		panic(err)
 	}
 	for i, b := range bins {
-		_, err = stmt.Exec(i, b.lowerBound, b.upperBound, binSize)
+		_, err = stmt.Exec(i, b.LowerBound, b.UpperBound, b.Count, b.AccumulativeCount, b.Percentile, b.Total)
 		if err != nil {
 			panic(err)
 		}
 	}
 	db.Close()
+}
+
+func LoadCDF() (CDF, CDF) {
+	attCDF := readCDFFromDB(AttStatsDB, AttCDFTable)
+	tableCDF := readCDFFromDB(TableStatsDB, TableCDFTable)
+	return attCDF, tableCDF
+}
+
+func readCDFFromDB(dbName, tableName string) CDF {
+	hist := make([]Bin, 0)
+	db, err := sql.Open("sqlite3", dbName)
+	if err != nil {
+		panic(err)
+	}
+	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT bin_num, lower_bound, upper_bound, b_count, accumulative_count, percentile, total FROM %s;`, tableName))
+	if err != nil {
+		panic(err)
+	}
+	//
+	for rows.Next() {
+		var binNum int
+		var lowerBound float64
+		var upperBound float64
+		var count int
+		var accumulativeCount int
+		var percentile float64
+		var total int
+		err := rows.Scan(&binNum, &lowerBound, &upperBound, &count, &accumulativeCount, &percentile, &total)
+		if err != nil {
+			panic(err)
+		}
+		bin := Bin{
+			LowerBound:        lowerBound,
+			UpperBound:        upperBound,
+			Count:             count,
+			AccumulativeCount: accumulativeCount,
+			Percentile:        percentile,
+			Total:             total,
+		}
+		hist = append(hist, bin)
+	}
+	db.Close()
+	cdf := CDF{
+		Histogram: hist,
+		Width:     1.0 / float64(len(hist)),
+	}
+	return cdf
 }

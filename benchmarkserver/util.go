@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"unicode"
 
 	minhashlsh "github.com/RJMillerLab/table-union/minhashlsh"
+	"github.com/RJMillerLab/table-union/opendata"
 	"github.com/deckarep/golang-set"
 	"github.com/ekzhu/counter"
 )
@@ -376,4 +378,17 @@ func getCardinality(column []string) int {
 		counter.Update(value)
 	}
 	return counter.Unique()
+}
+
+// getPercentile returns the percentile of a score as a number between 0 and 1
+func getPercentile(cdf opendata.CDF, score float64) float64 {
+	binWidth := cdf.Width
+	id := int(math.Floor(math.Exp(math.Log(score) - math.Log(binWidth))))
+	bin := cdf.Histogram[id]
+	percentile := bin.Percentile
+	detail := (float64(bin.Count) * math.Exp(math.Log(score-bin.LowerBound)-math.Log(bin.UpperBound-bin.LowerBound))) / float64(bin.Total)
+	if detail > 1.0 || percentile > 1.0 {
+		log.Printf("error in percentile.")
+	}
+	return percentile + detail
 }
