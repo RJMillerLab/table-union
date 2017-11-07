@@ -1,6 +1,7 @@
 package benchmarkserver
 
 import (
+	"log"
 	"math"
 	"sync"
 	"time"
@@ -13,7 +14,12 @@ import (
 	"github.com/RJMillerLab/table-union/pqueue"
 )
 
-func initCAlignment(N int, tableCDF, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF, domainDir string) alignment {
+type tablePair struct {
+	queryTable     string
+	candidateTable string
+}
+
+func initCAlignment(N int, tableCDF map[int]opendata.CDF, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF, domainDir string) alignment {
 	return alignment{
 		completedTables: counter.NewCounter(),
 		partialAlign:    make(map[string](*counter.Counter)),
@@ -26,11 +32,13 @@ func initCAlignment(N int, tableCDF, setCDF, semCDF, semsetCDF, nlCDF opendata.C
 		semCDF:          semCDF,
 		semsetCDF:       semsetCDF,
 		nlCDF:           nlCDF,
+		domainDir:       domainDir,
 	}
 }
 
 func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, setVecs, noOntVecs, ontVecs [][]uint64, N int, noOntCards, ontCards, nlCards, setCards []int, queryTableID string) <-chan SearchResult {
 	results := make(chan SearchResult)
+	log.Printf("search queryTableID: %s", queryTableID)
 	ontSigs := make([]minhashlsh.Signature, len(ontVecs))
 	noOntSigs := make([]minhashlsh.Signature, len(noOntVecs))
 	setSigs := make([]minhashlsh.Signature, len(setVecs))
@@ -147,24 +155,63 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 }
 
 func (a alignment) processPairsCombined(reduceQueue *pqueue.TopKQueue, out chan<- SearchResult, queryTableID string) bool {
-	pairs, _ := reduceQueue.Descending()
-	for i := range pairs {
-		pair := pairs[i].(Pair)
-		cAlignment := a.alignTables(queryTableID, pair.CandTableID)
-		a.completedTables.Update(pair.CandTableID)
-		result := SearchResult{
-			CandidateTableID: pair.CandTableID,
-			Alignment:        cAlignment.alignment.get(pair.CandTableID),
-			K:                a.k,
-			N:                a.completedTables.Unique(),
-			Duration:         float64(time.Now().Sub(a.startTime)) / float64(1000000),
-			CAlignment:       cAlignment,
+	cAlignmentQueue := pqueue.NewTopKQueue(a.n)
+	alignedTables := make(chan SearchResult)
+	tablesToAlign := make(chan string)
+	wg := &sync.WaitGroup{}
+	wg.Add(a.n + 1)
+	go func() {
+		defer wg.Done()
+		defer close(tablesToAlign)
+		pairs, _ := reduceQueue.Descending()
+		for i := range pairs {
+			pair := pairs[i].(Pair)
+			if a.hasCompleted(pair.CandTableID) {
+				continue
+			}
+			tablesToAlign <- pair.CandTableID
+			a.completedTables.Update(pair.CandTableID)
+			if a.completedTables.Unique() == a.n {
+				return
+			}
 		}
-		out <- result
+	}()
+	for i := 0; i < a.n; i++ {
+		go func() {
+			for tp := range tablesToAlign {
+				candTableID := tp
+				cAlignment := alignTables(queryTableID, candTableID, a.domainDir, a.setCDF, a.semCDF, a.semsetCDF, a.nlCDF, a.tableCDF)
+				result := SearchResult{
+					CandidateTableID:         candTableID,
+					Alignment:                cAlignment.alignment,
+					K:                        len(cAlignment.percentiles),
+					Duration:                 float64(time.Now().Sub(a.startTime)) / float64(1000000),
+					CUnionabilityScores:      cAlignment.scores,
+					CUnionabilityPercentiles: cAlignment.percentiles,
+					BestC: cAlignment.bestC,
+				}
+				alignedTables <- result
+			}
+			wg.Done()
+		}()
 	}
-	// Check if we are done
-	if a.completedTables.Unique() == a.n {
-		return true
-	}
+	wwg := &sync.WaitGroup{}
+	wwg.Add(1)
+	go func() {
+		for result := range alignedTables {
+			// this scoring can change
+			cAlignmentQueue.Push(result, result.CUnionabilityPercentiles[result.BestC-1])
+		}
+		results, _ := cAlignmentQueue.Descending()
+		for i := range results {
+			result := results[i].(SearchResult)
+			result.Duration = float64(time.Now().Sub(a.startTime)) / float64(1000000)
+			out <- result
+		}
+		wwg.Done()
+	}()
+	wg.Wait()
+	close(alignedTables)
+	wwg.Wait()
 	return a.completedTables.Unique() == a.n
 }

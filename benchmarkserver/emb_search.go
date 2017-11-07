@@ -26,11 +26,14 @@ var (
 )
 
 type SearchResult struct {
-	CandidateTableID string
-	Alignment        []Pair
-	K                int
-	N                int
-	Duration         float64
+	CandidateTableID         string
+	Alignment                []Pair
+	K                        int
+	N                        int
+	Duration                 float64
+	CUnionabilityScores      []float64
+	CUnionabilityPercentiles []float64
+	BestC                    int
 }
 
 type UnionIndex struct {
@@ -48,10 +51,41 @@ func NewUnionIndex(domainDir string, lsh *simhashlsh.CosineLSH) *UnionIndex {
 	return index
 }
 
+func (index *UnionIndex) BuildScalability(size int) error {
+	start := getNow()
+	domainfilenames := opendata.StreamFilenames()
+	embfilenames := opendata.StreamAllODEmbVectors(10, domainfilenames)
+	count := 0
+	for file := range embfilenames {
+		if count < size {
+			if _, err := os.Stat(file); os.IsNotExist(err) {
+				log.Printf("%s not found.", file)
+				continue
+			}
+			count += 1
+			if count%1000 == 0 {
+				log.Printf("indexed %d domains", count)
+			}
+			vec, err := embedding.ReadVecFromDisk(file, ByteOrder)
+			if err != nil {
+				log.Printf("Error in reading %s from disk.", file)
+				return err
+			}
+			tableID, columnIndex := parseFilename(index.domainDir, file)
+			index.lsh.Add(vec, toColumnID(tableID, columnIndex))
+		}
+	}
+	log.Printf("counted %d domains and size is: %d", count, size)
+	index.lsh.Index()
+	log.Printf("index time for embedding: %f", getNow()-start)
+	return nil
+}
+
 func (index *UnionIndex) Build() error {
 	start := getNow()
 	domainfilenames := opendata.StreamFilenames()
 	embfilenames := opendata.StreamEmbVectors(10, domainfilenames)
+	//embfilenames := StreamAllODEmbVectors(10, domainfilenames)
 	count := 0
 	for file := range embfilenames {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
@@ -73,16 +107,6 @@ func (index *UnionIndex) Build() error {
 	index.lsh.Index()
 	log.Printf("index time for embedding: %f", getNow()-start)
 	return nil
-}
-
-type alignment struct {
-	completedTables *counter.Counter
-	partialAlign    map[string](*counter.Counter)
-	reverseAlign    map[string](*counter.Counter)
-	tableQueues     map[string](*pqueue.TopKQueue)
-	k               int
-	n               int
-	startTime       time.Time
 }
 
 func initAlignment(K, N int) alignment {
@@ -187,10 +211,9 @@ func (index *UnionIndex) QueryOrderAll(query, queryCovar [][]float64, N, K int, 
 				if e.Cosine != 0.0 {
 					batch.Push(e, e.Cosine)
 					//batch.Push(e, -1.0*e.T2)
-					//log.Printf("scores: c: %f t2: %f", e.Cosine, e.T2)
-					if e.Cosine > 0.9 && e.T2 > 100 {
-						log.Printf("anomaly: c: %f t2: %f", e.Cosine, e.T2)
-					}
+					//if e.Cosine > 0.9 && e.T2 > 100 {
+					//	log.Printf("anomaly: c: %f t2: %f", e.Cosine, e.T2)
+					//}
 				}
 			}
 			if batch.Size() < batchSize {
@@ -223,28 +246,28 @@ func getColumnPairPlus(candTableID, domainDir string, candColIndex, queryColInde
 		panic(err)
 	}
 	// reading covariance matrix
-	covarFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-covar", candTableID, candColIndex))
-	if _, err := os.Stat(covarFilename); os.IsNotExist(err) {
-		log.Printf("Embedding file %s does not exist.", covarFilename)
-		panic(err)
-	}
-	covar, err := embedding.ReadVecFromDisk(covarFilename, ByteOrder)
-	if err != nil {
-		log.Printf("Error in reading %s from disk.", covarFilename)
-		panic(err)
-	}
-	//card := getDomainCardinality(candTableID, domainDir, candColIndex)
+	//covarFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-covar", candTableID, candColIndex))
+	//if _, err := os.Stat(covarFilename); os.IsNotExist(err) {
+	//	log.Printf("Embedding file %s does not exist.", covarFilename)
+	//	panic(err)
+	//}
+	//covar, err := embedding.ReadVecFromDisk(covarFilename, ByteOrder)
+	//if err != nil {
+	//	log.Printf("Error in reading %s from disk.", covarFilename)
+	//	panic(err)
+	//}
 	card := getDomainSize(candTableID, domainDir, candColIndex)
 	cosine := embedding.Cosine(mean, queryMean)
 	// inserting the pair into its corresponding priority queue
-	ht2, f := getT2Statistics(mean, queryMean, covar, queryCovar, card, queryCardinality)
+	//ht2, f := getT2Statistics(mean, queryMean, covar, queryCovar, card, queryCardinality)
 	p := Pair{
-		QueryColIndex:    queryColIndex,
-		CandTableID:      candTableID,
-		CandColIndex:     candColIndex,
-		Cosine:           cosine,
-		T2:               math.Abs(ht2),
-		F:                math.Abs(f),
+		QueryColIndex: queryColIndex,
+		CandTableID:   candTableID,
+		CandColIndex:  candColIndex,
+		Cosine:        cosine,
+		//T2:               math.Abs(ht2),
+		//F:                math.Abs(f),
+		//Sim:              math.Abs(ht2),
 		Sim:              cosine,
 		QueryCardinality: queryCardinality,
 		CandCardinality:  card,
@@ -275,6 +298,7 @@ func getT2Statistics(m1, m2 []float64, cv1, cv2 []float64, card1, card2 int) (fl
 	//	t3.Sub(t0, t2)
 	//	return t3
 	//}
+	// computing the inverse of a diagonal matrix
 	cols := scaleColsReciprocal(t2.RawRowView(0))
 	t1 = mat64.NewDense(1, dim, cols)
 	t0 = mat64.NewDense(1, dim, m1)

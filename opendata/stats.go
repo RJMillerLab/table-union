@@ -59,6 +59,63 @@ type Bin struct {
 	Total             int
 }
 
+func ComputeAllAttUnionabilityScores(queryTable, candidateTable string) []AttributeUnion {
+	union := make([]AttributeUnion, 0)
+	queryTextDomains := getTextDomains(queryTable)
+	candTextDomains := getTextDomains(candidateTable)
+	for _, qindex := range queryTextDomains {
+		for _, cindex := range candTextDomains {
+			uSet, uSem, uSemSet, uNL := getAllAttUnionability(queryTable, candidateTable, qindex, cindex)
+			if uSet != -1.0 {
+				attunion := AttributeUnion{
+					queryTable:  queryTable,
+					candTable:   candidateTable,
+					queryColumn: qindex,
+					candColumn:  cindex,
+					score:       uSet,
+					measure:     []string{"set"},
+				}
+				union = append(union, attunion)
+			}
+			if uSem != -1.0 {
+				attunion := AttributeUnion{
+					queryTable:  queryTable,
+					candTable:   candidateTable,
+					queryColumn: qindex,
+					candColumn:  cindex,
+					score:       uSem,
+					measure:     []string{"sem"},
+				}
+				union = append(union, attunion)
+			}
+			if uSemSet != -1.0 {
+				attunion := AttributeUnion{
+					queryTable:  queryTable,
+					candTable:   candidateTable,
+					queryColumn: qindex,
+					candColumn:  cindex,
+					score:       uSemSet,
+					measure:     []string{"semset"},
+				}
+				union = append(union, attunion)
+			}
+			if uNL != -1.0 {
+				attunion := AttributeUnion{
+					queryTable:  queryTable,
+					candTable:   candidateTable,
+					queryColumn: qindex,
+					candColumn:  cindex,
+					score:       uNL,
+					measure:     []string{"nl"},
+				}
+				union = append(union, attunion)
+			}
+		}
+
+	}
+	return union
+}
+
 func ComputeAttUnionabilityScores(queryTable, candidateTable string) ([]AttributeUnion, int, int) {
 	union := make([]AttributeUnion, 0)
 	queryTextDomains := getTextDomains(queryTable)
@@ -67,7 +124,7 @@ func ComputeAttUnionabilityScores(queryTable, candidateTable string) ([]Attribut
 	candColNum := len(candTextDomains)
 	for _, qindex := range queryTextDomains {
 		for _, cindex := range candTextDomains {
-			score, measure := getAttUnionability(queryTable, candidateTable, qindex, cindex)
+			score, measure := GetAttUnionability(queryTable, candidateTable, qindex, cindex)
 			if score == -1.0 {
 				continue
 			}
@@ -123,7 +180,48 @@ func ComputeTableUnionability(queryTable, candTable string, attunions []Attribut
 	}
 }
 
-func getAttUnionability(queryTable, candidateTable string, queryIndex, candIndex int) (float64, []string) {
+func getAllAttUnionability(queryTable, candidateTable string, queryIndex, candIndex int) (float64, float64, float64, float64) {
+	uSet := setUnionability(queryTable, candidateTable, queryIndex, candIndex)
+	uNL := nlUnionability(queryTable, candidateTable, queryIndex, candIndex)
+	uSem, uSemSet := semSetUnionability(queryTable, candidateTable, queryIndex, candIndex)
+	return uSet, uSem, uSemSet, uNL
+}
+
+func GetAttUnionabilityPercentile(queryTable, candidateTable string, queryIndex, candIndex int, setCDF, semCDF, semsetCDF, nlCDF CDF) (float64, []string) {
+	var uScore float64
+	uMeasure := make([]string, 0)
+	uSet := getPercentile(setCDF, setUnionability(queryTable, candidateTable, queryIndex, candIndex))
+	uScore = uSet
+	uMeasure = append(uMeasure, "set")
+	uNL := getPercentile(nlCDF, nlUnionability(queryTable, candidateTable, queryIndex, candIndex))
+	if uNL > uScore {
+		uScore = uNL
+		uMeasure = make([]string, 0)
+		uMeasure = append(uMeasure, "nl")
+	} else if uNL == uScore {
+		uMeasure = append(uMeasure, "nl")
+	}
+	uSem, uSemSet := semSetUnionability(queryTable, candidateTable, queryIndex, candIndex)
+	uSem = getPercentile(semCDF, uSem)
+	uSemSet = getPercentile(semsetCDF, uSemSet)
+	if uSemSet > uScore {
+		uScore = uSemSet
+		uMeasure = make([]string, 0)
+		uMeasure = append(uMeasure, "semset")
+	} else if uSemSet == uScore {
+		uMeasure = append(uMeasure, "semset")
+	}
+	if uSem > uScore {
+		uScore = uSem
+		uMeasure = make([]string, 0)
+		uMeasure = append(uMeasure, "sem")
+	} else if uSem == uScore {
+		uMeasure = append(uMeasure, "sem")
+	}
+	return uScore, uMeasure
+}
+
+func GetAttUnionability(queryTable, candidateTable string, queryIndex, candIndex int) (float64, []string) {
 	var uScore float64
 	uMeasure := make([]string, 0)
 	uSet := setUnionability(queryTable, candidateTable, queryIndex, candIndex)
@@ -158,6 +256,7 @@ func getAttUnionability(queryTable, candidateTable string, queryIndex, candIndex
 func semSetUnionability(queryTable, candidateTable string, queryIndex, candIndex int) (float64, float64) {
 	minhashFilename := getUnannotatedMinhashFilename(candidateTable, candIndex)
 	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
+		log.Printf("file %s does not exist.", minhashFilename)
 		return -1.0, -1.0
 	}
 	cuaVec, err := ReadMinhashSignature(minhashFilename, numHash)
@@ -166,6 +265,7 @@ func semSetUnionability(queryTable, candidateTable string, queryIndex, candIndex
 	}
 	minhashFilename = getUnannotatedMinhashFilename(queryTable, queryIndex)
 	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
+		log.Printf("file %s does not exist.", minhashFilename)
 		return -1.0, -1.0
 	}
 	quaVec, err := ReadMinhashSignature(minhashFilename, numHash)
@@ -176,10 +276,12 @@ func semSetUnionability(queryTable, candidateTable string, queryIndex, candIndex
 	// computing ontology jaccard
 	ontMinhashFilename := getOntMinhashFilename(candidateTable, candIndex)
 	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
+		log.Printf("file %s does not exist.", ontMinhashFilename)
 		return -1.0, -1.0
 	}
 	coVec, err := ReadMinhashSignature(ontMinhashFilename, numHash)
 	if err != nil {
+		log.Printf("file %s does not exist.", ontMinhashFilename)
 		return -1.0, -1.0
 	}
 	ontMinhashFilename = getOntMinhashFilename(queryTable, queryIndex)
@@ -377,7 +479,7 @@ func getUnannotatedMinhashFilename(tableID string, index int) string {
 }
 
 func getOntMinhashFilename(tableID string, index int) string {
-	fullpath := path.Join(OutputDir, tableID)
+	fullpath := path.Join(OutputDir, "domains", tableID)
 	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "ont-minhash-l1"))
 	//fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "ont-minhash-l2"))
 	return fullpath
@@ -386,7 +488,6 @@ func getOntMinhashFilename(tableID string, index int) string {
 func getOntDomainCardinality(tableID string, index int) (int, int) {
 	cardpath := path.Join(OutputDir, "domains", tableID)
 	cardpath = path.Join(cardpath, fmt.Sprintf("%d.%s", index, "ont-noann-card"))
-	log.Printf("cardpath: %s", cardpath)
 	f, err := os.Open(cardpath)
 	defer f.Close()
 	if err != nil {
@@ -441,17 +542,14 @@ func DoSaveAttScores(allScores chan []AttributeUnion, progress chan ProgressCoun
 		panic(err)
 	}
 	// Create table
-	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (query_table text,query_column int, candidate_table text,candidate_column int, score real, measure text);`, AttStatsTable, AttStatsTable))
+	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (query_table text,query_column int, candidate_table text,candidate_column int, score real, measure text);`, AllAttStatsTable, AllAttStatsTable))
 	if err != nil {
 		panic(err)
 	}
-	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(query_table, query_column, candidate_table, candidate_column, score, measure) values(?, ?, ?, ?, ?, ?);`, AttStatsTable))
+	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(query_table, query_column, candidate_table, candidate_column, score, measure) values(?, ?, ?, ?, ?, ?);`, AllAttStatsTable))
 	if err != nil {
 		panic(err)
 	}
-	//wg := &sync.WaitGroup{}
-	//wg.Add(1)
-	//go func() {
 	for scores := range allScores {
 		for _, score := range scores {
 			for _, m := range score.measure {
@@ -464,16 +562,9 @@ func DoSaveAttScores(allScores chan []AttributeUnion, progress chan ProgressCoun
 		}
 	}
 	db.Close()
-	//	wg.Done()
-	//}()
-	//go func() {
-	//	wg.Wait()
-	//	db.Close()
-	//}()
 }
 
 func DoSaveTableScores(unions chan TableUnion, progress chan ProgressCounter) {
-	log.Printf("saving table unions")
 	db, err := sql.Open("sqlite3", TableStatsDB)
 	if err != nil {
 		panic(err)
@@ -511,7 +602,6 @@ func DoSaveTableScores(unions chan TableUnion, progress chan ProgressCounter) {
 }
 
 func ComputeTableUnionabilityVariousC() {
-	log.Printf("ComputeTableUnionabilityVariousC")
 	tableUnions := make(chan tableCUnion)
 	db, err := sql.Open("sqlite3", AttStatsDB)
 	if err != nil {
@@ -536,7 +626,7 @@ func ComputeTableUnionabilityVariousC() {
 	wg.Add(2)
 	go func() {
 		for _, pair := range tablePairs {
-			rows, err = db.Query(fmt.Sprintf(`SELECT DISTINCT score FROM %s WHERE query_table='%s' AND candidate_table='%s' ORDER BY score DESC;`, AttStatsTable, strings.Split(pair, " ")[0], strings.Split(pair, " ")[1]))
+			rows, err = db.Query(fmt.Sprintf(`SELECT DISTINCT query_column, candidate_column, MAX(score) as attScore FROM %s WHERE query_table='%s' AND candidate_table='%s' GROUP BY query_column, candidate_column ORDER BY attScore DESC;`, AllAttStatsTable, strings.Split(pair, " ")[0], strings.Split(pair, " ")[1]))
 			if err != nil {
 				panic(err)
 			}
@@ -545,7 +635,9 @@ func ComputeTableUnionabilityVariousC() {
 			c := 1
 			for rows.Next() {
 				var score float64
-				err := rows.Scan(&score)
+				var queryTable string
+				var candidateTable string
+				err := rows.Scan(&queryTable, &candidateTable, &score)
 				if err != nil {
 					panic(err)
 				}
@@ -578,7 +670,6 @@ func ComputeTableUnionabilityVariousC() {
 }
 
 func saveTableUnionabilityVariousC(unions chan tableCUnion) {
-	log.Printf(TableStatsDB)
 	db, err := sql.Open("sqlite3", TableStatsDB)
 	if err != nil {
 		panic(err)
@@ -611,13 +702,191 @@ func saveTableUnionabilityVariousC(unions chan tableCUnion) {
 }
 
 func ComputeTableUnionabilityCDF(numBins int) {
-	cdf := computeCDFEquiWidth(numBins, TableStatsDB, TableStatsTable)
-	saveCDF(cdf, TableStatsDB, TableCDFTable)
+	cCDFs := computeCUnionabilityCDFEquiWidth(numBins, TableStatsDB, CTableStatsTable)
+	saveMultCDF(cCDFs, TableStatsDB, TableCDFTable)
 }
 
 func ComputeAttUnionabilityCDF(numBins int) {
 	cdf := computeCDFEquiWidth(numBins, AttStatsDB, AttStatsTable)
 	saveCDF(cdf, AttStatsDB, AttCDFTable)
+}
+
+func ComputeAllAttUnionabilityCDF(numBins int) {
+	setCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AttStatsTable, "set")
+	saveCDF(setCdf, AttStatsDB, SetCDFTable)
+	semCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AttStatsTable, "sem")
+	saveCDF(semCdf, AttStatsDB, SemCDFTable)
+	semSetCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AttStatsTable, "semset")
+	saveCDF(semSetCdf, AttStatsDB, SemSetCDFTable)
+	nlCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AttStatsTable, "nl")
+	saveCDF(nlCdf, AttStatsDB, NlCDFTable)
+}
+
+func computeCUnionabilityCDFEquiWidth(numBins int, dbName, tableName string) map[int][]Bin {
+	var total int
+	var maxC int
+	cCDFs := make(map[int][]Bin)
+	binWidth := 1.0 / float64(numBins)
+	db, err := sql.Open("sqlite3", dbName)
+	if err != nil {
+		panic(err)
+	}
+	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT c FROM %s;`, tableName))
+	if err != nil {
+		panic(err)
+	}
+	for rows.Next() {
+		err = rows.Scan(&maxC)
+		if err != nil {
+			panic(err)
+		}
+	}
+	for c := 1; c <= maxC; c++ {
+		cdf := make([]Bin, 0)
+		rows, err := db.Query(fmt.Sprintf(`SELECT count(*) as count FROM %s WHERE c=%d;`, tableName, c))
+		if err != nil {
+			panic(err)
+		}
+		for rows.Next() {
+			err = rows.Scan(&total)
+			if err != nil {
+				panic(err)
+			}
+		}
+		rows, err = db.Query(fmt.Sprintf(`SELECT score, count(*) as count FROM %s WHERE c=%d GROUP BY score ORDER BY score ASC;`, tableName, c))
+		if err != nil {
+			panic(err)
+		}
+		var i int
+		var j int
+		var binSize int
+		b := Bin{
+			LowerBound:        0.0,
+			UpperBound:        binWidth,
+			Count:             binSize,
+			AccumulativeCount: 0,
+			Percentile:        0.0,
+			Total:             total,
+		}
+		cdf = append(cdf, b)
+		for rows.Next() {
+			var score float64
+			var count int
+			err = rows.Scan(&score, &count)
+			if err != nil {
+				panic(err)
+			}
+			if score >= float64(i+1)*binWidth && i < (numBins-1) {
+				i += 1
+				b := Bin{
+					LowerBound:        float64(i) * binWidth,
+					UpperBound:        float64(i+1) * binWidth,
+					AccumulativeCount: j,
+					Percentile:        float64(j) / float64(total),
+					Total:             total,
+				}
+				cdf[len(cdf)-1].Count = binSize
+				cdf = append(cdf, b)
+				binSize = 0
+			}
+			binSize += count
+			j += count
+		}
+		cdf[len(cdf)-1].Count = binSize
+		if len(cdf) < numBins {
+			for i := len(cdf); i < numBins; i += 1 {
+				b := Bin{
+					LowerBound:        float64(i) * binWidth,
+					UpperBound:        float64(i+1) * binWidth,
+					Count:             0,
+					AccumulativeCount: cdf[len(cdf)-1].AccumulativeCount,
+					Percentile:        cdf[len(cdf)-1].Percentile,
+					Total:             cdf[len(cdf)-1].Total,
+				}
+				cdf = append(cdf, b)
+			}
+		}
+		cCDFs[c] = cdf
+		log.Printf("Number of bins for c = %d is %d.", c, len(cdf))
+	}
+	db.Close()
+	return cCDFs
+}
+
+func computeAttCDFEquiWidth(numBins int, dbName, tableName, measure string) []Bin {
+	cdf := make([]Bin, 0)
+	var total int
+	db, err := sql.Open("sqlite3", dbName)
+	if err != nil {
+		panic(err)
+	}
+	rows, err := db.Query(fmt.Sprintf(`SELECT count(*) as count FROM %s WHERE measure='%s';`, tableName, measure))
+	if err != nil {
+		panic(err)
+	}
+	for rows.Next() {
+		err = rows.Scan(&total)
+		if err != nil {
+			panic(err)
+		}
+	}
+	binWidth := 1.0 / float64(numBins)
+	rows, err = db.Query(fmt.Sprintf(`SELECT score, count(*) as count FROM %s WHERE measure='%s' GROUP BY score ORDER BY score ASC;`, tableName, measure))
+	if err != nil {
+		panic(err)
+	}
+	var i int
+	var j int
+	var binSize int
+	b := Bin{
+		LowerBound:        0.0,
+		UpperBound:        binWidth,
+		Count:             binSize,
+		AccumulativeCount: 0,
+		Percentile:        0.0,
+		Total:             total,
+	}
+	cdf = append(cdf, b)
+	for rows.Next() {
+		var score float64
+		var count int
+		err = rows.Scan(&score, &count)
+		if err != nil {
+			panic(err)
+		}
+		if score >= float64(i+1)*binWidth && i < (numBins-1) {
+			i += 1
+			b := Bin{
+				LowerBound:        float64(i) * binWidth,
+				UpperBound:        float64(i+1) * binWidth,
+				AccumulativeCount: j,
+				Percentile:        float64(j) / float64(total),
+				Total:             total,
+			}
+			cdf[len(cdf)-1].Count = binSize
+			cdf = append(cdf, b)
+			binSize = 0
+		}
+		binSize += count
+		j += count
+	}
+	cdf[len(cdf)-1].Count = binSize
+	if len(cdf) < numBins {
+		for i := len(cdf); i < numBins; i += 1 {
+			b := Bin{
+				LowerBound:        float64(i) * binWidth,
+				UpperBound:        float64(i+1) * binWidth,
+				Count:             0,
+				AccumulativeCount: cdf[len(cdf)-1].AccumulativeCount,
+				Percentile:        cdf[len(cdf)-1].Percentile,
+				Total:             cdf[len(cdf)-1].Total,
+			}
+			cdf = append(cdf, b)
+		}
+	}
+	log.Printf("Number of bins %d.", len(cdf))
+	db.Close()
+	return cdf
 }
 
 func computeCDFEquiWidth(numBins int, dbName, tableName string) []Bin {
@@ -661,7 +930,7 @@ func computeCDFEquiWidth(numBins int, dbName, tableName string) []Bin {
 		if err != nil {
 			panic(err)
 		}
-		if score == float64(i+1)*binWidth {
+		if score >= float64(i+1)*binWidth && i < (numBins-1) {
 			i += 1
 			b := Bin{
 				LowerBound:        float64(i) * binWidth,
@@ -673,15 +942,52 @@ func computeCDFEquiWidth(numBins int, dbName, tableName string) []Bin {
 			cdf[len(cdf)-1].Count = binSize
 			cdf = append(cdf, b)
 			binSize = 0
-			log.Printf("Built a bin with size %d.", j)
 		}
 		binSize += count
 		j += count
 	}
 	cdf[len(cdf)-1].Count = binSize
-	log.Printf("Number of bins %d.", i)
+	if len(cdf) < numBins {
+		for i := len(cdf); i < numBins; i += 1 {
+			b := Bin{
+				LowerBound:        float64(i) * binWidth,
+				UpperBound:        float64(i+1) * binWidth,
+				Count:             0,
+				AccumulativeCount: cdf[len(cdf)-1].AccumulativeCount,
+				Percentile:        cdf[len(cdf)-1].Percentile,
+				Total:             cdf[len(cdf)-1].Total,
+			}
+			cdf = append(cdf, b)
+		}
+	}
+	log.Printf("Number of bins %d.", len(cdf))
 	db.Close()
 	return cdf
+}
+
+func saveMultCDF(cbins map[int][]Bin, dbName, tableName string) {
+	db, err := sql.Open("sqlite3", dbName)
+	if err != nil {
+		panic(err)
+	}
+	// Create table
+	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (bin_num int, lower_bound real, upper_bound real, b_count int, accumulative_count int, percentile real, total int, c int);`, tableName, tableName))
+	if err != nil {
+		panic(err)
+	}
+	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(bin_num, lower_bound, upper_bound, b_count, accumulative_count, percentile, total, c) values(?, ?, ?, ?, ?, ?, ?, ?);`, tableName))
+	if err != nil {
+		panic(err)
+	}
+	for c, bins := range cbins {
+		for i, b := range bins {
+			_, err = stmt.Exec(i, b.LowerBound, b.UpperBound, b.Count, b.AccumulativeCount, b.Percentile, b.Total, c)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+	db.Close()
 }
 
 func saveCDF(bins []Bin, dbName, tableName string) {
@@ -707,10 +1013,69 @@ func saveCDF(bins []Bin, dbName, tableName string) {
 	db.Close()
 }
 
-func LoadCDF() (CDF, CDF) {
-	attCDF := readCDFFromDB(AttStatsDB, AttCDFTable)
-	tableCDF := readCDFFromDB(TableStatsDB, TableCDFTable)
-	return attCDF, tableCDF
+func LoadCDF() (CDF, CDF, CDF, CDF, map[int]CDF) {
+	setCDF := readCDFFromDB(AttStatsDB, SetCDFTable)
+	semCDF := readCDFFromDB(AttStatsDB, SemCDFTable)
+	semsetCDF := readCDFFromDB(AttStatsDB, SemSetCDFTable)
+	nlCDF := readCDFFromDB(AttStatsDB, NlCDFTable)
+	tableCDF := readMultCDFFromDB(TableStatsDB, TableCDFTable)
+	return setCDF, semCDF, semsetCDF, nlCDF, tableCDF
+}
+
+func readMultCDFFromDB(dbName, tableName string) map[int]CDF {
+	cdfs := make(map[int]CDF)
+	db, err := sql.Open("sqlite3", dbName)
+	if err != nil {
+		panic(err)
+	}
+	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT c FROM %s;`, tableName))
+	if err != nil {
+		panic(err)
+	}
+	var maxC int
+	for rows.Next() {
+		err := rows.Scan(&maxC)
+		if err != nil {
+			panic(err)
+		}
+	}
+	for c := 1; c <= maxC; c++ {
+		rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT bin_num, lower_bound, upper_bound, b_count, accumulative_count, percentile, total FROM %s WHERE c = %d;`, tableName, c))
+		if err != nil {
+			panic(err)
+		}
+		//
+		hist := make([]Bin, 0)
+		for rows.Next() {
+			var binNum int
+			var lowerBound float64
+			var upperBound float64
+			var count int
+			var accumulativeCount int
+			var percentile float64
+			var total int
+			err := rows.Scan(&binNum, &lowerBound, &upperBound, &count, &accumulativeCount, &percentile, &total)
+			if err != nil {
+				panic(err)
+			}
+			bin := Bin{
+				LowerBound:        lowerBound,
+				UpperBound:        upperBound,
+				Count:             count,
+				AccumulativeCount: accumulativeCount,
+				Percentile:        percentile,
+				Total:             total,
+			}
+			hist = append(hist, bin)
+		}
+		cdf := CDF{
+			Histogram: hist,
+			Width:     1.0 / float64(len(hist)),
+		}
+		cdfs[c] = cdf
+	}
+	db.Close()
+	return cdfs
 }
 
 func readCDFFromDB(dbName, tableName string) CDF {
@@ -752,4 +1117,25 @@ func readCDFFromDB(dbName, tableName string) CDF {
 		Width:     1.0 / float64(len(hist)),
 	}
 	return cdf
+}
+
+// getPercentile returns the percentile of a score as a number between 0 and 1
+func getPercentile(cdf CDF, score float64) float64 {
+	if score > 1.0 || score < 0.0 {
+		return 0.0
+	}
+	binWidth := cdf.Width
+	id := 0
+	if score != 0.0 {
+		//id = int(math.Min(float64(len(cdf.Histogram)-1), math.Floor(math.Exp(math.Log(score)-math.Log(binWidth)))))
+		id = int(math.Min(float64(len(cdf.Histogram)-1), math.Floor(score/binWidth)))
+	}
+	bin := cdf.Histogram[id]
+	percentile := bin.Percentile
+	//detail := (float64(bin.Count) * math.Exp(math.Log(score-bin.LowerBound)-math.Log(bin.UpperBound-bin.LowerBound))) / float64(bin.Total)
+	detail := (float64(bin.Count) * ((score - bin.LowerBound) / binWidth)) / float64(bin.Total)
+	if detail > 1.0 || percentile > 1.0 {
+		log.Printf("error in percentile.")
+	}
+	return percentile + detail
 }

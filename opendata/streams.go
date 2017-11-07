@@ -738,7 +738,6 @@ func StreamQueryFilenames() <-chan string {
 	output := make(chan string)
 	go func() {
 		f, err := os.Open(QueryList)
-		log.Printf("QL: %s", QueryList)
 		if err != nil {
 			panic(err)
 		}

@@ -59,7 +59,8 @@ func (s *OntologyJaccardServer) queryHandler(c *gin.Context) {
 	}
 	// Query index
 	searchResults := make([]QueryResult, 0)
-	queryResults := s.OntQueryOrderAll(queryRequest.NoOntVecs, queryRequest.OntVecs, queryRequest.Vecs, queryRequest.N, queryRequest.K, queryRequest.NoOntCardinality, queryRequest.OntCardinality, queryRequest.Cardinality)
+	//(noOntQuery, ontQuery [][]uint64, N, K int,              noOntQueryCard, ontQueryCard []int)
+	queryResults := s.OntQueryOrderAll(queryRequest.NoOntVecs, queryRequest.OntVecs, queryRequest.N, queryRequest.K, queryRequest.NoOntCardinality, queryRequest.OntCardinality)
 	for result := range queryResults {
 		union := Union{
 			CandTableID:    result.CandidateTableID,

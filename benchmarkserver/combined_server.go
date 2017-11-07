@@ -20,7 +20,7 @@ type CombinedServer struct {
 	// U_nl index
 	nli       *UnionIndex
 	router    *gin.Engine
-	tableCDF  opendata.CDF
+	tableCDF  map[int]opendata.CDF
 	semCDF    opendata.CDF
 	setCDF    opendata.CDF
 	semsetCDF opendata.CDF
@@ -84,14 +84,17 @@ func (s *CombinedServer) queryHandler(c *gin.Context) {
 	queryResults := s.CombinedOrderAll(queryRequest.NlMeans, queryRequest.NlCovars, queryRequest.SetVecs, queryRequest.NoOntVecs, queryRequest.OntVecs, queryRequest.N, queryRequest.NoOntCards, queryRequest.OntCards, queryRequest.NlCards, queryRequest.SetCards, queryRequest.QueryTableID)
 	for result := range queryResults {
 		union := Union{
-			CandTableID:    result.CandidateTableID,
-			CandHeader:     getHeaders(result.CandidateTableID, s.seti.domainDir),
-			CandTextHeader: getTextHeaders(result.CandidateTableID, s.seti.domainDir),
-			Alignment:      result.Alignment,
-			Kunioability:   result.Alignment[len(result.Alignment)-1].Sim,
-			N:              result.N,
-			Duration:       result.Duration,
+			CandTableID:              result.CandidateTableID,
+			CandHeader:               getHeaders(result.CandidateTableID, s.seti.domainDir),
+			CandTextHeader:           getTextHeaders(result.CandidateTableID, s.seti.domainDir),
+			Alignment:                result.Alignment,
+			N:                        result.N,
+			Duration:                 result.Duration,
+			CUnionabilityScores:      result.CUnionabilityScores,
+			CUnionabilityPercentiles: result.CUnionabilityPercentiles,
+			BestC: result.BestC,
 		}
+		log.Printf("alignment: %d", len(result.Alignment))
 
 		searchResults = append(searchResults, QueryResult{
 			TableUnion: union,

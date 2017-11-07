@@ -12,11 +12,12 @@ import (
 //}
 
 func Test_hyoperGeometricProb(t *testing.T) {
-	log.Printf("sd: %f", sameDomainProb(0.001, 900, 1000))
-	log.Printf("sd: %f", sameDomainProb(0.3, 900, 1000))
-	log.Printf("sd: %f", sameDomainProb(0.5, 900, 1000))
-	log.Printf("sd: %f", sameDomainProb(0.7, 900, 1000))
-	log.Printf("sd: %f", sameDomainProb(1.0, 900, 1000))
+	//log.Printf("sd: %f", sameDomainProb(0.001, 900, 1000))
+	//log.Printf("sd: %f", sameDomainProb(0.3, 900, 1000))
+	//log.Printf("sd: %f", sameDomainProb(0.5, 900, 1000))
+	//log.Printf("sd: %f", sameDomainProb(0.7, 900, 1000))
+	log.Printf("sd: %f", sameDomainProb(0.0, 5, 5))
+	log.Printf("sd: %f", sameDomainProb(1.0, 5, 5))
 }
 
 func Test_sameDomainProb(t *testing.T) {

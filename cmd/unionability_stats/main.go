@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	. "github.com/RJMillerLab/table-union/opendata"
 )
 
@@ -12,8 +14,9 @@ type pair struct {
 func main() {
 	CheckEnv()
 	//ComputeTableUnionabilityVariousC()
-	ComputeAttUnionabilityPercentile(100)
-	ComputeTableUnionabilityPercentile(100)
+	//ComputeAttUnionabilityCDF(100)
+	//ComputeAllAttUnionabilityCDF(100)
+	ComputeTableUnionabilityCDF(100)
 	/*
 		tstart := GetNow()
 		astart := tstart
@@ -26,7 +29,7 @@ func main() {
 		seen := make(map[string]bool)
 		go func() {
 			for query := range queryFilenames {
-				if len(seen) >= 5000 {
+				if len(seen) >= 100000 {
 					continue
 				}
 				candFilenames := StreamQueryFilenames()
@@ -53,10 +56,11 @@ func main() {
 					for p := range tablePairs {
 						query := p.t1name
 						cand := p.t2name
-						attUnions, qColNum, cColNm := ComputeAttUnionabilityScores(query, cand)
+						//attUnions, qColNum, cColNm := ComputeAttUnionabilityScores(query, cand)
+						attUnions := ComputeAllAttUnionabilityScores(query, cand)
 						allAttUnions <- attUnions
-						tableUnion := ComputeTableUnionability(query, cand, attUnions, qColNum, cColNm)
-						allTableUnions <- tableUnion
+						//tableUnion := ComputeTableUnionability(query, cand, attUnions, qColNum, cColNm)
+						//allTableUnions <- tableUnion
 					}
 					wg.Done()
 				}()
@@ -68,16 +72,12 @@ func main() {
 		swg := &sync.WaitGroup{}
 		swg.Add(4)
 		go func() {
-			//for attUnions := range allAttUnions {
 			DoSaveAttScores(allAttUnions, attProgress)
-			//}
 			close(attProgress)
 			swg.Done()
 		}()
 		go func() {
-			//for tableUnion := range allTableUnions {
-			DoSaveTableScores(allTableUnions, tableProgress)
-			//}
+			//DoSaveTableScores(allTableUnions, tableProgress)
 			close(tableProgress)
 			swg.Done()
 		}()
@@ -104,7 +104,6 @@ func main() {
 			swg.Done()
 		}()
 		swg.Wait()
-
-		log.Printf("Done collecting stats.")
 	*/
+	log.Printf("Done collecting stats.")
 }

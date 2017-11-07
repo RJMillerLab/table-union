@@ -22,10 +22,11 @@ import (
 )
 
 var (
-	domainDir   = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/domains"
-	opendataDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/csvfiles"
-	//domainDir   = "/home/fnargesian/TABLE_UNION_OUTPUT/domains"
-	//opendataDir = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
+	domainDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/domains"
+	//opendataDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/csvfiles"
+	//domainDir     = "/home/fnargesian/TABLE_UNION_OUTPUT/domains"
+	opendataDir   = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
+	opendataDirUS = "/home/ekzhu/OPENDATA"
 )
 
 type Client struct {
@@ -196,7 +197,6 @@ func (c *Client) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryRe
 		return results
 	}
 	for _, kp := range ks {
-		log.Printf("k: %d", kp)
 		resp := c.mkReq(QueryRequest{Vecs: means, Covars: covars, K: kp, N: n, Cards: cards})
 		//resp := c.mkReq(QueryRequest{Vecs: means, K: kp, N: n, Cards: cards})
 		//resp := c.mkReq(QueryRequest{Vecs: means, K: kp, N: n})
@@ -206,7 +206,7 @@ func (c *Client) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryRe
 		}
 		//log.Printf("query: %s", queryCSVFilename)
 		for _, result := range resp.Result {
-			log.Printf("candidate: %s", result.TableUnion.CandTableID)
+			//log.Printf("candidate: %s", result.TableUnion.CandTableID)
 			result.TableUnion.QueryHeader = queryHeaders
 			result.TableUnion.QueryTextHeader = queryTextHeaders
 			// Retrive header index
@@ -215,7 +215,7 @@ func (c *Client) QueryWithFixedN(queryCSVFilename string, minK, n int) []QueryRe
 				pair.QueryColIndex = textToAllHeaders[pair.QueryColIndex]
 				result.TableUnion.Alignment[i] = pair
 			}
-			log.Printf("--------------------------")
+			//log.Printf("--------------------------")
 			results = append(results, result)
 		}
 	}
@@ -232,7 +232,11 @@ func containsNan(matrix []float64) bool {
 }
 
 func getDomainEmbMeanCovar(tableID string, colIndex int) ([]float64, []float64, error) {
-	tableID = strings.Replace(tableID, opendataDir, "", -1)
+	if strings.HasPrefix(tableID, "us.") {
+		tableID = strings.Replace(tableID, opendataDirUS, "", -1)
+	} else {
+		tableID = strings.Replace(tableID, opendataDir, "", -1)
+	}
 	meanFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ft-mean", tableID, colIndex))
 	if _, err := os.Stat(meanFilename); os.IsNotExist(err) {
 		//log.Printf("Mean embedding file %s does not exist.", meanFilename)

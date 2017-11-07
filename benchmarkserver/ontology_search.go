@@ -70,16 +70,15 @@ func (index *JaccardUnionIndex) NoOntBuild() error {
 	return nil
 }
 
-func (server *OntologyJaccardServer) OntQueryOrderAll(noOntQuery, ontQuery, query [][]uint64, N, K int, noOntQueryCard, ontQueryCard, queryCard []int) <-chan SearchResult {
-	log.Printf("Started querying the minhash index with %d columns.", len(query))
+func (server *OntologyJaccardServer) OntQueryOrderAll(noOntQuery, ontQuery [][]uint64, N, K int, noOntQueryCard, ontQueryCard []int) <-chan SearchResult {
 	results := make(chan SearchResult)
-	querySigs := make([]minhashlsh.Signature, len(query))
+	//querySigs := make([]minhashlsh.Signature, len(query))
 	ontQuerySigs := make([]minhashlsh.Signature, len(ontQuery))
 	noOntQuerySigs := make([]minhashlsh.Signature, len(noOntQuery))
 	// cast the type of query columns to Signature
-	for i := 0; i < len(query); i++ {
-		querySigs[i] = minhashlsh.Signature(query[i])
-	}
+	//for i := 0; i < len(query); i++ {
+	//	querySigs[i] = minhashlsh.Signature(query[i])
+	//}
 	for i := 0; i < len(ontQuery); i++ {
 		ontQuerySigs[i] = minhashlsh.Signature(ontQuery[i])
 	}
@@ -94,19 +93,19 @@ func (server *OntologyJaccardServer) OntQueryOrderAll(noOntQuery, ontQuery, quer
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
-		//for pair := range server.ui.lsh.QueryPlus(noOntQuerySigs, done1) {
-		//	tableID, columnIndex := fromColumnID(pair.CandidateKey)
-		//	e := getColumnPairOntJaccardPlus(tableID, server.ui.domainDir, columnIndex, pair.QueryIndex, server.ui.numHash, query[pair.QueryIndex], ontQuery[pair.QueryIndex], noOntQuery[pair.QueryIndex], queryCard[pair.QueryIndex], ontQueryCard[pair.QueryIndex], noOntQueryCard[pair.QueryIndex])
-		//	if e.Sim != 0.0 {
-		//		reduceBatch <- e
-		//	}
-		//}
+		for pair := range server.ui.lsh.QueryPlus(noOntQuerySigs, done1) {
+			tableID, columnIndex := fromColumnID(pair.CandidateKey)
+			e := getColumnPairOntJaccardPlus(tableID, server.ui.domainDir, columnIndex, pair.QueryIndex, server.ui.numHash, ontQuery[pair.QueryIndex], noOntQuery[pair.QueryIndex], ontQueryCard[pair.QueryIndex], noOntQueryCard[pair.QueryIndex])
+			if e.Sim != 0.0 {
+				reduceBatch <- e
+			}
+		}
 		wg.Done()
 	}()
 	go func() {
 		for pair := range server.oi.lsh.QueryPlus(ontQuerySigs, done2) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
-			e := getColumnPairOntJaccardPlus(tableID, server.ui.domainDir, columnIndex, pair.QueryIndex, server.ui.numHash, query[pair.QueryIndex], ontQuery[pair.QueryIndex], noOntQuery[pair.QueryIndex], queryCard[pair.QueryIndex], ontQueryCard[pair.QueryIndex], noOntQueryCard[pair.QueryIndex])
+			e := getColumnPairOntJaccardPlus(tableID, server.ui.domainDir, columnIndex, pair.QueryIndex, server.ui.numHash, ontQuery[pair.QueryIndex], noOntQuery[pair.QueryIndex], ontQueryCard[pair.QueryIndex], noOntQueryCard[pair.QueryIndex])
 			if e.Sim != 0.0 {
 				reduceBatch <- e
 			}
@@ -185,7 +184,7 @@ func (a alignment) processPairsOntology(reduceQueue *pqueue.TopKQueue, out chan<
 	return a.completedTables.Unique() == a.n
 }
 
-func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, query []uint64, ontQuery []uint64, noOntQuery []uint64, queryCard, ontQueryCard, noOntQueryCard int) Pair {
+func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, queryColIndex, numHash int, ontQuery, noOntQuery []uint64, ontQueryCard, noOntQueryCard int) Pair {
 	// getting the embedding of the candidate column
 	minhashFilename := getUnannotatedMinhashFilename(candTableID, domainDir, candColIndex)
 	//minhashFilename := getMinhashFilename(candTableID, domainDir, candColIndex)
@@ -250,9 +249,9 @@ func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, qu
 		OntologyJaccard:        ontJaccard,
 		OntologyHypergeometric: ontProb,
 		//Sim: (1-coverage)*jaccardProb + coverage*ontProb,
-		Sim: ontProb,
+		//Sim: ontProb,
 		//Sim: jaccardProb,
-		//Sim: ontProb + jaccardProb - ontProb*jaccardProb,
+		Sim: ontProb + jaccardProb - ontProb*jaccardProb,
 		//Sim: ontProb * jaccardProb,
 		//Sim: math.Max(jaccardProb, ontProb),
 	}

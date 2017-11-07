@@ -55,6 +55,11 @@ var CTableStatsDB = os.Getenv("C_TABLE_STATS_DB")
 var CTableStatsTable = os.Getenv("C_TABLE_STATS_TABLE")
 var AttCDFTable = os.Getenv("ATT_CDF_TABLE")
 var TableCDFTable = os.Getenv("TABLE_CDF_TABLE")
+var AllAttStatsTable = os.Getenv("ALL_ATT_STATS_TABLE")
+var SetCDFTable = os.Getenv("SET_CDF_TABLE")
+var SemCDFTable = os.Getenv("SEM_CDF_TABLE")
+var SemSetCDFTable = os.Getenv("SEMSET_CDF_TABLE")
+var NlCDFTable = os.Getenv("NL_CDF_TABLE")
 
 func CheckEnv() {
 }

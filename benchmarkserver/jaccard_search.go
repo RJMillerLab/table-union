@@ -153,20 +153,20 @@ func getColumnPairJaccardPlus(candTableID, domainDir string, candColIndex, query
 	jaccard := estimateJaccard(vec, query[queryColIndex])
 	nB := getDomainCardinality(candTableID, domainDir, candColIndex)
 	nA := queryCardinality
-	containment := (jaccard * (float64(nA + nB))) / ((1.0 + jaccard) * float64(nA))
+	//containment := (jaccard * (float64(nA + nB))) / ((1.0 + jaccard) * float64(nA))
 	sig := sameDomainProb(jaccard, nA, nB)
 	if sig >= 0.99 {
-		log.Printf("nA: %d, nB: %d, jaccard: %f, containment: %f", nA, nB, jaccard, containment)
+		log.Printf("nA: %d, nB: %d, jaccard: %f", nA, nB, jaccard)
 	}
 	p := Pair{
-		QueryColIndex:  queryColIndex,
-		CandTableID:    candTableID,
-		CandColIndex:   candColIndex,
-		Jaccard:        jaccard,
-		Containment:    containment,
+		QueryColIndex: queryColIndex,
+		CandTableID:   candTableID,
+		CandColIndex:  candColIndex,
+		Jaccard:       jaccard,
+		//	Containment:    containment,
 		Hypergeometric: sig,
-		//Sim:            sig,
-		Sim: jaccard,
+		Sim:            sig,
+		//Sim: jaccard,
 	}
 	return p
 }
@@ -221,7 +221,7 @@ func sameDomainProb(estimatedJaccard float64, nA, nB int) float64 {
 		k = int(math.Min(float64(nA), float64(nB)))
 	}
 	F_k_A_B := 0.0
-	for i := 1; i < k; i++ {
+	for i := 0; i <= k; i++ {
 		F_k_A_B += math.Exp(logHyperGeometricProb(i, nA, nB, N))
 	}
 	if F_k_A_B > 2.0 {

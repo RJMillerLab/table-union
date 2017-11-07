@@ -30,6 +30,32 @@ var (
 	seed            = 1
 )
 
+//type Slice struct {
+//	sort.Float64Slice
+//	idx []int
+//}
+
+//func (s Slice) Len() int {
+//	return len(s)
+//}
+
+//func (s Slice) Less(i, j int) bool {
+//	return s[i] < s[j]
+//}
+
+//func (s Slice) Swap(i, j int) {
+//	s.Float64Slice.Swap(i, j)
+//	s.idx[i], s.idx[j] = s.idx[j], s.idx[i]
+//}
+
+//func NewSlice(n ...float64) *Slice {
+//	s := &Slice{Float64Slice: sort.Float64Slice(n), idx: make([]int, len(n))}
+//	for i := range s.idx {
+//		s.idx[i] = i
+//	}
+//	return s
+//}
+
 func parseFilename(domainDir, filename string) (tableID string, columnIndex int) {
 	tableID = strings.TrimPrefix(filepath.Dir(filename), domainDir)
 	tableID = strings.TrimPrefix(tableID, "/")
@@ -382,11 +408,19 @@ func getCardinality(column []string) int {
 
 // getPercentile returns the percentile of a score as a number between 0 and 1
 func getPercentile(cdf opendata.CDF, score float64) float64 {
+	if score > 1.0 || score < 0.0 {
+		return 0.0
+	}
 	binWidth := cdf.Width
-	id := int(math.Floor(math.Exp(math.Log(score) - math.Log(binWidth))))
+	id := 0
+	if score != 0.0 {
+		//id = int(math.Min(float64(len(cdf.Histogram)-1), math.Floor(math.Exp(math.Log(score)-math.Log(binWidth)))))
+		id = int(math.Min(float64(len(cdf.Histogram)-1), math.Floor(score/binWidth)))
+	}
 	bin := cdf.Histogram[id]
 	percentile := bin.Percentile
-	detail := (float64(bin.Count) * math.Exp(math.Log(score-bin.LowerBound)-math.Log(bin.UpperBound-bin.LowerBound))) / float64(bin.Total)
+	//detail := (float64(bin.Count) * math.Exp(math.Log(score-bin.LowerBound)-math.Log(bin.UpperBound-bin.LowerBound))) / float64(bin.Total)
+	detail := (float64(bin.Count) * ((score - bin.LowerBound) / binWidth)) / float64(bin.Total)
 	if detail > 1.0 || percentile > 1.0 {
 		log.Printf("error in percentile.")
 	}

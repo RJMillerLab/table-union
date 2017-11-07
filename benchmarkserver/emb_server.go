@@ -32,17 +32,20 @@ type QueryResult struct {
 }
 
 type Union struct {
-	QueryTableID    string
-	CandTableID     string
-	CandHeader      []string
-	CandTextHeader  []string
-	Alignment       []Pair // query to candidate table
-	QueryTextHeader []string
-	QueryHeader     []string
-	Kunioability    float64
-	K               int
-	N               int
-	Duration        float64
+	QueryTableID             string
+	CandTableID              string
+	CandHeader               []string
+	CandTextHeader           []string
+	Alignment                []Pair // query to candidate table
+	QueryTextHeader          []string
+	QueryHeader              []string
+	Kunioability             float64
+	K                        int
+	N                        int
+	Duration                 float64
+	CUnionabilityScores      []float64
+	CUnionabilityPercentiles []float64
+	BestC                    int
 }
 
 func NewServer(ui *UnionIndex) *Server {
