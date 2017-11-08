@@ -33,6 +33,7 @@ type SearchResult struct {
 	Duration                 float64
 	CUnionabilityScores      []float64
 	CUnionabilityPercentiles []float64
+	MaxC                     int
 	BestC                    int
 }
 

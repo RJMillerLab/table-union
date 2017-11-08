@@ -62,6 +62,7 @@ type CUnionableVector struct {
 	scores         []float64
 	percentiles    []float64
 	alignment      []Pair
+	maxC           int
 	bestC          int
 }
 
@@ -107,6 +108,7 @@ func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, s
 			break
 		}
 	}
+	maxC = len(cUnionabilityPercentiles)
 	// if no alignment found for k = number of query columns
 	for i := len(cUnionabilityScores); i < maxC; i += 1 {
 		cUnionabilityScores = append(cUnionabilityScores, 0.0)
@@ -123,6 +125,7 @@ func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, s
 		scores:         cUnionabilityScores,
 		percentiles:    cUnionabilityPercentiles,
 		alignment:      alignment,
+		maxC:           maxC,
 		bestC:          inds[len(cUnionabilityPercentiles)-1] + 1,
 	}
 	return result

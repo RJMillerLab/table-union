@@ -188,6 +188,7 @@ func (a alignment) processPairsCombined(reduceQueue *pqueue.TopKQueue, out chan<
 					Duration:                 float64(time.Now().Sub(a.startTime)) / float64(1000000),
 					CUnionabilityScores:      cAlignment.scores,
 					CUnionabilityPercentiles: cAlignment.percentiles,
+					MaxC:  cAlignment.maxC,
 					BestC: cAlignment.bestC,
 				}
 				alignedTables <- result
