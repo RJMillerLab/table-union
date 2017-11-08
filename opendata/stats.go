@@ -66,7 +66,7 @@ func ComputeAllAttUnionabilityScores(queryTable, candidateTable string) []Attrib
 	for _, qindex := range queryTextDomains {
 		for _, cindex := range candTextDomains {
 			uSet, uSem, uSemSet, uNL := getAllAttUnionability(queryTable, candidateTable, qindex, cindex)
-			if uSet != -1.0 {
+			if uSet != -1.0 && uSet != 0.0 {
 				attunion := AttributeUnion{
 					queryTable:  queryTable,
 					candTable:   candidateTable,
@@ -77,7 +77,7 @@ func ComputeAllAttUnionabilityScores(queryTable, candidateTable string) []Attrib
 				}
 				union = append(union, attunion)
 			}
-			if uSem != -1.0 {
+			if uSem != -1.0 && uSem != 0.0 {
 				attunion := AttributeUnion{
 					queryTable:  queryTable,
 					candTable:   candidateTable,
@@ -88,7 +88,7 @@ func ComputeAllAttUnionabilityScores(queryTable, candidateTable string) []Attrib
 				}
 				union = append(union, attunion)
 			}
-			if uSemSet != -1.0 {
+			if uSemSet != -1.0 && uSemSet != 0.0 {
 				attunion := AttributeUnion{
 					queryTable:  queryTable,
 					candTable:   candidateTable,
@@ -99,7 +99,7 @@ func ComputeAllAttUnionabilityScores(queryTable, candidateTable string) []Attrib
 				}
 				union = append(union, attunion)
 			}
-			if uNL != -1.0 {
+			if uNL != -1.0 && uNL != 0.0 {
 				attunion := AttributeUnion{
 					queryTable:  queryTable,
 					candTable:   candidateTable,
@@ -481,7 +481,6 @@ func getUnannotatedMinhashFilename(tableID string, index int) string {
 func getOntMinhashFilename(tableID string, index int) string {
 	fullpath := path.Join(OutputDir, "domains", tableID)
 	fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "ont-minhash-l1"))
-	//fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", index, "ont-minhash-l2"))
 	return fullpath
 }
 
@@ -542,7 +541,7 @@ func DoSaveAttScores(allScores chan []AttributeUnion, progress chan ProgressCoun
 		panic(err)
 	}
 	// Create table
-	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (query_table text,query_column int, candidate_table text,candidate_column int, score real, measure text);`, AllAttStatsTable, AllAttStatsTable))
+	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (query_table text,query_column int, candidate_table text,candidate_column int, score real, measure text, percentile real);`, AllAttStatsTable, AllAttStatsTable))
 	if err != nil {
 		panic(err)
 	}
@@ -601,13 +600,70 @@ func DoSaveTableScores(unions chan TableUnion, progress chan ProgressCounter) {
 	//}()
 }
 
-func ComputeTableUnionabilityVariousC() {
-	tableUnions := make(chan tableCUnion)
-	db, err := sql.Open("sqlite3", AttStatsDB)
+func SavePercentileAttUnionability() {
+	setCDF, semCDF, semsetCDF, nlCDF := LoadAttCDF()
+	cdfs := make(map[string]CDF)
+	cdfs["set"] = setCDF
+	cdfs["sem"] = semCDF
+	cdfs["semset"] = semsetCDF
+	cdfs["nl"] = nlCDF
+	db1, err := sql.Open("sqlite3", AttStatsDB)
 	if err != nil {
 		panic(err)
 	}
-	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT query_table, candidate_table FROM %s LIMIT 10000;`, AttStatsTable))
+
+	db2, err := sql.Open("sqlite3", TableStatsDB)
+	if err != nil {
+		panic(err)
+	}
+
+	rows, err := db1.Query(fmt.Sprintf(`SELECT DISTINCT query_table, candidate_table, query_column, candidate_column, score, measure FROM %s;`, AllAttStatsTable))
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = db2.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (query_table text, candidate_table text, query_column int, candidate_column int, score real, percentile real, measure text);`, AllAttPercentileTable, AllAttPercentileTable))
+	if err != nil {
+		panic(err)
+	}
+	stmt, err := db2.Prepare(fmt.Sprintf(`insert into %s(query_table, candidate_table, query_column,  candidate_column, score, percentile, measure) values(?, ?, ?, ?, ?, ?, ?);`, AllAttPercentileTable))
+	if err != nil {
+		panic(err)
+	}
+	var count int
+	for rows.Next() {
+		var queryTable string
+		var candidateTable string
+		var queryColumn int
+		var candidateColumn int
+		var score float64
+		var measure string
+		err := rows.Scan(&queryTable, &candidateTable, &queryColumn, &candidateColumn, &score, &measure)
+		if err != nil {
+			panic(err)
+		}
+		percentile := getPercentile(cdfs[measure], score)
+		_, err = stmt.Exec(queryTable, candidateTable, queryColumn, candidateColumn, score, percentile, measure)
+		if err != nil {
+			panic(err)
+		}
+		count += 1
+		if count%500 == 0 {
+			log.Printf("Processed count %d attribute pairs.", count)
+		}
+	}
+	rows.Close()
+	db1.Close()
+	db2.Close()
+}
+
+func ComputeTableUnionabilityVariousC() {
+	tableUnions := make(chan tableCUnion)
+	db, err := sql.Open("sqlite3", TableStatsDB)
+	if err != nil {
+		panic(err)
+	}
+	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT query_table, candidate_table FROM %s LIMIT 20000;`, AllAttPercentileTable))
 	if err != nil {
 		panic(err)
 	}
@@ -625,8 +681,9 @@ func ComputeTableUnionabilityVariousC() {
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
+		var count int
 		for _, pair := range tablePairs {
-			rows, err = db.Query(fmt.Sprintf(`SELECT DISTINCT query_column, candidate_column, MAX(score) as attScore FROM %s WHERE query_table='%s' AND candidate_table='%s' GROUP BY query_column, candidate_column ORDER BY attScore DESC;`, AllAttStatsTable, strings.Split(pair, " ")[0], strings.Split(pair, " ")[1]))
+			rows, err = db.Query(fmt.Sprintf(`SELECT DISTINCT query_column, candidate_column, MAX(percentile) AS maxPercentile FROM %s WHERE query_table='%s' AND candidate_table='%s' GROUP BY query_column, candidate_column ORDER BY maxPercentile;`, AllAttPercentileTable, strings.Split(pair, " ")[0], strings.Split(pair, " ")[1]))
 			if err != nil {
 				panic(err)
 			}
@@ -634,18 +691,18 @@ func ComputeTableUnionabilityVariousC() {
 			unionabilityDiffs := make(map[int]float64)
 			c := 1
 			for rows.Next() {
-				var score float64
-				var queryTable string
-				var candidateTable string
-				err := rows.Scan(&queryTable, &candidateTable, &score)
+				var maxPercentile float64
+				var queryColumn int
+				var candidateColumn int
+				err := rows.Scan(&queryColumn, &candidateColumn, &maxPercentile)
 				if err != nil {
 					panic(err)
 				}
 				if c == 1 {
-					cUnionabilityScores[c] = score
-					unionabilityDiffs[c] = 1.0 - score
+					cUnionabilityScores[c] = maxPercentile
+					unionabilityDiffs[c] = 1.0 - maxPercentile
 				} else {
-					cUnionabilityScores[c] = cUnionabilityScores[c-1] * score
+					cUnionabilityScores[c] = cUnionabilityScores[c-1] * maxPercentile
 					unionabilityDiffs[c] = cUnionabilityScores[c-1] - cUnionabilityScores[c]
 				}
 				c += 1
@@ -657,6 +714,10 @@ func ComputeTableUnionabilityVariousC() {
 				diffScores:     unionabilityDiffs,
 			}
 			tableUnions <- cus
+			count += 1
+			if count%500 == 0 {
+				log.Printf("Processed %d tables.", count)
+			}
 		}
 		db.Close()
 		close(tableUnions)
@@ -694,9 +755,6 @@ func saveTableUnionabilityVariousC(unions chan tableCUnion) {
 			}
 		}
 		count += 1
-		if count%50 == 0 {
-			log.Printf("Saved %d table unionability.", count)
-		}
 	}
 	db.Close()
 }
@@ -1013,6 +1071,14 @@ func saveCDF(bins []Bin, dbName, tableName string) {
 	db.Close()
 }
 
+func LoadAttCDF() (CDF, CDF, CDF, CDF) {
+	setCDF := readCDFFromDB(AttStatsDB, SetCDFTable)
+	semCDF := readCDFFromDB(AttStatsDB, SemCDFTable)
+	semsetCDF := readCDFFromDB(AttStatsDB, SemSetCDFTable)
+	nlCDF := readCDFFromDB(AttStatsDB, NlCDFTable)
+	return setCDF, semCDF, semsetCDF, nlCDF
+}
+
 func LoadCDF() (CDF, CDF, CDF, CDF, map[int]CDF) {
 	setCDF := readCDFFromDB(AttStatsDB, SetCDFTable)
 	semCDF := readCDFFromDB(AttStatsDB, SemCDFTable)
@@ -1111,6 +1177,7 @@ func readCDFFromDB(dbName, tableName string) CDF {
 		}
 		hist = append(hist, bin)
 	}
+	rows.Close()
 	db.Close()
 	cdf := CDF{
 		Histogram: hist,

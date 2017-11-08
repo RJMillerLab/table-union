@@ -60,6 +60,7 @@ var SetCDFTable = os.Getenv("SET_CDF_TABLE")
 var SemCDFTable = os.Getenv("SEM_CDF_TABLE")
 var SemSetCDFTable = os.Getenv("SEMSET_CDF_TABLE")
 var NlCDFTable = os.Getenv("NL_CDF_TABLE")
+var AllAttPercentileTable = os.Getenv("ALL_ATT_PERCENTILE_TABLE")
 
 func CheckEnv() {
 }
