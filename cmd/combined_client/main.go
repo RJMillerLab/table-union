@@ -29,11 +29,11 @@ func main() {
 	var fanout int
 	var opendataDir string
 	var experimentType string
-	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/domains",
-		"The top-level director for all domain and embedding files")
+	//flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/domains",	"The top-level director for all domain and embedding files")
+	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/domains", "The top-level director for all domain and embedding files")
 	flag.IntVar(&numHash, "h", 256, "LSH Parameter: number of hash functions")
-	flag.StringVar(&queryDir, "query-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/csvfiles",
-		"The directory of query files")
+	flag.StringVar(&queryDir, "query-dir", "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only", "The directory of query files")
+	//flag.StringVar(&queryDir, "query-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/csvfiles",	"The directory of query files")
 	flag.Float64Var(&threshold, "t", 0.7, "Search Parameter: k-unionability threshold")
 	flag.IntVar(&n, "n", 25, "Search Parameter: top (n,k) unionable tables")
 	flag.StringVar(&host, "host", "http://localhost:4075", "Server host")

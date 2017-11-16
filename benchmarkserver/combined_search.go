@@ -2,7 +2,6 @@ package benchmarkserver
 
 import (
 	"log"
-	"math"
 	"sync"
 	"time"
 
@@ -65,11 +64,9 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		for pair := range server.nli.lsh.QueryPlus(nlMeans, done3) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairPlus(tableID, server.seti.domainDir, columnIndex, pair.QueryIndex, nlMeans[pair.QueryIndex], nlCovars[pair.QueryIndex], nlCards[pair.QueryIndex])
-			if !math.IsNaN(e.T2) && !math.IsNaN(e.F) && !math.IsInf(e.T2, 0) && !math.IsInf(e.F, 0) {
-				if e.Sim != 0.0 {
-					e.Percentile = getPercentile(server.nlCDF, e.Sim)
-					reduceBatch <- e
-				}
+			e.Percentile = getPercentile(server.nlCDF, e.Sim)
+			if e.Percentile != 0.0 {
+				reduceBatch <- e
 			}
 		}
 		wg.Done()
@@ -78,8 +75,8 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		for pair := range server.seti.lsh.QueryPlus(setSigs, done4) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairJaccardPlus(tableID, server.seti.domainDir, columnIndex, pair.QueryIndex, server.seti.numHash, setVecs, setCards[pair.QueryIndex])
-			if e.Sim != 0.0 {
-				e.Percentile = getPercentile(server.setCDF, e.Sim)
+			e.Percentile = getPercentile(server.setCDF, e.Sim)
+			if e.Percentile != 0.0 {
 				reduceBatch <- e
 			}
 		}
@@ -88,11 +85,23 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		for pair := range server.semseti.lsh.QueryPlus(noOntSigs, done1) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairOntJaccardPlus(tableID, server.semseti.domainDir, columnIndex, pair.QueryIndex, server.semseti.numHash, ontVecs[pair.QueryIndex], noOntVecs[pair.QueryIndex], ontCards[pair.QueryIndex], noOntCards[pair.QueryIndex])
-			if e.Sim != 0.0 {
-				e.Percentile = getPercentile(server.semsetCDF, e.Sim)
-				if e.Percentile != 0.0 {
-					reduceBatch <- e
-				}
+			p1 := getPercentile(server.semCDF, e.OntologyHypergeometric)
+			p2 := getPercentile(server.semsetCDF, e.Sim)
+			if p1 > p2 {
+				e.Percentile = p1
+				e.Measure = "sem"
+				reduceBatch <- e
+			} else if p1 < p2 {
+				e.Percentile = p2
+				e.Measure = "semset"
+				reduceBatch <- e
+			} else {
+				e.Percentile = p2
+				e.Measure = "semset"
+				reduceBatch <- e
+				e.Percentile = p1
+				e.Measure = "sem"
+				reduceBatch <- e
 			}
 		}
 		wg.Done()
@@ -101,17 +110,23 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		for pair := range server.semi.lsh.QueryPlus(ontSigs, done2) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairOntJaccardPlus(tableID, server.semi.domainDir, columnIndex, pair.QueryIndex, server.semi.numHash, ontVecs[pair.QueryIndex], noOntVecs[pair.QueryIndex], ontCards[pair.QueryIndex], noOntCards[pair.QueryIndex])
-			if e.Sim != 0.0 {
-				p1 := getPercentile(server.semCDF, e.Sim)
-				p2 := getPercentile(server.semsetCDF, e.Sim)
-				if p1 > p2 {
-					e.Percentile = p1
-				} else {
-					e.Percentile = p2
-				}
-				if e.Percentile != 0.0 {
-					reduceBatch <- e
-				}
+			p1 := getPercentile(server.semCDF, e.Sim)
+			p2 := getPercentile(server.semsetCDF, e.Sim)
+			if p1 > p2 {
+				e.Percentile = p1
+				e.Measure = "sem"
+				reduceBatch <- e
+			} else if p1 < p2 {
+				e.Percentile = p2
+				e.Measure = "semset"
+				reduceBatch <- e
+			} else if p1 != 0.0 && p2 != 0.0 {
+				e.Percentile = p2
+				e.Measure = "semset"
+				reduceBatch <- e
+				e.Percentile = p1
+				e.Measure = "sem"
+				reduceBatch <- e
 			}
 		}
 		wg.Done()
@@ -123,7 +138,7 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 			if alignment.hasCompleted(pair.CandTableID) {
 				continue
 			}
-			reduceQueue.Push(pair, pair.Sim)
+			reduceQueue.Push(pair, pair.Percentile)
 			if reduceQueue.Size() == batchSize {
 				if finished := alignment.processPairsCombined(reduceQueue, results, queryTableID); finished {
 					close(done1)
@@ -159,8 +174,9 @@ func (a alignment) processPairsCombined(reduceQueue *pqueue.TopKQueue, out chan<
 	alignedTables := make(chan SearchResult)
 	tablesToAlign := make(chan string)
 	wg := &sync.WaitGroup{}
-	wg.Add(a.n + 1)
+	//wg.Add(a.n + 1)
 	go func() {
+		wg.Add(1)
 		defer wg.Done()
 		defer close(tablesToAlign)
 		pairs, _ := reduceQueue.Descending()
@@ -177,6 +193,7 @@ func (a alignment) processPairsCombined(reduceQueue *pqueue.TopKQueue, out chan<
 		}
 	}()
 	for i := 0; i < a.n; i++ {
+		wg.Add(1)
 		go func() {
 			for tp := range tablesToAlign {
 				candTableID := tp

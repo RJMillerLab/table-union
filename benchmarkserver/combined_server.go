@@ -94,7 +94,6 @@ func (s *CombinedServer) queryHandler(c *gin.Context) {
 			CUnionabilityPercentiles: result.CUnionabilityPercentiles,
 			BestC: result.BestC,
 		}
-		log.Printf("alignment: %d", len(result.Alignment))
 
 		searchResults = append(searchResults, QueryResult{
 			TableUnion: union,

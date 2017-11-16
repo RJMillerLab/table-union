@@ -3,6 +3,8 @@ package benchmarkserver
 import (
 	"log"
 	"testing"
+
+	"github.com/gonum/floats"
 )
 
 //func Test_combination(t *testing.T) {
@@ -52,4 +54,21 @@ func Test_getHotellingScore(t *testing.T) {
 	card2 := 18
 	ht2, f := getT2Statistics(m1, m2, cv1, cv2, card1, card2)
 	log.Printf("T2: %f, f: %f", ht2, f)
+}
+
+func Test_sortFloats(t *testing.T) {
+	a := []float64{0.3, 0.4, 0.1, 0.6, 0.8}
+	log.Printf("a: %v", a)
+	c := make([]float64, len(a))
+	copy(c, a)
+	log.Printf("c: %v", c)
+	s := c
+	inds := make([]int, len(s))
+	log.Printf("s: %v", s)
+	floats.Argsort(s, inds)
+	log.Printf("----------")
+	log.Printf("a: %v", a)
+	log.Printf("c: %v", c)
+	log.Printf("s: %v", s)
+	log.Printf("inds: %v", inds)
 }

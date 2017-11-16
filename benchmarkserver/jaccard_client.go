@@ -1,13 +1,19 @@
 package benchmarkserver
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/RJMillerLab/table-union/opendata"
 	"github.com/ekzhu/datatable"
@@ -171,4 +177,89 @@ func (c *JaccardClient) QueryWithFixedN(queryCSVFilename string, minK, n int) []
 		}
 	}
 	return results
+}
+
+func getAttributeOntologyData(tableID string, colIndex, numHash int) ([]uint64, []uint64, []uint64, int, int, int, error) {
+	tableID = strings.Replace(tableID, opendataDir, "", -1)
+	ontVecFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.ont-minhash-l1", tableID, colIndex))
+	ontVec, err := opendata.ReadMinhashSignature(ontVecFilename, numHash)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", ontVecFilename)
+		//ontVec = make([]uint64, 0)
+		return nil, nil, nil, 0, 0, 0, err
+	}
+	//
+	noOntVecFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.noann-minhash", tableID, colIndex))
+	noOntVec, err := opendata.ReadMinhashSignature(noOntVecFilename, numHash)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", noOntVecFilename)
+		//noOntVec = make([]uint64, 0)
+		return nil, nil, nil, 0, 0, 0, err
+	}
+	//
+	vecFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.minhash", tableID, colIndex))
+	vec, err := opendata.ReadMinhashSignature(vecFilename, numHash)
+	if err != nil {
+		log.Printf("Error in reading %s from disk.", vecFilename)
+		//vec = make([]uint64, 0)
+		return nil, nil, nil, 0, 0, 0, err
+	}
+	//
+	cardpath := path.Join(domainDir, tableID, fmt.Sprintf("%d.%s", colIndex, "ont-noann-card"))
+	f, err := os.Open(cardpath)
+	defer f.Close()
+	if err != nil {
+		return nil, nil, nil, 0, 0, 0, err
+	}
+	noOntCard := 0
+	card := 0
+	scanner := bufio.NewScanner(f)
+	lineIndex := 0
+	for scanner.Scan() {
+		if lineIndex == 0 {
+			c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
+			if err == nil {
+				noOntCard = c
+			}
+		}
+		if lineIndex == 2 {
+			c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
+			if err == nil {
+				card = c
+			}
+		}
+		lineIndex += 1
+	}
+	//
+	cardpath = path.Join(domainDir, tableID, fmt.Sprintf("%d.%s", colIndex, "ont-card"))
+	f, err = os.Open(cardpath)
+	defer f.Close()
+	if err != nil {
+		return nil, nil, nil, 0, 0, 0, err
+	}
+	ontCard := 0
+	scanner = bufio.NewScanner(f)
+	lineIndex = 0
+	for scanner.Scan() {
+		if lineIndex == 0 {
+			c, err := strconv.Atoi(strings.Replace(scanner.Text(), "\n", "", -1))
+			if err == nil {
+				ontCard = c
+			}
+		}
+		lineIndex += 1
+	}
+	//
+	return ontVec, noOntVec, vec, ontCard, noOntCard, card, nil
+}
+
+func getAttributeMinhash(tableID string, colIndex, numHash int) ([]uint64, error) {
+	tableID = strings.Replace(tableID, opendataDir, "", -1)
+	vecFilename := filepath.Join(domainDir, fmt.Sprintf("%s/%d.minhash", tableID, colIndex))
+	vec, err := opendata.ReadMinhashSignature(vecFilename, numHash)
+	if err != nil {
+		return nil, err
+	}
+	//
+	return vec, err
 }

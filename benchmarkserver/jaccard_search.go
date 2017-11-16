@@ -155,9 +155,6 @@ func getColumnPairJaccardPlus(candTableID, domainDir string, candColIndex, query
 	nA := queryCardinality
 	//containment := (jaccard * (float64(nA + nB))) / ((1.0 + jaccard) * float64(nA))
 	sig := sameDomainProb(jaccard, nA, nB)
-	if sig >= 0.99 {
-		log.Printf("nA: %d, nB: %d, jaccard: %f", nA, nB, jaccard)
-	}
 	p := Pair{
 		QueryColIndex: queryColIndex,
 		CandTableID:   candTableID,
@@ -167,6 +164,7 @@ func getColumnPairJaccardPlus(candTableID, domainDir string, candColIndex, query
 		Hypergeometric: sig,
 		Sim:            sig,
 		//Sim: jaccard,
+		Measure: "set",
 	}
 	return p
 }

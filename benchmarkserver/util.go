@@ -406,23 +406,34 @@ func getCardinality(column []string) int {
 	return counter.Unique()
 }
 
-// getPercentile returns the percentile of a score as a number between 0 and 1
-func getPercentile(cdf opendata.CDF, score float64) float64 {
-	if score > 1.0 || score < 0.0 {
+/*
+func getPercentile(score float64) float64 {
+	i := sort.Search(len(cdf), func(i int) bool { return cdf[i] <= score })
+	if i == len(data) {
 		return 0.0
 	}
+	return float64(i + 1)
+}
+*/
+// getPercentile returns the percentile of a score as a number between 0 and 1
+func getPercentile(cdf opendata.CDF, score float64) float64 {
+	if score <= 0.0 {
+		return 0.0
+	}
+	score = math.Min(score, 1.0)
 	binWidth := cdf.Width
 	id := 0
 	if score != 0.0 {
-		//id = int(math.Min(float64(len(cdf.Histogram)-1), math.Floor(math.Exp(math.Log(score)-math.Log(binWidth)))))
-		id = int(math.Min(float64(len(cdf.Histogram)-1), math.Floor(score/binWidth)))
+		id = int(math.Min(float64(len(cdf.Histogram)-1), math.Floor(math.Log(math.Exp(score))+(1.0/binWidth))))
+		//id = int(math.Max(math.Min(float64(len(cdf.Histogram)-1), math.Floor(score/binWidth)), 0.0))
 	}
+	//log.Printf("width: %f score: %f len(cdf.Histogram): %d, i: %d", binWidth, score, len(cdf.Histogram), id)
 	bin := cdf.Histogram[id]
 	percentile := bin.Percentile
-	//detail := (float64(bin.Count) * math.Exp(math.Log(score-bin.LowerBound)-math.Log(bin.UpperBound-bin.LowerBound))) / float64(bin.Total)
-	detail := (float64(bin.Count) * ((score - bin.LowerBound) / binWidth)) / float64(bin.Total)
-	if detail > 1.0 || percentile > 1.0 {
-		log.Printf("error in percentile.")
-	}
-	return percentile + detail
+	//detail := (float64(bin.Count) * ((score - bin.LowerBound) / binWidth)) / float64(bin.Total)
+	//if detail > 1.0 || percentile > 1.0 {
+	//	log.Printf("error in percentile.")
+	//}
+	//return percentile + detail
+	return percentile
 }

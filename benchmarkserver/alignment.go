@@ -54,6 +54,7 @@ type Pair struct {
 	T2                     float64
 	Sim                    float64
 	Percentile             float64 //between 0 and 1
+	Measure                string
 }
 
 type CUnionableVector struct {
@@ -81,8 +82,8 @@ func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, s
 	for _, qindex := range queryTextDomains {
 		for _, cindex := range candTextDomains {
 			p := getAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, setCDF, semCDF, semsetCDF, nlCDF)
-			if p.Sim != 0.0 {
-				batch.Push(p, p.Sim)
+			if p.Percentile != 0.0 {
+				batch.Push(p, p.Percentile)
 			}
 		}
 	}
@@ -98,9 +99,9 @@ func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, s
 		reverseAlign.Update(strconv.Itoa(pair.QueryColIndex))
 		alignment = append(alignment, pair)
 		if len(cUnionabilityScores) == 0 {
-			cUnionabilityScores = append(cUnionabilityScores, pair.Sim)
+			cUnionabilityScores = append(cUnionabilityScores, pair.Percentile)
 		} else {
-			cUnionabilityScores = append(cUnionabilityScores, cUnionabilityScores[len(cUnionabilityScores)-1]*pair.Sim)
+			cUnionabilityScores = append(cUnionabilityScores, cUnionabilityScores[len(cUnionabilityScores)-1]*pair.Percentile)
 		}
 		cUnionabilityPercentiles = append(cUnionabilityPercentiles, getPercentile(tableCDF[len(cUnionabilityPercentiles)+1], cUnionabilityScores[len(cUnionabilityScores)-1]))
 		// When we get c unique column alignments for a candidate table
@@ -118,6 +119,7 @@ func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, s
 	copy(cUP, cUnionabilityPercentiles)
 	s := cUP
 	inds := make([]int, len(s))
+	// ascending sort
 	floats.Argsort(s, inds)
 	result = CUnionableVector{
 		queryTable:     queryTable,
@@ -132,12 +134,14 @@ func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, s
 }
 
 func getAttUnionabilityPair(queryTable, candidateTable string, qindex, cindex int, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF) Pair {
-	uScore, uMeasures := opendata.GetAttUnionabilityPercentile(queryTable, candidateTable, qindex, cindex, setCDF, semCDF, semsetCDF, nlCDF)
+	uScore, uPercentile, uMeasures := opendata.GetAttUnionabilityPercentile(queryTable, candidateTable, qindex, cindex, setCDF, semCDF, semsetCDF, nlCDF)
 	p := Pair{
 		CandTableID:   candidateTable,
 		CandColIndex:  cindex,
 		QueryColIndex: qindex,
 		Sim:           uScore,
+		Percentile:    uPercentile,
+		Measure:       uMeasures[0],
 	}
 	for _, m := range uMeasures {
 		if m == "set" {

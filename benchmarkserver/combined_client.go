@@ -12,13 +12,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/RJMillerLab/table-union/opendata"
 	"github.com/ekzhu/datatable"
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
 var (
-	queryDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/csvfiles/"
+	//queryDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/csvfiles/"
+	queryDir = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
 )
 
 type CombinedClient struct {
@@ -108,7 +108,8 @@ func (c *CombinedClient) Query(queryCSVFilename string, n int) []QueryResult {
 		if classifyValues(col) == "text" {
 			nlMean, nlCovar, err1 := getDomainEmbMeanCovar(queryRawFilename, i)
 			ontVec, noOntVec, _, ontCard, noOntCard, _, err2 := getAttributeOntologyData(queryRawFilename, i, c.numHash)
-			setVec := opendata.GetDomainMinhash(c.tokenFun, c.transFun, col, c.numHash)
+			//setVec := opendata.GetDomainMinhash(c.tokenFun, c.transFun, col, c.numHash)
+			setVec, err3 := getAttributeMinhash(queryRawFilename, i, c.numHash)
 			if err1 == nil && len(nlMean) != 0 && len(nlCovar) != 0 && !containsNan(nlCovar) && !containsNan(nlMean) {
 				nlMeans = append(nlMeans, nlMean)
 				nlCovars = append(nlCovars, nlCovar)
@@ -116,7 +117,7 @@ func (c *CombinedClient) Query(queryCSVFilename string, n int) []QueryResult {
 				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
 				textToAllHeaders[len(queryTextHeaders)-1] = i
 			}
-			if len(setVec) != 0 {
+			if len(setVec) != 0 && err3 == nil {
 				setVecs = append(setVecs, setVec)
 				setCards = append(setCards, getCardinality(col))
 			}
@@ -127,6 +128,11 @@ func (c *CombinedClient) Query(queryCSVFilename string, n int) []QueryResult {
 				noOntCards = append(noOntCards, noOntCard)
 			}
 		}
+	}
+	// the query is empty
+	if len(setVecs) == 0 {
+		log.Printf("Query %s does not contain text attributes.")
+		return results
 	}
 	// Query server
 	queryTableID := strings.Replace(queryCSVFilename, queryDir, "", -1)
@@ -145,7 +151,7 @@ func (c *CombinedClient) Query(queryCSVFilename string, n int) []QueryResult {
 		log.Printf("table unionability percentile: %v", result.TableUnion.CUnionabilityPercentiles)
 		log.Printf("maxC: %d - bestC: %d bestPerc: %f", len(result.TableUnion.CUnionabilityPercentiles), result.TableUnion.BestC, result.TableUnion.CUnionabilityPercentiles[result.TableUnion.BestC-1])
 		for i, pair := range result.TableUnion.Alignment {
-			log.Printf("%s -> %s : score %f - perc: %f", queryHeaders[pair.QueryColIndex], result.TableUnion.CandHeader[pair.CandColIndex], result.TableUnion.CUnionabilityScores[i], result.TableUnion.CUnionabilityPercentiles[i])
+			log.Printf("%s -> %s : score %f - perc: %f - measure: %s", queryHeaders[pair.QueryColIndex], result.TableUnion.CandHeader[pair.CandColIndex], pair.Sim, pair.Percentile, pair.Measure)
 			pair.QueryColIndex = textToAllHeaders[pair.QueryColIndex]
 			result.TableUnion.Alignment[i] = pair
 		}

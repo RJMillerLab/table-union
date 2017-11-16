@@ -22,7 +22,7 @@ import (
 
 var (
 	ByteOrder = binary.BigEndian
-	batchSize = 3000
+	batchSize = 1000
 )
 
 type SearchResult struct {
@@ -272,6 +272,7 @@ func getColumnPairPlus(candTableID, domainDir string, candColIndex, queryColInde
 		Sim:              cosine,
 		QueryCardinality: queryCardinality,
 		CandCardinality:  card,
+		Measure:          "nl",
 	}
 	return p
 }

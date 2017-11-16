@@ -31,7 +31,6 @@ func (index *JaccardUnionIndex) OntBuild() error {
 		}
 		vec, err := opendata.ReadMinhashSignature(file, index.numHash)
 		if err != nil {
-			log.Printf("Error in reading minhash %s from disk.", file)
 			return err
 		}
 		tableID, columnIndex := parseFilename(index.domainDir, file)
@@ -59,7 +58,6 @@ func (index *JaccardUnionIndex) NoOntBuild() error {
 		}
 		vec, err := opendata.ReadMinhashSignature(file, index.numHash)
 		if err != nil {
-			log.Printf("Error in reading minhash %s from disk.", file)
 			return err
 		}
 		tableID, columnIndex := parseFilename(index.domainDir, file)
@@ -200,7 +198,6 @@ func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, qu
 	}
 	vec, err := opendata.ReadMinhashSignature(minhashFilename, numHash)
 	if err != nil {
-		log.Printf("Error in reading %s from disk.", minhashFilename)
 		//panic(err)
 		return Pair{
 			QueryColIndex: queryColIndex,
@@ -224,7 +221,6 @@ func getColumnPairOntJaccardPlus(candTableID, domainDir string, candColIndex, qu
 	}
 	vec, err = opendata.ReadMinhashSignature(ontMinhashFilename, numHash)
 	if err != nil {
-		log.Printf("Error in reading %s from disk.", ontMinhashFilename)
 		return Pair{
 			QueryColIndex: queryColIndex,
 			CandTableID:   candTableID,
