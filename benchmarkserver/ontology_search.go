@@ -25,16 +25,16 @@ func (index *JaccardUnionIndex) OntBuild() error {
 			//		log.Printf("Minhash file does not exist: %s", file)
 			continue
 		}
-		count += 1
-		if count%1000 == 0 {
-			log.Printf("indexed %d domains", count)
-		}
 		vec, err := opendata.ReadMinhashSignature(file, index.numHash)
 		if err != nil {
 			return err
 		}
 		tableID, columnIndex := parseFilename(index.domainDir, file)
 		index.lsh.Add(toColumnID(tableID, columnIndex), vec)
+		count += 1
+		if count%1000 == 0 {
+			log.Printf("indexed %d domains", count)
+		}
 	}
 	index.lsh.Index()
 	log.Printf("ont build count %d", count)
@@ -52,16 +52,17 @@ func (index *JaccardUnionIndex) NoOntBuild() error {
 			//log.Printf("Minhash file does not exist: %s", file)
 			continue
 		}
+		vec, err := opendata.ReadMinhashSignature(file, index.numHash)
+		if err != nil {
+			continue
+			//return err
+		}
+		tableID, columnIndex := parseFilename(index.domainDir, file)
+		index.lsh.Add(toColumnID(tableID, columnIndex), vec)
 		count += 1
 		if count%1000 == 0 {
 			log.Printf("indexed %d domains", count)
 		}
-		vec, err := opendata.ReadMinhashSignature(file, index.numHash)
-		if err != nil {
-			return err
-		}
-		tableID, columnIndex := parseFilename(index.domainDir, file)
-		index.lsh.Add(toColumnID(tableID, columnIndex), vec)
 	}
 	index.lsh.Index()
 	log.Printf("no ont build count %d", count)

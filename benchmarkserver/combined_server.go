@@ -11,6 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var (
+	perturbationDelta = 0.1
+)
+
 type CombinedServer struct {
 	// U_set index
 	seti *JaccardUnionIndex
@@ -18,14 +22,11 @@ type CombinedServer struct {
 	semi    *JaccardUnionIndex
 	semseti *JaccardUnionIndex
 	// U_nl index
-	nli      *UnionIndex
-	router   *gin.Engine
-	tableCDF map[int]opendata.CDF
-	//semCDF    opendata.CDF
-	//setCDF    opendata.CDF
-	//semsetCDF opendata.CDF
-	//nlCDF     opendata.CDF
-	attCDFs map[string]opendata.CDF
+	nli               *UnionIndex
+	router            *gin.Engine
+	tableCDF          map[int]opendata.CDF
+	attCDFs           map[string]opendata.CDF
+	perturbationDelta float64
 }
 
 type CombinedQueryRequest struct {
@@ -58,9 +59,10 @@ func NewCombinedServer(seti, semi, semseti *JaccardUnionIndex, nli *UnionIndex) 
 		//setCDF:    setCDF,
 		//semsetCDF: semsetCDF,
 		//nlCDF:     nlCDF,
-		attCDFs:  attCDFs,
-		tableCDF: tableCDF,
-		router:   gin.Default(),
+		attCDFs:           attCDFs,
+		tableCDF:          tableCDF,
+		router:            gin.Default(),
+		perturbationDelta: perturbationDelta,
 	}
 	s.router.POST("/query", s.queryHandler)
 	log.Printf("New combined server for experiments.")

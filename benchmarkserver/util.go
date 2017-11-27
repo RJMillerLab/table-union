@@ -108,7 +108,6 @@ func getUnannotatedMinhashFilename(tableID, domainDir string, index int) string 
 func getOntDomainCardinality(tableID, domainDir string, index int) (int, int) {
 	cardpath := path.Join(domainDir, tableID)
 	cardpath = path.Join(cardpath, fmt.Sprintf("%d.%s", index, "ont-noann-card"))
-	log.Printf("cardpath: %s", cardpath)
 	f, err := os.Open(cardpath)
 	defer f.Close()
 	if err != nil {
@@ -427,7 +426,7 @@ func getPercentile(cdf opendata.CDF, score float64) float64 {
 		//id = int(math.Min(float64(len(cdf.Histogram)-1), math.Floor(math.Log(math.Exp(score))+(1.0/binWidth))))
 		id = int(math.Max(math.Min(float64(len(cdf.Histogram)-1), math.Floor(score/binWidth)), 0.0))
 	}
-	//log.Printf("width: %f score: %f len(cdf.Histogram): %d, i: %d", binWidth, score, len(cdf.Histogram), id)
+	log.Printf("width: %f score: %f len(cdf.Histogram): %d, i: %d", binWidth, score, len(cdf.Histogram), id)
 	bin := cdf.Histogram[id]
 	percentile := bin.Percentile
 	//detail := (float64(bin.Count) * ((score - bin.LowerBound) / binWidth)) / float64(bin.Total)
@@ -438,8 +437,8 @@ func getPercentile(cdf opendata.CDF, score float64) float64 {
 	return percentile
 }
 
-func perturbPercentile(cdf opendata.CDF, score, delta float64) (float64, float64) {
-	lb := getPercentile(cdf, math.Min(score-delta, 0.0))
-	ub := getPercentile(cdf, math.Max(score+delta, 1.0))
-	return lb, ub
-}
+//func getPerturbPercentile(cdf opendata.CDF, score, delta float64) (float64, float64) {
+//	lb := getPercentile(cdf, math.Max(score-delta, 0.0))
+//	ub := getPercentile(cdf, math.Min(score+delta, 1.0))
+//	return lb, ub
+//}
