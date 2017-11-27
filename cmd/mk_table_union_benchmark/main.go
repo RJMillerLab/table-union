@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"regexp"
 	"sort"
 	"strings"
@@ -28,10 +29,11 @@ var (
 	}
 	numRawTableToSelect                   = 100
 	numBenchmarkTablePerRaw               = 25
-	fastTextMinNumCol                     = 4
+	fastTextMinNumCol                     = 5
 	fasttextMinPct                        = 0.8
 	yagoMinNumCol                         = fastTextMinNumCol
 	yagoMinPct                            = fasttextMinPct
+	numProjPerC                           = 2
 	maxSrcTableNumRow                     = 25000
 	statTablename                         = "dataset_profile"
 	maxNumDistinctBeforeGiveUp            = 100
@@ -47,6 +49,7 @@ type tableStat struct {
 }
 
 type columnStat struct {
+	isText         bool
 	distinctCount  int
 	fastTextMapped int
 	yagoMapped     int
@@ -60,6 +63,44 @@ func (colStat columnStat) isFastTextCol() bool {
 func (colStat columnStat) isYagoCol() bool {
 	pct := float64(colStat.yagoMapped) / float64(colStat.distinctCount)
 	return pct >= yagoMinPct
+}
+
+func (stat tableStat) randomProjectTextCols(c int) tableStat {
+	if c > stat.numTextCol() {
+		panic(fmt.Errorf("c (%d) > num text cols (%d)", c, stat.numTextCol()))
+	}
+	var colInds []int
+	textColInds := make([]int, 0)
+	for i := range stat.colStats {
+		if stat.colStats[i].isText {
+			textColInds = append(textColInds, i)
+		}
+	}
+	for i := range rand.Perm(len(textColInds)) {
+		colInds = append(colInds, textColInds[i])
+	}
+	colInds = colInds[:c]
+	s := tableStat{
+		TableStat: stat.TableStat,
+		colStats:  make([]columnStat, c),
+		columns:   make([]string, c),
+	}
+	s.NumCol = c
+	for i, colInd := range colInds {
+		s.columns[i] = stat.columns[colInd]
+		s.colStats[i] = stat.colStats[colInd]
+	}
+	return s
+}
+
+func (stat tableStat) numTextCol() int {
+	var n int
+	for _, s := range stat.colStats {
+		if s.isText {
+			n++
+		}
+	}
+	return n
 }
 
 func (stat tableStat) metFastTextCriteria() bool {
@@ -227,16 +268,15 @@ func main() {
 			continue
 		}
 		// Find out the text columns, so we are just looking at those
-		textCols := make([]int, 0)
 		for i, colType := range colTypes {
 			if colType.DatabaseTypeName() == "TEXT" {
-				textCols = append(textCols, i)
+				stat.colStats[i].isText = true
 			}
 		}
 		if ignoreCoverage {
 			// If we don't use YAGO and FastText coverage as selection criteria
 			// We can early-decide based on what we have so far
-			if len(textCols) >= fastTextMinNumCol || len(textCols) >= yagoMinNumCol {
+			if stat.numTextCol() >= fastTextMinNumCol || stat.numTextCol() >= yagoMinNumCol {
 				log.Printf("Selected %s.%s", stat.Database, stat.Name)
 				selected = append(selected, stat)
 				selectedPackages.Update(stat.MetadataID)
@@ -250,8 +290,10 @@ func main() {
 		log.Printf("Scanning table %s.%s (%d rows, %d columns)...",
 			stat.Database, stat.Name, stat.NumRow, stat.NumCol)
 		var readErr error
-		for _, i := range textCols {
-			column := columns[i]
+		for i, column := range stat.columns {
+			if !stat.colStats[i].isText {
+				continue
+			}
 			err = od.ReadColumnDistinct(stat.Database, stat.Name, column, func(rows *sql.Rows) error {
 				var value sql.NullString
 				for rows.Next() {
@@ -300,24 +342,45 @@ func main() {
 		}
 	}
 
+	// Create random projections of the selected tables
+	// The projections for the selected tables, multiple projections for each value of c
+	projections := make([](map[int]([]tableStat)), len(selected))
+	for i, stat := range selected {
+		log.Printf("Projecting %s.%s, num text col = %d",
+			stat.Database, stat.Name, stat.numTextCol())
+		projections[i] = make(map[int]([]tableStat))
+		for c := 1; c <= stat.numTextCol(); c++ {
+			projections[i][c] = make([]tableStat, 0)
+			for j := 0; j < numProjPerC; j++ {
+				p := stat.randomProjectTextCols(c)
+				projections[i][c] = append(projections[i][c], p)
+			}
+		}
+	}
+
 	// Generating tablets
 	log.Print("Generating benchmark tables from selected source tables...")
-	for rank, stat := range selected {
-		limit := stat.NumRow / numBenchmarkTablePerRaw
-		if limit == 0 {
-			panic("Getting limit = 0")
-		}
-		// First load the original table into the cache in random order
-		// of rows
-		originalTablename := fmt.Sprintf("%d____%s____%s", rank, stat.Database, stat.Name)
-		if err := od.LoadTable(stat.Database, stat.Name, originalTablename); err != nil {
-			panic(err)
-		}
-		for i := 0; i < numBenchmarkTablePerRaw; i++ {
-			offset := limit * i
-			tablename := fmt.Sprintf("%d____%s____%s____%d", rank, stat.Database, stat.Name, i)
-			if err := od.LoadTableLimit("", originalTablename, tablename, offset, limit); err != nil {
-				panic(err)
+	for _, projections := range projections {
+		for c, ps := range projections {
+			for j, stat := range ps {
+				limit := stat.NumRow / numBenchmarkTablePerRaw
+				if limit == 0 {
+					panic("Getting limit = 0")
+				}
+				originalTablename := fmt.Sprintf("%s____%s____c%d_%d",
+					stat.Database, stat.Name, c, j)
+				if err := od.LoadTableProject(stat.Database, stat.Name, originalTablename,
+					stat.columns); err != nil {
+					panic(err)
+				}
+				for i := 0; i < numBenchmarkTablePerRaw; i++ {
+					offset := limit * i
+					tablename := fmt.Sprintf("%s____%s____c%d_%d____%d",
+						stat.Database, stat.Name, c, j, i)
+					if err := od.LoadTableLimit("", originalTablename, tablename, offset, limit); err != nil {
+						panic(err)
+					}
+				}
 			}
 		}
 	}
