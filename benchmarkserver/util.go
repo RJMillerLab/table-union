@@ -424,8 +424,8 @@ func getPercentile(cdf opendata.CDF, score float64) float64 {
 	binWidth := cdf.Width
 	id := 0
 	if score != 0.0 {
-		id = int(math.Min(float64(len(cdf.Histogram)-1), math.Floor(math.Log(math.Exp(score))+(1.0/binWidth))))
-		//id = int(math.Max(math.Min(float64(len(cdf.Histogram)-1), math.Floor(score/binWidth)), 0.0))
+		//id = int(math.Min(float64(len(cdf.Histogram)-1), math.Floor(math.Log(math.Exp(score))+(1.0/binWidth))))
+		id = int(math.Max(math.Min(float64(len(cdf.Histogram)-1), math.Floor(score/binWidth)), 0.0))
 	}
 	//log.Printf("width: %f score: %f len(cdf.Histogram): %d, i: %d", binWidth, score, len(cdf.Histogram), id)
 	bin := cdf.Histogram[id]
@@ -436,4 +436,10 @@ func getPercentile(cdf opendata.CDF, score float64) float64 {
 	//}
 	//return percentile + detail
 	return percentile
+}
+
+func perturbPercentile(cdf opendata.CDF, score, delta float64) (float64, float64) {
+	lb := getPercentile(cdf, math.Min(score-delta, 0.0))
+	ub := getPercentile(cdf, math.Max(score+delta, 1.0))
+	return lb, ub
 }

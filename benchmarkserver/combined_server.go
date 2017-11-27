@@ -18,13 +18,14 @@ type CombinedServer struct {
 	semi    *JaccardUnionIndex
 	semseti *JaccardUnionIndex
 	// U_nl index
-	nli       *UnionIndex
-	router    *gin.Engine
-	tableCDF  map[int]opendata.CDF
-	semCDF    opendata.CDF
-	setCDF    opendata.CDF
-	semsetCDF opendata.CDF
-	nlCDF     opendata.CDF
+	nli      *UnionIndex
+	router   *gin.Engine
+	tableCDF map[int]opendata.CDF
+	//semCDF    opendata.CDF
+	//setCDF    opendata.CDF
+	//semsetCDF opendata.CDF
+	//nlCDF     opendata.CDF
+	attCDFs map[string]opendata.CDF
 }
 
 type CombinedQueryRequest struct {
@@ -43,17 +44,23 @@ type CombinedQueryRequest struct {
 
 func NewCombinedServer(seti, semi, semseti *JaccardUnionIndex, nli *UnionIndex) *CombinedServer {
 	setCDF, semCDF, semsetCDF, nlCDF, tableCDF := opendata.LoadCDF()
+	attCDFs := make(map[string]opendata.CDF)
+	attCDFs["set"] = setCDF
+	attCDFs["sem"] = semCDF
+	attCDFs["semset"] = semsetCDF
+	attCDFs["nl"] = nlCDF
 	s := &CombinedServer{
-		seti:      seti,
-		semi:      semi,
-		semseti:   semseti,
-		nli:       nli,
-		semCDF:    semCDF,
-		setCDF:    setCDF,
-		semsetCDF: semsetCDF,
-		nlCDF:     nlCDF,
-		tableCDF:  tableCDF,
-		router:    gin.Default(),
+		seti:    seti,
+		semi:    semi,
+		semseti: semseti,
+		nli:     nli,
+		//semCDF:    semCDF,
+		//setCDF:    setCDF,
+		//semsetCDF: semsetCDF,
+		//nlCDF:     nlCDF,
+		attCDFs:  attCDFs,
+		tableCDF: tableCDF,
+		router:   gin.Default(),
 	}
 	s.router.POST("/query", s.queryHandler)
 	log.Printf("New combined server for experiments.")

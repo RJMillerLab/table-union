@@ -8,6 +8,7 @@ import (
 	"github.com/RJMillerLab/table-union/opendata"
 	"github.com/RJMillerLab/table-union/pqueue"
 	"github.com/ekzhu/counter"
+	"github.com/fnargesian/pqueuespan"
 	"github.com/gonum/floats"
 )
 
@@ -16,15 +17,17 @@ type alignment struct {
 	partialAlign    map[string](*counter.Counter)
 	reverseAlign    map[string](*counter.Counter)
 	tableQueues     map[string](*pqueue.TopKQueue)
+	tableSpanQueues map[string](*pqueuespan.TopKQueue)
 	k               int
 	n               int
 	startTime       time.Time
 	tableCDF        map[int]opendata.CDF
-	setCDF          opendata.CDF
-	semCDF          opendata.CDF
-	semsetCDF       opendata.CDF
-	nlCDF           opendata.CDF
-	domainDir       string
+	//setCDF          opendata.CDF
+	//semCDF          opendata.CDF
+	//semsetCDF       opendata.CDF
+	//nlCDF           opendata.CDF
+	attCDFs   map[string]opendata.CDF
+	domainDir string
 }
 
 type embDomain struct {
@@ -67,7 +70,12 @@ type CUnionableVector struct {
 	bestC          int
 }
 
-func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF, tableCDF map[int]opendata.CDF) CUnionableVector {
+//func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF, tableCDF map[int]opendata.CDF) CUnionableVector {
+func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[string]opendata.CDF, tableCDF map[int]opendata.CDF) CUnionableVector {
+	setCDF := attCDFs["set"]
+	semCDF := attCDFs["sem"]
+	semsetCDF := attCDFs["semset"]
+	nlCDF := attCDFs["nl"]
 	log.Printf("processing candidate table %s.", candidateTable)
 	var result CUnionableVector
 	cUnionabilityScores := make([]float64, 0)
@@ -78,17 +86,19 @@ func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, s
 	reverseAlign := counter.NewCounter()
 	maxC := len(candTextDomains)
 	alignment := make([]Pair, 0)
-	batch := pqueue.NewTopKQueue(len(queryTextDomains) * len(candTextDomains))
+	batch := pqueuespan.NewTopKQueue(len(queryTextDomains) * len(candTextDomains))
 	for _, qindex := range queryTextDomains {
 		for _, cindex := range candTextDomains {
 			p := getAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, setCDF, semCDF, semsetCDF, nlCDF)
 			if p.Percentile != 0.0 {
-				batch.Push(p, p.Percentile)
+				//batch.Push(p, p.Percentile)
+				lb, ub := perturbPercentile(attCDFs[p.Measure], p.Percentile, delta)
+				batch.Push(p, lb, ub)
 			}
 		}
 	}
 
-	pairs, _ := batch.Descending()
+	pairs, _, _ := batch.Descending()
 	for i := range pairs {
 		pair := pairs[i].(Pair)
 		if partialAlign.Has(strconv.Itoa(pair.CandColIndex)) || reverseAlign.Has(strconv.Itoa(pair.QueryColIndex)) {
@@ -128,7 +138,7 @@ func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, s
 		percentiles:    cUnionabilityPercentiles,
 		alignment:      alignment,
 		maxC:           maxC,
-		bestC:          inds[len(cUnionabilityPercentiles)-1] + 1,
+		bestC:          inds[len(inds)-1] + 1,
 	}
 	return result
 }

@@ -2,15 +2,20 @@ package benchmarkserver
 
 import (
 	"log"
+	"math"
 	"sync"
 	"time"
 
 	"github.com/ekzhu/counter"
+	"github.com/fnargesian/pqueuespan"
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/RJMillerLab/table-union/minhashlsh"
 	"github.com/RJMillerLab/table-union/opendata"
-	"github.com/RJMillerLab/table-union/pqueue"
+)
+
+var (
+	delta = 0.1
 )
 
 type tablePair struct {
@@ -18,24 +23,28 @@ type tablePair struct {
 	candidateTable string
 }
 
-func initCAlignment(N int, tableCDF map[int]opendata.CDF, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF, domainDir string) alignment {
+//func initCAlignment(N int, tableCDF map[int]opendata.CDF, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF, domainDir string) alignment {
+func initCAlignment(N int, tableCDF map[int]opendata.CDF, attCDFs map[string]opendata.CDF, domainDir string) alignment {
 	return alignment{
 		completedTables: counter.NewCounter(),
 		partialAlign:    make(map[string](*counter.Counter)),
 		reverseAlign:    make(map[string](*counter.Counter)),
-		tableQueues:     make(map[string]*pqueue.TopKQueue),
+		//tableQueues:     make(map[string]*pqueue.TopKQueue),
+		tableSpanQueues: make(map[string]*pqueuespan.TopKQueue),
 		n:               N,
 		startTime:       time.Now(),
 		tableCDF:        tableCDF,
-		setCDF:          setCDF,
-		semCDF:          semCDF,
-		semsetCDF:       semsetCDF,
-		nlCDF:           nlCDF,
-		domainDir:       domainDir,
+		//setCDF:          setCDF,
+		//semCDF:          semCDF,
+		//semsetCDF:       semsetCDF,
+		//nlCDF:           nlCDF,
+		attCDFs:   attCDFs,
+		domainDir: domainDir,
 	}
 }
 
 func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, setVecs, noOntVecs, ontVecs [][]uint64, N int, noOntCards, ontCards, nlCards, setCards []int, queryTableID string) <-chan SearchResult {
+	var numBatches int
 	results := make(chan SearchResult)
 	log.Printf("search queryTableID: %s", queryTableID)
 	ontSigs := make([]minhashlsh.Signature, len(ontVecs))
@@ -51,8 +60,10 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 	for i := 0; i < len(setVecs); i++ {
 		setSigs[i] = minhashlsh.Signature(setVecs[i])
 	}
-	alignment := initCAlignment(N, server.tableCDF, server.setCDF, server.semCDF, server.semsetCDF, server.nlCDF, server.seti.domainDir)
-	reduceQueue := pqueue.NewTopKQueue(batchSize)
+	//alignment := initCAlignment(N, server.tableCDF, server.setCDF, server.semCDF, server.semsetCDF, server.nlCDF, server.seti.domainDir)
+	alignment := initCAlignment(N, server.tableCDF, server.attCDFs, server.seti.domainDir)
+	//reduceQueue := pqueue.NewTopKQueue(batchSize)
+	reduceQueue := pqueuespan.NewTopKQueue(batchSize)
 	reduceBatch := make(chan Pair)
 	done1 := make(chan struct{})
 	done2 := make(chan struct{})
@@ -61,10 +72,16 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 	wg := &sync.WaitGroup{}
 	wg.Add(4)
 	go func() {
+		if len(nlMeans) == 0 {
+			return
+		}
 		for pair := range server.nli.lsh.QueryPlus(nlMeans, done3) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairPlus(tableID, server.seti.domainDir, columnIndex, pair.QueryIndex, nlMeans[pair.QueryIndex], nlCovars[pair.QueryIndex], nlCards[pair.QueryIndex])
-			e.Percentile = getPercentile(server.nlCDF, e.Sim)
+			e.Percentile = getPercentile(server.attCDFs["nl"], e.Sim)
+			if e.Percentile > 0.9 && e.Sim < 0.4 {
+				log.Printf("%s.%d has nlsim %f and perc %f  and with 0.1 pert becomes [%f, %f].", tableID, columnIndex, e.Sim, e.Percentile, getPercentile(server.attCDFs["nl"], math.Max(e.Sim-0.1, 0.0)), getPercentile(server.attCDFs["nl"], math.Min(e.Sim+0.1, 1.0)))
+			}
 			if e.Percentile != 0.0 {
 				reduceBatch <- e
 			}
@@ -72,21 +89,36 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		wg.Done()
 	}()
 	go func() {
+		if len(setVecs) == 0 {
+			return
+		}
 		for pair := range server.seti.lsh.QueryPlus(setSigs, done4) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairJaccardPlus(tableID, server.seti.domainDir, columnIndex, pair.QueryIndex, server.seti.numHash, setVecs, setCards[pair.QueryIndex])
-			e.Percentile = getPercentile(server.setCDF, e.Sim)
+			e.Percentile = getPercentile(server.attCDFs["set"], e.Sim)
+			if e.Percentile > 0.9 && e.Sim < 0.4 {
+				log.Printf("%s.%d has set sim %f and perc %f and with 0.1 pert becomes [%f, %f].", tableID, columnIndex, e.Sim, e.Percentile, getPercentile(server.attCDFs["set"], math.Max(e.Sim-0.1, 0.0)), getPercentile(server.attCDFs["set"], math.Min(e.Sim+0.1, 1.0)))
+			}
 			if e.Percentile != 0.0 {
 				reduceBatch <- e
 			}
 		}
 	}()
 	go func() {
+		if len(noOntVecs) == 0 {
+			return
+		}
 		for pair := range server.semseti.lsh.QueryPlus(noOntSigs, done1) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairOntJaccardPlus(tableID, server.semseti.domainDir, columnIndex, pair.QueryIndex, server.semseti.numHash, ontVecs[pair.QueryIndex], noOntVecs[pair.QueryIndex], ontCards[pair.QueryIndex], noOntCards[pair.QueryIndex])
-			p1 := getPercentile(server.semCDF, e.OntologyHypergeometric)
-			p2 := getPercentile(server.semsetCDF, e.Sim)
+			p1 := getPercentile(server.attCDFs["sem"], e.OntologyHypergeometric)
+			p2 := getPercentile(server.attCDFs["semset"], e.Sim)
+			if p1 > 0.9 && e.OntologyHypergeometric < 0.4 {
+				log.Printf("%s.%d has sem sim %f and perc %f and with 0.1 pert becomes [%f, %f].", tableID, columnIndex, e.OntologyHypergeometric, p1, getPercentile(server.attCDFs["sem"], math.Max(e.OntologyHypergeometric-0.1, 0.0)), getPercentile(server.attCDFs["sem"], math.Min(e.OntologyHypergeometric+0.1, 1.0)))
+			}
+			if p2 > 0.9 && e.Sim < 0.4 {
+				log.Printf("%s.%d has semset sim %f and perc %f and with 0.1 pert becomes [%f, %f].", tableID, columnIndex, e.Sim, p2, getPercentile(server.attCDFs["semset"], math.Max(e.Sim-0.1, 0.0)), getPercentile(server.attCDFs["semset"], math.Min(e.Sim+0.1, 1.0)))
+			}
 			if p1 > p2 {
 				e.Percentile = p1
 				e.Measure = "sem"
@@ -107,11 +139,14 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		wg.Done()
 	}()
 	go func() {
+		if len(ontVecs) == 0 {
+			return
+		}
 		for pair := range server.semi.lsh.QueryPlus(ontSigs, done2) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairOntJaccardPlus(tableID, server.semi.domainDir, columnIndex, pair.QueryIndex, server.semi.numHash, ontVecs[pair.QueryIndex], noOntVecs[pair.QueryIndex], ontCards[pair.QueryIndex], noOntCards[pair.QueryIndex])
-			p1 := getPercentile(server.semCDF, e.Sim)
-			p2 := getPercentile(server.semsetCDF, e.Sim)
+			p1 := getPercentile(server.attCDFs["sem"], e.Sim)
+			p2 := getPercentile(server.attCDFs["semset"], e.Sim)
 			if p1 > p2 {
 				e.Percentile = p1
 				e.Measure = "sem"
@@ -138,8 +173,20 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 			if alignment.hasCompleted(pair.CandTableID) {
 				continue
 			}
-			reduceQueue.Push(pair, pair.Percentile)
+			//reduceQueue.Push(pair, pair.Percentile)
+			lb, ub := perturbPercentile(server.attCDFs[pair.Measure], pair.Percentile, delta)
+			reduceQueue.Push(pair, lb, ub)
 			if reduceQueue.Size() == batchSize {
+				// checking if we have processed too many batches
+				if numBatches > 4 {
+					close(done1)
+					close(done2)
+					close(done3)
+					close(done4)
+					wwg.Done()
+					return
+				}
+				numBatches += 1
 				if finished := alignment.processPairsCombined(reduceQueue, results, queryTableID); finished {
 					close(done1)
 					close(done2)
@@ -148,7 +195,8 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 					wwg.Done()
 					return
 				}
-				reduceQueue = pqueue.NewTopKQueue(batchSize)
+				//reduceQueue = pqueue.NewTopKQueue(batchSize)
+				reduceQueue = pqueuespan.NewTopKQueue(batchSize)
 			}
 		}
 		if reduceQueue.Size() != 0 {
@@ -169,8 +217,10 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 	return results
 }
 
-func (a alignment) processPairsCombined(reduceQueue *pqueue.TopKQueue, out chan<- SearchResult, queryTableID string) bool {
-	cAlignmentQueue := pqueue.NewTopKQueue(a.n)
+//func (a alignment) processPairsCombined(reduceQueue *pqueue.TopKQueue, out chan<- SearchResult, queryTableID string) bool {
+func (a alignment) processPairsCombined(reduceQueue *pqueuespan.TopKQueue, out chan<- SearchResult, queryTableID string) bool {
+	//cAlignmentQueue := pqueue.NewTopKQueue(a.n)
+	cAlignmentQueue := pqueuespan.NewTopKQueue(a.n)
 	alignedTables := make(chan SearchResult)
 	tablesToAlign := make(chan string)
 	wg := &sync.WaitGroup{}
@@ -179,7 +229,7 @@ func (a alignment) processPairsCombined(reduceQueue *pqueue.TopKQueue, out chan<
 		wg.Add(1)
 		defer wg.Done()
 		defer close(tablesToAlign)
-		pairs, _ := reduceQueue.Descending()
+		pairs, _, _ := reduceQueue.Descending()
 		for i := range pairs {
 			pair := pairs[i].(Pair)
 			if a.hasCompleted(pair.CandTableID) {
@@ -197,7 +247,8 @@ func (a alignment) processPairsCombined(reduceQueue *pqueue.TopKQueue, out chan<
 		go func() {
 			for tp := range tablesToAlign {
 				candTableID := tp
-				cAlignment := alignTables(queryTableID, candTableID, a.domainDir, a.setCDF, a.semCDF, a.semsetCDF, a.nlCDF, a.tableCDF)
+				//cAlignment := alignTables(queryTableID, candTableID, a.domainDir, a.setCDF, a.semCDF, a.semsetCDF, a.nlCDF, a.tableCDF)
+				cAlignment := alignTables(queryTableID, candTableID, a.domainDir, a.attCDFs, a.tableCDF)
 				result := SearchResult{
 					CandidateTableID:         candTableID,
 					Alignment:                cAlignment.alignment,
@@ -218,9 +269,11 @@ func (a alignment) processPairsCombined(reduceQueue *pqueue.TopKQueue, out chan<
 	go func() {
 		for result := range alignedTables {
 			// this scoring can change
-			cAlignmentQueue.Push(result, result.CUnionabilityPercentiles[result.BestC-1])
+			//cAlignmentQueue.Push(result, result.CUnionabilityPercentiles[result.BestC-1])
+			lb, ub := perturbPercentile(a.tableCDF[result.BestC-1], result.CUnionabilityPercentiles[result.BestC-1], delta)
+			cAlignmentQueue.Push(result, lb, ub)
 		}
-		results, _ := cAlignmentQueue.Descending()
+		results, _, _ := cAlignmentQueue.Descending()
 		for i := range results {
 			result := results[i].(SearchResult)
 			result.Duration = float64(time.Now().Sub(a.startTime)) / float64(1000000)

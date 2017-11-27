@@ -60,7 +60,6 @@ func (index *UnionIndex) BuildScalability(size int) error {
 	for file := range embfilenames {
 		if count < size {
 			if _, err := os.Stat(file); os.IsNotExist(err) {
-				log.Printf("%s not found.", file)
 				continue
 			}
 			count += 1
@@ -69,7 +68,6 @@ func (index *UnionIndex) BuildScalability(size int) error {
 			}
 			vec, err := embedding.ReadVecFromDisk(file, ByteOrder)
 			if err != nil {
-				log.Printf("Error in reading %s from disk.", file)
 				return err
 			}
 			tableID, columnIndex := parseFilename(index.domainDir, file)
