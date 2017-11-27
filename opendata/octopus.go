@@ -9,31 +9,13 @@ import (
 	"math"
 	"os"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/ekzhu/datatable"
+	"github.com/gonum/floats"
 )
-
-type Slice struct {
-	sort.Float64Slice
-	idx []int
-}
-
-func (s Slice) Swap(i, j int) {
-	s.Float64Slice.Swap(i, j)
-	s.idx[i], s.idx[j] = s.idx[j], s.idx[i]
-}
-
-func NewSlice(n ...float64) *Slice {
-	s := &Slice{Float64Slice: sort.Float64Slice(n), idx: make([]int, len(n))}
-	for i := range s.idx {
-		s.idx[i] = i
-	}
-	return s
-}
 
 type OctopusScore struct {
 	query     string
@@ -124,18 +106,27 @@ func ComputeColumnTextClusterScore(t1name, t2name string, tfidfs1, tfidfs2 []map
 			}
 		}
 	}
-	s := NewSlice(cdists...)
-	sort.Sort(s)
+	cUP := make([]float64, len(cdists))
+	copy(cUP, cdists)
+	s := cUP
+	inds := make([]int, len(s))
+	// ascending sort
+	floats.Argsort(s, inds)
+	//s := NewSlice(cdists...)
+	//sort.Sort(s)
 	m := int(math.Min(float64(len(tfidfs1)), float64(len(tfidfs2))))
 	var matchNum int
 	covered := make(map[string]bool)
 	var score float64
-	for jx, ix := range s.idx {
+	//for jx, ix := range s.idx {
+	for jx := 0; jx < len(inds); jx++ {
+		ix := inds[jx]
 		i, _ := strconv.Atoi(strings.Split(colpairs[ix], " ")[0])
 		j, _ := strconv.Atoi(strings.Split(colpairs[ix], " ")[1])
 		if _, ok := covered[t1name+string(i)]; !ok {
 			if _, ok := covered[t2name+string(j)]; !ok {
-				score += 1.0 - s.Float64Slice[jx]
+				//score += 1.0 - s.Float64Slice[jx]
+				score += (1.0 - cdists[ix])
 				matchNum += 1
 				covered[t1name+string(i)] = true
 				covered[t2name+string(j)] = true
@@ -160,6 +151,10 @@ func ComputeSizeClusterScore(t1name, t2name string, lens1, lens2 []float64) Octo
 	jnx := 0
 	sum := 0.0
 	anum := 1
+	inds1 := make([]int, len(lens1))
+	floats.Argsort(lens1, inds1)
+	inds2 := make([]int, len(lens2))
+	floats.Argsort(lens2, inds2)
 	m := int(math.Min(float64(len(lens1)), float64(len(lens2))))
 	for i := 0; i < m; i++ {
 		if anum == m {
@@ -202,6 +197,7 @@ func ComputeTextClusterScore(t1name, t2name string, idf map[string]float64) Octo
 	}()
 	wg.Wait()
 	cosine := computeCosine(t1Vec, t2Vec, t1L2, t2L2)
+	log.Printf("t1: %s and t2: %s has %f score.", t1name, t2name, cosine)
 	sp := OctopusScore{
 		query:     t1name,
 		candidate: t2name,
@@ -307,6 +303,7 @@ func GetTableColumnMeanLength(tablename string) []float64 {
 	for _, index := range getNonNumericDomains(tablename) {
 		colens = append(colens, getMeanLength(tablename, index))
 	}
+
 	return colens
 }
 

@@ -121,7 +121,6 @@ func readDomainsWithOntologyFromDB() <-chan dbDomain {
 			if err != nil {
 				panic(err)
 			}
-			log.Printf("%s", tableName)
 			out <- dbDomain{
 				tableName:   tableName,
 				columnIndex: columnIndex,
