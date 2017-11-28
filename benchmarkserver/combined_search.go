@@ -2,7 +2,6 @@ package benchmarkserver
 
 import (
 	"log"
-	"math"
 	"sync"
 	"time"
 
@@ -24,22 +23,18 @@ type tablePair struct {
 }
 
 //func initCAlignment(N int, tableCDF map[int]opendata.CDF, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF, domainDir string) alignment {
-func initCAlignment(N int, tableCDF map[int]opendata.CDF, attCDFs map[string]opendata.CDF, domainDir string) alignment {
+func initCAlignment(N int, tableCDF map[int]opendata.CDF, attCDFs map[string]opendata.CDF, domainDir string, perturbationDelta float64) alignment {
 	return alignment{
-		completedTables: counter.NewCounter(),
-		partialAlign:    make(map[string](*counter.Counter)),
-		reverseAlign:    make(map[string](*counter.Counter)),
-		//tableQueues:     make(map[string]*pqueue.TopKQueue),
-		tableSpanQueues: make(map[string]*pqueuespan.TopKQueue),
-		n:               N,
-		startTime:       time.Now(),
-		tableCDF:        tableCDF,
-		//setCDF:          setCDF,
-		//semCDF:          semCDF,
-		//semsetCDF:       semsetCDF,
-		//nlCDF:           nlCDF,
-		attCDFs:   attCDFs,
-		domainDir: domainDir,
+		completedTables:   counter.NewCounter(),
+		partialAlign:      make(map[string](*counter.Counter)),
+		reverseAlign:      make(map[string](*counter.Counter)),
+		tableSpanQueues:   make(map[string]*pqueuespan.TopKQueue),
+		n:                 N,
+		startTime:         time.Now(),
+		tableCDF:          tableCDF,
+		attCDFs:           attCDFs,
+		domainDir:         domainDir,
+		perturbationDelta: perturbationDelta,
 	}
 }
 
@@ -61,7 +56,7 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		setSigs[i] = minhashlsh.Signature(setVecs[i])
 	}
 	//alignment := initCAlignment(N, server.tableCDF, server.setCDF, server.semCDF, server.semsetCDF, server.nlCDF, server.seti.domainDir)
-	alignment := initCAlignment(N, server.tableCDF, server.attCDFs, server.seti.domainDir)
+	alignment := initCAlignment(N, server.tableCDF, server.attCDFs, server.seti.domainDir, server.perturbationDelta)
 	//reduceQueue := pqueue.NewTopKQueue(batchSize)
 	reduceQueue := pqueuespan.NewTopKQueue(batchSize)
 	reduceBatch := make(chan Pair)
@@ -78,11 +73,9 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		for pair := range server.nli.lsh.QueryPlus(nlMeans, done3) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairPlus(tableID, server.seti.domainDir, columnIndex, pair.QueryIndex, nlMeans[pair.QueryIndex], nlCovars[pair.QueryIndex], nlCards[pair.QueryIndex])
-			e.Percentile = getPercentile(server.attCDFs["nl"], e.Sim)
-			if e.Percentile > 0.9 && e.Sim < 0.4 {
-				log.Printf("%s.%d has nlsim %f and perc %f  and with 0.1 pert becomes [%f, %f].", tableID, columnIndex, e.Sim, e.Percentile, getPercentile(server.attCDFs["nl"], math.Max(e.Sim-0.1, 0.0)), getPercentile(server.attCDFs["nl"], math.Min(e.Sim+0.1, 1.0)))
-			}
-			if e.Percentile != 0.0 {
+			//e.Percentile = getPercentile(server.attCDFs["nl"], e.Sim)
+			e.Percentile = opendata.GetPerturbedPercentile(server.attCDFs["nl"], e.Sim, server.perturbationDelta)
+			if e.Percentile.Value != 0.0 {
 				reduceBatch <- e
 			}
 		}
@@ -95,11 +88,9 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		for pair := range server.seti.lsh.QueryPlus(setSigs, done4) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairJaccardPlus(tableID, server.seti.domainDir, columnIndex, pair.QueryIndex, server.seti.numHash, setVecs, setCards[pair.QueryIndex])
-			e.Percentile = getPercentile(server.attCDFs["set"], e.Sim)
-			if e.Percentile > 0.9 && e.Sim < 0.4 {
-				log.Printf("%s.%d has set sim %f and perc %f and with 0.1 pert becomes [%f, %f].", tableID, columnIndex, e.Sim, e.Percentile, getPercentile(server.attCDFs["set"], math.Max(e.Sim-0.1, 0.0)), getPercentile(server.attCDFs["set"], math.Min(e.Sim+0.1, 1.0)))
-			}
-			if e.Percentile != 0.0 {
+			//e.Percentile = getPercentile(server.attCDFs["set"], e.Sim)
+			e.Percentile = opendata.GetPerturbedPercentile(server.attCDFs["set"], e.Sim, server.perturbationDelta)
+			if e.Percentile.Value != 0.0 {
 				reduceBatch <- e
 			}
 		}
@@ -111,23 +102,28 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		for pair := range server.semseti.lsh.QueryPlus(noOntSigs, done1) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairOntJaccardPlus(tableID, server.semseti.domainDir, columnIndex, pair.QueryIndex, server.semseti.numHash, ontVecs[pair.QueryIndex], noOntVecs[pair.QueryIndex], ontCards[pair.QueryIndex], noOntCards[pair.QueryIndex])
-			p1 := getPercentile(server.attCDFs["sem"], e.OntologyHypergeometric)
-			p2 := getPercentile(server.attCDFs["semset"], e.Sim)
-			if p1 > 0.9 && e.OntologyHypergeometric < 0.4 {
-				log.Printf("%s.%d has sem sim %f and perc %f and with 0.1 pert becomes [%f, %f].", tableID, columnIndex, e.OntologyHypergeometric, p1, getPercentile(server.attCDFs["sem"], math.Max(e.OntologyHypergeometric-0.1, 0.0)), getPercentile(server.attCDFs["sem"], math.Min(e.OntologyHypergeometric+0.1, 1.0)))
-			}
-			if p2 > 0.9 && e.Sim < 0.4 {
-				log.Printf("%s.%d has semset sim %f and perc %f and with 0.1 pert becomes [%f, %f].", tableID, columnIndex, e.Sim, p2, getPercentile(server.attCDFs["semset"], math.Max(e.Sim-0.1, 0.0)), getPercentile(server.attCDFs["semset"], math.Min(e.Sim+0.1, 1.0)))
-			}
-			if p1 > p2 {
+			//p1 := getPercentile(server.attCDFs["sem"], e.OntologyHypergeometric)
+			//p2 := getPercentile(server.attCDFs["semset"], e.Sim)
+			p1 := opendata.GetPerturbedPercentile(server.attCDFs["sem"], e.Sim, server.perturbationDelta)
+			p2 := opendata.GetPerturbedPercentile(server.attCDFs["semset"], e.Sim, server.perturbationDelta)
+			//if p1 > 0.9 && e.OntologyHypergeometric < 0.4 {
+			//	log.Printf("%s.%d has sem sim %f and perc %f and with 0.1 pert becomes [%f, %f].", tableID, columnIndex, e.OntologyHypergeometric, p1, getPercentile(server.attCDFs["sem"], math.Max(e.OntologyHypergeometric-0.1, 0.0)), getPercentile(server.attCDFs["sem"], math.Min(e.OntologyHypergeometric+0.1, 1.0)))
+			//}
+			//if p2 > 0.9 && e.Sim < 0.4 {
+			//	log.Printf("%s.%d has semset sim %f and perc %f and with 0.1 pert becomes [%f, %f].", tableID, columnIndex, e.Sim, p2, getPercentile(server.attCDFs["semset"], math.Max(e.Sim-0.1, 0.0)), getPercentile(server.attCDFs["semset"], math.Min(e.Sim+0.1, 1.0)))
+			//}
+			cmp := opendata.ComparePercentiles(p1, p2)
+			//if p1 > p2 {
+			if cmp == 1 {
 				e.Percentile = p1
 				e.Measure = "sem"
 				reduceBatch <- e
-			} else if p1 < p2 {
+				//} else if p1 < p2 {
+			} else if cmp == -1 {
 				e.Percentile = p2
 				e.Measure = "semset"
 				reduceBatch <- e
-			} else {
+			} else if p1.Value != 0.0 && p2.Value != 0.0 {
 				e.Percentile = p2
 				e.Measure = "semset"
 				reduceBatch <- e
@@ -145,17 +141,22 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		for pair := range server.semi.lsh.QueryPlus(ontSigs, done2) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairOntJaccardPlus(tableID, server.semi.domainDir, columnIndex, pair.QueryIndex, server.semi.numHash, ontVecs[pair.QueryIndex], noOntVecs[pair.QueryIndex], ontCards[pair.QueryIndex], noOntCards[pair.QueryIndex])
-			p1 := getPercentile(server.attCDFs["sem"], e.Sim)
-			p2 := getPercentile(server.attCDFs["semset"], e.Sim)
-			if p1 > p2 {
+			//p1 := getPercentile(server.attCDFs["sem"], e.Sim)
+			p1 := opendata.GetPerturbedPercentile(server.attCDFs["sem"], e.Sim, server.perturbationDelta)
+			//p2 := getPercentile(server.attCDFs["semset"], e.Sim)
+			p2 := opendata.GetPerturbedPercentile(server.attCDFs["semset"], e.Sim, server.perturbationDelta)
+			cmp := opendata.ComparePercentiles(p1, p2)
+			if cmp == 1 {
+				//if p1 > p2 {
 				e.Percentile = p1
 				e.Measure = "sem"
 				reduceBatch <- e
-			} else if p1 < p2 {
+				//} else if p1 < p2 {
+			} else if cmp == -1 {
 				e.Percentile = p2
 				e.Measure = "semset"
 				reduceBatch <- e
-			} else if p1 != 0.0 && p2 != 0.0 {
+			} else if p1.Value != 0.0 && p2.Value != 0.0 {
 				e.Percentile = p2
 				e.Measure = "semset"
 				reduceBatch <- e
@@ -174,8 +175,7 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 				continue
 			}
 			//reduceQueue.Push(pair, pair.Percentile)
-			lb, ub := perturbPercentile(server.attCDFs[pair.Measure], pair.Percentile, delta)
-			reduceQueue.Push(pair, lb, ub)
+			reduceQueue.Push(pair, pair.Percentile.ValueMinus, pair.Percentile.ValuePlus)
 			if reduceQueue.Size() == batchSize {
 				// checking if we have processed too many batches
 				if numBatches > 4 {
@@ -248,7 +248,7 @@ func (a alignment) processPairsCombined(reduceQueue *pqueuespan.TopKQueue, out c
 			for tp := range tablesToAlign {
 				candTableID := tp
 				//cAlignment := alignTables(queryTableID, candTableID, a.domainDir, a.setCDF, a.semCDF, a.semsetCDF, a.nlCDF, a.tableCDF)
-				cAlignment := alignTables(queryTableID, candTableID, a.domainDir, a.attCDFs, a.tableCDF)
+				cAlignment := alignTables(queryTableID, candTableID, a.domainDir, a.attCDFs, a.tableCDF, a.perturbationDelta)
 				result := SearchResult{
 					CandidateTableID:         candTableID,
 					Alignment:                cAlignment.alignment,
@@ -270,8 +270,10 @@ func (a alignment) processPairsCombined(reduceQueue *pqueuespan.TopKQueue, out c
 		for result := range alignedTables {
 			// this scoring can change
 			//cAlignmentQueue.Push(result, result.CUnionabilityPercentiles[result.BestC-1])
-			lb, ub := perturbPercentile(a.tableCDF[result.BestC-1], result.CUnionabilityPercentiles[result.BestC-1], delta)
-			cAlignmentQueue.Push(result, lb, ub)
+			//lb, ub := perturbPercentile(a.tableCDF[result.BestC], result.CUnionabilityPercentiles[result.BestC-1], delta)
+			//pair.PercentilePlus = ub
+			//pair.PercentileMinus = lb
+			cAlignmentQueue.Push(result, result.CUnionabilityPercentiles[result.BestC-1].ValueMinus, result.CUnionabilityPercentiles[result.BestC-1].ValuePlus)
 		}
 		results, _, _ := cAlignmentQueue.Descending()
 		for i := range results {

@@ -9,7 +9,6 @@ import (
 	"github.com/RJMillerLab/table-union/pqueue"
 	"github.com/ekzhu/counter"
 	"github.com/fnargesian/pqueuespan"
-	"github.com/gonum/floats"
 )
 
 type alignment struct {
@@ -26,8 +25,9 @@ type alignment struct {
 	//semCDF          opendata.CDF
 	//semsetCDF       opendata.CDF
 	//nlCDF           opendata.CDF
-	attCDFs   map[string]opendata.CDF
-	domainDir string
+	attCDFs           map[string]opendata.CDF
+	domainDir         string
+	perturbationDelta float64
 }
 
 type embDomain struct {
@@ -56,7 +56,7 @@ type Pair struct {
 	F                      float64
 	T2                     float64
 	Sim                    float64
-	Percentile             float64 //between 0 and 1
+	Percentile             opendata.Percentile //between 0 and 1
 	Measure                string
 }
 
@@ -64,22 +64,18 @@ type CUnionableVector struct {
 	queryTable     string
 	candidateTable string
 	scores         []float64
-	percentiles    []float64
+	percentiles    []opendata.Percentile
 	alignment      []Pair
 	maxC           int
 	bestC          int
 }
 
 //func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF, tableCDF map[int]opendata.CDF) CUnionableVector {
-func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[string]opendata.CDF, tableCDF map[int]opendata.CDF) CUnionableVector {
-	setCDF := attCDFs["set"]
-	semCDF := attCDFs["sem"]
-	semsetCDF := attCDFs["semset"]
-	nlCDF := attCDFs["nl"]
+func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[string]opendata.CDF, tableCDF map[int]opendata.CDF, perturbationDelta float64) CUnionableVector {
 	log.Printf("processing candidate table %s.", candidateTable)
 	var result CUnionableVector
 	cUnionabilityScores := make([]float64, 0)
-	cUnionabilityPercentiles := make([]float64, 0)
+	cUnionabilityPercentiles := make([]opendata.Percentile, 0)
 	queryTextDomains := getTextDomains(queryTable, domainDir)
 	candTextDomains := getTextDomains(candidateTable, domainDir)
 	partialAlign := counter.NewCounter()
@@ -89,11 +85,10 @@ func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[strin
 	batch := pqueuespan.NewTopKQueue(len(queryTextDomains) * len(candTextDomains))
 	for _, qindex := range queryTextDomains {
 		for _, cindex := range candTextDomains {
-			p := getAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, setCDF, semCDF, semsetCDF, nlCDF)
-			if p.Percentile != 0.0 {
+			p := getAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, attCDFs, perturbationDelta)
+			if p.Percentile.Value != 0.0 {
 				//batch.Push(p, p.Percentile)
-				lb, ub := perturbPercentile(attCDFs[p.Measure], p.Percentile, delta)
-				batch.Push(p, lb, ub)
+				batch.Push(p, p.Percentile.ValueMinus, p.Percentile.ValuePlus)
 			}
 		}
 	}
@@ -109,11 +104,12 @@ func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[strin
 		reverseAlign.Update(strconv.Itoa(pair.QueryColIndex))
 		alignment = append(alignment, pair)
 		if len(cUnionabilityScores) == 0 {
-			cUnionabilityScores = append(cUnionabilityScores, pair.Percentile)
+			cUnionabilityScores = append(cUnionabilityScores, pair.Percentile.Value)
 		} else {
-			cUnionabilityScores = append(cUnionabilityScores, cUnionabilityScores[len(cUnionabilityScores)-1]*pair.Percentile)
+			cUnionabilityScores = append(cUnionabilityScores, cUnionabilityScores[len(cUnionabilityScores)-1]*pair.Percentile.Value)
 		}
-		cUnionabilityPercentiles = append(cUnionabilityPercentiles, getPercentile(tableCDF[len(cUnionabilityPercentiles)+1], cUnionabilityScores[len(cUnionabilityScores)-1]))
+		cUnionabilityPercentiles = append(cUnionabilityPercentiles, opendata.GetPerturbedPercentile(tableCDF[len(cUnionabilityPercentiles)+1], cUnionabilityScores[len(cUnionabilityScores)-1], perturbationDelta))
+		//cUnionabilityPercentiles = append(cUnionabilityPercentiles, getPercentile(tableCDF[len(cUnionabilityPercentiles)+1], cUnionabilityScores[len(cUnionabilityScores)-1]))
 		// When we get c unique column alignments for a candidate table
 		if partialAlign.Unique() == maxC {
 			break
@@ -123,28 +119,32 @@ func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[strin
 	// if no alignment found for k = number of query columns
 	for i := len(cUnionabilityScores); i < maxC; i += 1 {
 		cUnionabilityScores = append(cUnionabilityScores, 0.0)
-		cUnionabilityPercentiles = append(cUnionabilityPercentiles, 0.0)
+		p := opendata.Percentile{0.0, 0.0, 0.0, 0.0}
+		cUnionabilityPercentiles = append(cUnionabilityPercentiles, p)
 	}
-	cUP := make([]float64, len(cUnionabilityPercentiles))
-	copy(cUP, cUnionabilityPercentiles)
-	s := cUP
-	inds := make([]int, len(s))
+	//cUP := make([]opendata.Percentile, len(cUnionabilityPercentiles))
+	//copy(cUP, cUnionabilityPercentiles)
+	//s := cUP
+	//inds := make([]int, len(s))
 	// ascending sort
-	floats.Argsort(s, inds)
+	//floats.Argsort(s, inds)
+	s, bestC := opendata.SortPercentiles(cUnionabilityPercentiles)
 	result = CUnionableVector{
 		queryTable:     queryTable,
 		candidateTable: candidateTable,
 		scores:         cUnionabilityScores,
-		percentiles:    cUnionabilityPercentiles,
-		alignment:      alignment,
-		maxC:           maxC,
-		bestC:          inds[len(inds)-1] + 1,
+		//percentiles:    cUnionabilityPercentiles,
+		percentiles: s,
+		alignment:   alignment,
+		maxC:        maxC,
+		//bestC:       inds[len(inds)-1] + 1,
+		bestC: bestC + 1,
 	}
 	return result
 }
 
-func getAttUnionabilityPair(queryTable, candidateTable string, qindex, cindex int, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF) Pair {
-	uScore, uPercentile, uMeasures := opendata.GetAttUnionabilityPercentile(queryTable, candidateTable, qindex, cindex, setCDF, semCDF, semsetCDF, nlCDF)
+func getAttUnionabilityPair(queryTable, candidateTable string, qindex, cindex int, attCDFs map[string]opendata.CDF, perturbationDelta float64) Pair {
+	uScore, uPercentile, uMeasures := opendata.GetAttUnionabilityPercentile(queryTable, candidateTable, qindex, cindex, attCDFs, perturbationDelta)
 	p := Pair{
 		CandTableID:   candidateTable,
 		CandColIndex:  cindex,

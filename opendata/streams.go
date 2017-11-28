@@ -733,6 +733,28 @@ func StreamEmbVectors(fanout int, filenames <-chan string) <-chan string {
 	return out
 }
 
+// to be removed
+func StreamQueryFilenames2() <-chan string {
+	output := make(chan string)
+	go func() {
+		f, err := os.Open(QueryList2)
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			parts := strings.SplitN(scanner.Text(), " ", 3)
+			filename := path.Join(parts...)
+			//filename := scanner.Text()
+			output <- filename
+		}
+		close(output)
+	}()
+
+	return output
+}
+
 // Creates a channel of filenames
 func StreamQueryFilenames() <-chan string {
 	output := make(chan string)

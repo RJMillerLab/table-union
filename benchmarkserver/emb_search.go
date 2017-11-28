@@ -26,13 +26,14 @@ var (
 )
 
 type SearchResult struct {
-	CandidateTableID         string
-	Alignment                []Pair
-	K                        int
-	N                        int
-	Duration                 float64
-	CUnionabilityScores      []float64
-	CUnionabilityPercentiles []float64
+	CandidateTableID    string
+	Alignment           []Pair
+	K                   int
+	N                   int
+	Duration            float64
+	CUnionabilityScores []float64
+	//CUnionabilityPercentiles []float64
+	CUnionabilityPercentiles []opendata.Percentile
 	MaxC                     int
 	BestC                    int
 }
@@ -62,16 +63,16 @@ func (index *UnionIndex) BuildScalability(size int) error {
 			if _, err := os.Stat(file); os.IsNotExist(err) {
 				continue
 			}
-			count += 1
-			if count%1000 == 0 {
-				log.Printf("indexed %d domains", count)
-			}
 			vec, err := embedding.ReadVecFromDisk(file, ByteOrder)
 			if err != nil {
 				return err
 			}
 			tableID, columnIndex := parseFilename(index.domainDir, file)
 			index.lsh.Add(vec, toColumnID(tableID, columnIndex))
+			count += 1
+			if count%1000 == 0 {
+				log.Printf("indexed %d domains", count)
+			}
 		}
 	}
 	log.Printf("counted %d domains and size is: %d", count, size)
@@ -88,17 +89,16 @@ func (index *UnionIndex) Build() error {
 	count := 0
 	for file := range embfilenames {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
-			log.Printf("%s not found.", file)
 			continue
-		}
-		count += 1
-		if count%1000 == 0 {
-			log.Printf("indexed %d domains", count)
 		}
 		vec, err := embedding.ReadVecFromDisk(file, ByteOrder)
 		if err != nil {
 			log.Printf("Error in reading %s from disk.", file)
 			return err
+		}
+		count += 1
+		if count%1000 == 0 {
+			log.Printf("indexed %d domains", count)
 		}
 		tableID, columnIndex := parseFilename(index.domainDir, file)
 		index.lsh.Add(vec, toColumnID(tableID, columnIndex))

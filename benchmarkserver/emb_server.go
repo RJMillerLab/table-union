@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/RJMillerLab/table-union/opendata"
 	"github.com/gin-gonic/gin"
 )
 
@@ -44,7 +45,7 @@ type Union struct {
 	N                        int
 	Duration                 float64
 	CUnionabilityScores      []float64
-	CUnionabilityPercentiles []float64
+	CUnionabilityPercentiles []opendata.Percentile
 	BestC                    int
 }
 
