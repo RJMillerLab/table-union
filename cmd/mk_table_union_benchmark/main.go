@@ -65,6 +65,23 @@ func (colStat columnStat) isYagoCol() bool {
 	return pct >= yagoMinPct
 }
 
+func (stat tableStat) equals(stat2 tableStat) bool {
+	if stat.Database != stat2.Database || stat.Name != stat2.Name ||
+		len(stat.columns) != len(stat.columns) {
+		return false
+	}
+	columns := make(map[string]bool)
+	for _, c := range stat.columns {
+		columns[c] = true
+	}
+	for _, c := range stat2.columns {
+		if _, ok := columns[c]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func (stat tableStat) randomProjectTextCols(c int) tableStat {
 	if c > stat.numTextCol() {
 		panic(fmt.Errorf("c (%d) > num text cols (%d)", c, stat.numTextCol()))
@@ -76,7 +93,7 @@ func (stat tableStat) randomProjectTextCols(c int) tableStat {
 			textColInds = append(textColInds, i)
 		}
 	}
-	for i := range rand.Perm(len(textColInds)) {
+	for _, i := range rand.Perm(len(textColInds)) {
 		colInds = append(colInds, textColInds[i])
 	}
 	colInds = colInds[:c]
@@ -349,13 +366,30 @@ func main() {
 		log.Printf("Projecting %s.%s, num text col = %d",
 			stat.Database, stat.Name, stat.numTextCol())
 		projections[i] = make(map[int]([]tableStat))
-		for c := 1; c <= stat.numTextCol(); c++ {
+		numTextCol := stat.numTextCol()
+		for c := 1; c < numTextCol; c++ {
 			projections[i][c] = make([]tableStat, 0)
 			for j := 0; j < numProjPerC; j++ {
-				p := stat.randomProjectTextCols(c)
+				var p tableStat
+				for {
+					p = stat.randomProjectTextCols(c)
+					// Check if this projection is duplicate with a previously generated one
+					var duplicate bool
+					for _, p2 := range projections[i][c] {
+						if p.equals(p2) {
+							duplicate = true
+							log.Printf("found duplicate %v vs. %v; %v, %d text col", p.columns, p2.columns, stat.columns, numTextCol)
+							break
+						}
+					}
+					if !duplicate {
+						break
+					}
+				}
 				projections[i][c] = append(projections[i][c], p)
 			}
 		}
+		projections[i][numTextCol] = []tableStat{stat}
 	}
 
 	// Generating tablets
