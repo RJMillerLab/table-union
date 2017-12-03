@@ -543,7 +543,6 @@ func streamDomainWords(file string, index int, out chan *Domain) {
 			//}
 		}
 	}
-	log.Printf("len(values): %d", len(values))
 	out <- &Domain{
 		Filename: file,
 		Index:    index,

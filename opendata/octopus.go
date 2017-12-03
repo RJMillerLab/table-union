@@ -197,7 +197,6 @@ func ComputeTextClusterScore(t1name, t2name string, idf map[string]float64) Octo
 	}()
 	wg.Wait()
 	cosine := computeCosine(t1Vec, t2Vec, t1L2, t2L2)
-	log.Printf("t1: %s and t2: %s has %f score.", t1name, t2name, cosine)
 	sp := OctopusScore{
 		query:     t1name,
 		candidate: t2name,

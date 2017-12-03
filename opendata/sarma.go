@@ -41,7 +41,7 @@ func InitSarma() {
 
 func InitAnnotator() {
 	entityToClass = loadEntityClasses()
-	prepareDB()
+	//prepareDB()
 }
 
 func AnnotateDomainsFromEntityFiles(files <-chan string, fanout int, ext string) <-chan *domainAnnotation {
@@ -111,14 +111,15 @@ func getSubjectColumnPlus(tableName string) int {
 }
 
 func annotateDomainEntities(file string, index int, out chan *domainAnnotation, ext string) {
+	// this is here just to restore annotation for unannotated domains
+	if _, err := os.Stat(path.Join(OutputDir, "domains", file, fmt.Sprintf("%d.%s", index, "ont-minhash-l1"))); !os.IsNotExist(err) {
+		return
+	}
+
 	filepath := path.Join(OutputDir, "domains", file, fmt.Sprintf("%d.%s", index, ext))
 	f, err := os.Open(filepath)
 	if err != nil {
 		return
-		//out <- &domainAnnotation{
-		//	filename: file,
-		//	index:    index,
-		//}
 	}
 	//defer f.Close()
 	scanner := bufio.NewScanner(f)

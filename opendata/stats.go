@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -681,7 +682,8 @@ func SavePercentileAttUnionability() {
 		if err != nil {
 			panic(err)
 		}
-		percentile := getPercentile(cdfs[measure], score)
+		//percentile := getPercentile(cdfs[measure], score)
+		percentile := getPercentileEquiDepth(cdfs[measure], score)
 		_, err = stmt.Exec(queryTable, candidateTable, queryColumn, candidateColumn, score, percentile, measure)
 		if err != nil {
 			panic(err)
@@ -799,7 +801,7 @@ func saveTableUnionabilityVariousC(unions chan tableCUnion) {
 }
 
 func ComputeTableUnionabilityCDF(numBins int) {
-	cCDFs := computeCUnionabilityCDFEquiWidth(numBins, TableStatsDB, CTableStatsTable)
+	cCDFs := computeCUnionabilityCDFEquiDepth(numBins, TableStatsDB, CTableStatsTable)
 	saveMultCDF(cCDFs, TableStatsDB, TableCDFTable)
 }
 
@@ -809,14 +811,24 @@ func ComputeAttUnionabilityCDF(numBins int) {
 }
 
 func ComputeAllAttUnionabilityCDF(numBins int) {
-	setCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AllAttStatsTable, "set")
-	saveCDF(setCdf, AttStatsDB, SetCDFTable)
-	semCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AllAttStatsTable, "sem")
-	saveCDF(semCdf, AttStatsDB, SemCDFTable)
-	semSetCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AllAttStatsTable, "semset")
-	saveCDF(semSetCdf, AttStatsDB, SemSetCDFTable)
-	nlCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AllAttStatsTable, "nl")
-	saveCDF(nlCdf, AttStatsDB, NlCDFTable)
+	setCdf := computeAttCDFEquiDepth(numBins, AttStatsDB, AllAttStatsTable, "set")
+	saveCDF(setCdf, AttStatsDB, SetCDFTable+"_eqdepth")
+	semCdf := computeAttCDFEquiDepth(numBins, AttStatsDB, AllAttStatsTable, "sem")
+	saveCDF(semCdf, AttStatsDB, SemCDFTable+"_eqdepth")
+	semSetCdf := computeAttCDFEquiDepth(numBins, AttStatsDB, AllAttStatsTable, "semset")
+	saveCDF(semSetCdf, AttStatsDB, SemSetCDFTable+"_eqdepth")
+	nlCdf := computeAttCDFEquiDepth(numBins, AttStatsDB, AllAttStatsTable, "nl")
+	saveCDF(nlCdf, AttStatsDB, NlCDFTable+"_eqdepth")
+	/*
+		setCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AllAttStatsTable, "set")
+		saveCDF(setCdf, AttStatsDB, SetCDFTable)
+		semCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AllAttStatsTable, "sem")
+		saveCDF(semCdf, AttStatsDB, SemCDFTable)
+		semSetCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AllAttStatsTable, "semset")
+		saveCDF(semSetCdf, AttStatsDB, SemSetCDFTable)
+		nlCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AllAttStatsTable, "nl")
+		saveCDF(nlCdf, AttStatsDB, NlCDFTable)
+	*/
 }
 
 func computeCUnionabilityCDFEquiWidth(numBins int, dbName, tableName string) map[int][]Bin {
@@ -946,7 +958,7 @@ func computeCUnionabilityCDFEquiDepth(numBins int, dbName, tableName string) map
 			panic(err)
 		}
 		b := Bin{
-			LowerBound:        -1.0,
+			LowerBound:        0.0,
 			UpperBound:        0.0,
 			Count:             0,
 			AccumulativeCount: 0,
@@ -960,33 +972,30 @@ func computeCUnionabilityCDFEquiDepth(numBins int, dbName, tableName string) map
 			if err != nil {
 				panic(err)
 			}
-			if b.LowerBound == -1.0 {
-				b.LowerBound = score
-			}
-			if b.AccumulativeCount < binSize {
-				b.AccumulativeCount += count
+			score = math.Min(score, 1.0)
+			if b.Count < binSize {
+				b.Count += count
 				b.UpperBound = score
 			} else {
-				b.Percentile = float64(hist[len(hist)-1].AccumulativeCount) / float64(total)
-				b.Count = b.AccumulativeCount
-				b.AccumulativeCount += hist[len(hist)-1].AccumulativeCount
+				if len(hist) != 0 {
+					b.Percentile = float64(hist[len(hist)-1].AccumulativeCount) / float64(total)
+					b.AccumulativeCount += hist[len(hist)-1].AccumulativeCount
+				}
+				b.AccumulativeCount += b.Count
 				hist = append(hist, b)
 				b = Bin{
-					LowerBound:        -1.0,
-					UpperBound:        0.0,
-					Count:             0,
+					LowerBound:        score,
+					UpperBound:        score,
+					Count:             count,
 					AccumulativeCount: 0,
 					Percentile:        0.0,
 					Total:             total,
 				}
 			}
 		}
-		if b.AccumulativeCount != 0 {
-			b.Percentile = float64(hist[len(hist)-1].AccumulativeCount) / float64(total)
-			b.Count = b.AccumulativeCount
-			b.AccumulativeCount += hist[len(hist)-1].AccumulativeCount
-			hist = append(hist, b)
-		}
+		hist[len(hist)-1].UpperBound = 1.0
+		hist[len(hist)-1].Percentile = float64(hist[len(hist)-1].AccumulativeCount) / float64(total)
+		hist[len(hist)-1].AccumulativeCount = hist[len(hist)-1].AccumulativeCount + b.Count
 		cHists[c] = hist
 	}
 	log.Printf("Number of c hists %d.", len(cHists))
@@ -1011,13 +1020,14 @@ func computeAttCDFEquiDepth(numBins int, dbName, tableName, measure string) []Bi
 			panic(err)
 		}
 	}
+	// numBins is the maximum number of bins
 	binSize := int(math.Floor(float64(total) / float64(numBins)))
 	rows, err = db.Query(fmt.Sprintf(`SELECT score, count(*) as count FROM %s WHERE measure='%s' GROUP BY score ORDER BY score ASC;`, tableName, measure))
 	if err != nil {
 		panic(err)
 	}
 	b := Bin{
-		LowerBound:        -1.0,
+		LowerBound:        0.0,
 		UpperBound:        0.0,
 		Count:             0,
 		AccumulativeCount: 0,
@@ -1031,21 +1041,21 @@ func computeAttCDFEquiDepth(numBins int, dbName, tableName, measure string) []Bi
 		if err != nil {
 			panic(err)
 		}
-		if b.LowerBound == -1.0 {
-			b.LowerBound = score
-		}
-		if b.AccumulativeCount < binSize {
-			b.AccumulativeCount += count
+		score = math.Min(score, 1.0)
+		if b.Count < binSize {
+			b.Count += count
 			b.UpperBound = score
 		} else {
-			b.Percentile = float64(hist[len(hist)-1].AccumulativeCount) / float64(total)
-			b.Count = b.AccumulativeCount
-			b.AccumulativeCount += hist[len(hist)-1].AccumulativeCount
+			if len(hist) != 0 {
+				b.Percentile = float64(hist[len(hist)-1].AccumulativeCount) / float64(total)
+				b.AccumulativeCount += hist[len(hist)-1].AccumulativeCount
+			}
+			b.AccumulativeCount += b.Count
 			hist = append(hist, b)
 			b = Bin{
-				LowerBound:        -1.0,
-				UpperBound:        0.0,
-				Count:             0,
+				LowerBound:        score,
+				UpperBound:        score,
+				Count:             count,
 				AccumulativeCount: 0,
 				Percentile:        0.0,
 				Total:             total,
@@ -1053,7 +1063,6 @@ func computeAttCDFEquiDepth(numBins int, dbName, tableName, measure string) []Bi
 		}
 	}
 	// setting the lower bound and upper bound of the first and last bins
-	hist[0].LowerBound = 0.0
 	hist[len(hist)-1].UpperBound = 1.0
 	db.Close()
 	return hist
@@ -1377,10 +1386,7 @@ func readCDFFromDB(dbName, tableName string) CDF {
 
 // getPercentile returns the percentile of a score as a number between 0 and 1
 func getPercentile(cdf CDF, score float64) float64 {
-	if math.IsNaN(score) || math.IsInf(score, 0) {
-		return 0.0
-	}
-	if score <= 0.0 {
+	if score <= 0.0 || math.IsNaN(score) || math.IsInf(score, 0) {
 		return 0.0
 	}
 	score = math.Min(score, 1.0)
@@ -1392,7 +1398,6 @@ func getPercentile(cdf CDF, score float64) float64 {
 	}
 	bin := cdf.Histogram[id]
 	percentile := bin.Percentile
-	//detail := (float64(bin.Count) * ((score - bin.LowerBound) / binWidth)) / float64(bin.Total)
 	//if detail > 1.0 || percentile > 1.0 {
 	//	log.Printf("error in percentile.")
 	//}
@@ -1401,6 +1406,19 @@ func getPercentile(cdf CDF, score float64) float64 {
 	//}
 	//return percentile + detail
 	return percentile
+}
+
+// getPercentileEquiDepth returns the percentile of a score as a number between 0 and 1 using cdf stored in equi depth format
+func getPercentileEquiDepth(cdf CDF, score float64) float64 {
+	if score <= 0.0 || math.IsNaN(score) || math.IsInf(score, 0) {
+		return 0.0
+	}
+	score = math.Min(score, 1.0)
+	i := sort.Search(len(cdf.Histogram), func(i int) bool { return cdf.Histogram[i].UpperBound >= score })
+	if i == len(cdf.Histogram) {
+		return 0.0
+	}
+	return cdf.Histogram[i].Percentile
 }
 
 func GetPerturbedPercentile(cdf CDF, score, delta float64) Percentile {

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"sync"
@@ -82,6 +81,13 @@ func DoOntologyMinhashFromDB(fanout int, files <-chan string) <-chan *DomainSket
 		wg.Add(1)
 		go func(id int) {
 			for domain := range dbDomains {
+				// checkpoint - do not process the domains that have been already minhashed.
+				fullpath := path.Join(OutputDir, "domains", domain.tableName)
+				fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", domain.columnIndex, "ont-minhash-l1"))
+				if _, err := os.Stat(fullpath); !os.IsNotExist(err) {
+					return
+				}
+				//
 				minhashDomainClasses(domain.tableName, domain.columnIndex, out)
 			}
 			wg.Done()
@@ -183,11 +189,9 @@ func DoSaveDomainSketches(fanout int, sketches <-chan *DomainSketch, ext string)
 	for i := 0; i < fanout; i++ {
 		go func(id int, sketches <-chan *DomainSketch) {
 			for domain := range sketches {
-				log.Printf("%s", domain.Filename)
 				minhashFilename := domain.PhysicalFilename(ext)
 				err := writeMinhashSignature(domain.Sketch, minhashFilename)
 				if err == nil {
-					log.Printf("%s", minhashFilename)
 					progress <- ProgressCounter{1}
 				}
 			}
