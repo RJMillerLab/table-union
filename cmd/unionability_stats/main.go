@@ -15,8 +15,8 @@ func main() {
 	CheckEnv()
 	//ComputeTableUnionabilityVariousC()
 	//ComputeAttUnionabilityCDF(100)
-	//ComputeAllAttUnionabilityCDF(100)
-	//ComputeTableUnionabilityCDF(100)
+	//ComputeAllAttUnionabilityCDF(500)
+	ComputeTableUnionabilityCDF(500)
 	//SavePercentileAttUnionability()
 	/*
 		tstart := GetNow()

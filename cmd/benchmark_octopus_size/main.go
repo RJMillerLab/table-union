@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"sync"
 
@@ -16,30 +15,31 @@ type pair struct {
 }
 
 func main() {
+	log.Printf("start of octopus size experiments")
 	CheckEnv()
 	start := GetNow()
 	results := make(chan OctopusScore)
 	queryFilenames := StreamQueryFilenames()
 	pairs := make(chan pair)
 	go func() {
-		seen := make(map[string]bool)
+		//seen := make(map[string]bool)
 		for query := range queryFilenames {
 			queryLens := GetTableColumnMeanLength(query)
-			candFilenames := StreamQueryFilenames()
+			candFilenames := StreamFilenames()
 			for cand := range candFilenames {
 				candLens := GetTableColumnMeanLength(cand)
-				if _, ok := seen[query+" "+cand]; !ok {
-					if _, ok := seen[cand+" "+query]; !ok {
-						seen[cand+" "+query] = true
-						seen[query+" "+cand] = true
-						pairs <- pair{
-							t1name:  query,
-							t2name:  cand,
-							colens1: queryLens,
-							colens2: candLens,
-						}
-					}
+				//if _, ok := seen[query+" "+cand]; !ok {
+				//	if _, ok := seen[cand+" "+query]; !ok {
+				//		seen[cand+" "+query] = true
+				//		seen[query+" "+cand] = true
+				pairs <- pair{
+					t1name:  query,
+					t2name:  cand,
+					colens1: queryLens,
+					colens2: candLens,
 				}
+				//	}
+				//}
 			}
 		}
 		close(pairs)
@@ -65,7 +65,7 @@ func main() {
 		total.Values += n.Values
 		now := GetNow()
 		if total.Values%100 == 0 {
-			fmt.Printf("Processed %d datasets in %.2f seconds\n", total.Values, now-start)
+			log.Printf("Processed %d datasets in %.2f seconds\n", total.Values, now-start)
 		}
 	}
 	log.Printf("Done benchmarking Octopus using size cluster score.")
