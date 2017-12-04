@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	//queryDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/csvfiles/"
-	queryDir = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
+	queryDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v5/csvfiles/"
+	//queryDir = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
 )
 
 type CombinedClient struct {
@@ -131,7 +131,7 @@ func (c *CombinedClient) Query(queryCSVFilename string, n int) []QueryResult {
 	}
 	// the query is empty
 	if len(setVecs) == 0 {
-		log.Printf("Query %s does not contain text attributes.")
+		log.Printf("Query %s does not contain text attributes.", queryCSVFilename)
 		return results
 	}
 	// Query server

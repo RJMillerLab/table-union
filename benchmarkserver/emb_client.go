@@ -22,10 +22,10 @@ import (
 )
 
 var (
-	//domainDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/domains"
-	//opendataDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/csvfiles"
-	domainDir     = "/home/fnargesian/TABLE_UNION_OUTPUT/domains"
-	opendataDir   = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
+	domainDir   = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v5/domains"
+	opendataDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v5/csvfiles"
+	//domainDir     = "/home/fnargesian/TABLE_UNION_OUTPUT/domains"
+	//opendataDir   = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
 	opendataDirUS = "/home/ekzhu/OPENDATA"
 )
 

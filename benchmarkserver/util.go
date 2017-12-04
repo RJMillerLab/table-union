@@ -405,15 +405,6 @@ func getCardinality(column []string) int {
 	return counter.Unique()
 }
 
-/*
-func getPercentile(score float64) float64 {
-	i := sort.Search(len(cdf), func(i int) bool { return cdf[i] <= score })
-	if i == len(data) {
-		return 0.0
-	}
-	return float64(i + 1)
-}
-*/
 // getPercentile returns the percentile of a score as a number between 0 and 1
 func getPercentile(cdf opendata.CDF, score float64) float64 {
 	if score <= 0.0 {
@@ -436,9 +427,3 @@ func getPercentile(cdf opendata.CDF, score float64) float64 {
 	//return percentile + detail
 	return percentile
 }
-
-//func getPerturbPercentile(cdf opendata.CDF, score, delta float64) (float64, float64) {
-//	lb := getPercentile(cdf, math.Max(score-delta, 0.0))
-//	ub := getPercentile(cdf, math.Min(score+delta, 1.0))
-//	return lb, ub
-//}

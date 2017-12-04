@@ -178,7 +178,7 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 			reduceQueue.Push(pair, pair.Percentile.ValueMinus, pair.Percentile.ValuePlus)
 			if reduceQueue.Size() == batchSize {
 				// checking if we have processed too many batches
-				if numBatches > 4 {
+				if numBatches > 3 {
 					close(done1)
 					close(done2)
 					close(done3)
@@ -201,6 +201,10 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		}
 		if reduceQueue.Size() != 0 {
 			alignment.processPairsCombined(reduceQueue, results, queryTableID)
+			close(done1)
+			close(done2)
+			close(done3)
+			close(done4)
 		}
 		wwg.Done()
 	}()
