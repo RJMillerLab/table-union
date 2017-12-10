@@ -22,17 +22,18 @@ import (
 var (
 	databases = [][]string{
 		[]string{"/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db", "canada"},
-		[]string{"/home/ekzhu/OPENDATA/2017-03-05/catalog.data.gov.jsonl.db", "us"},
+		// []string{"/home/ekzhu/OPENDATA/2017-03-05/catalog.data.gov.jsonl.db", "us"},
 		[]string{"/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db", "uk"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/datahub.io.jsonl.db", "datahub"},
 	}
-	numRawTableToSelect                   = 100
-	numBenchmarkTablePerRaw               = 25
+	numRawTableToSelect                   = 10
+	numBenchmarkTablePerRaw               = 5
 	fastTextMinNumCol                     = 5
 	fasttextMinPct                        = 0.8
 	yagoMinNumCol                         = fastTextMinNumCol
 	yagoMinPct                            = fasttextMinPct
+	minDistinct                           = 4
 	numProjPerC                           = 2
 	maxSrcTableNumRow                     = 25000
 	statTablename                         = "dataset_profile"
@@ -82,30 +83,48 @@ func (stat tableStat) equals(stat2 tableStat) bool {
 	return true
 }
 
+func (stat tableStat) discardSmallCardinalityCols(minDistinct int) tableStat {
+	colInds := make([]int, 0)
+	for i := range stat.colStats {
+		if stat.colStats[i].distinctCount >= minDistinct {
+			colInds = append(colInds, i)
+		}
+	}
+	s := tableStat{
+		TableStat: stat.TableStat,
+		colStats:  make([]columnStat, len(colInds)),
+		columns:   make([]string, len(colInds)),
+	}
+	s.NumCol = len(colInds)
+	for i, colInd := range colInds {
+		s.colStats[i] = stat.colStats[colInd]
+		s.columns[i] = stat.columns[colInd]
+	}
+	return s
+}
+
 func (stat tableStat) randomProjectTextCols(c int) tableStat {
 	if c > stat.numTextCol() {
 		panic(fmt.Errorf("c (%d) > num text cols (%d)", c, stat.numTextCol()))
 	}
-	var colInds []int
 	textColInds := make([]int, 0)
 	for i := range stat.colStats {
 		if stat.colStats[i].isText {
 			textColInds = append(textColInds, i)
 		}
 	}
-	for _, i := range rand.Perm(len(textColInds)) {
-		colInds = append(colInds, textColInds[i])
-	}
-	colInds = colInds[:c]
 	s := tableStat{
 		TableStat: stat.TableStat,
-		colStats:  make([]columnStat, c),
-		columns:   make([]string, c),
+		colStats:  make([]columnStat, 0),
+		columns:   make([]string, 0),
 	}
 	s.NumCol = c
-	for i, colInd := range colInds {
-		s.columns[i] = stat.columns[colInd]
-		s.colStats[i] = stat.colStats[colInd]
+	for i, j := range rand.Perm(len(textColInds)) {
+		if i == c {
+			break
+		}
+		s.columns = append(s.columns, stat.columns[textColInds[j]])
+		s.colStats = append(s.colStats, stat.colStats[textColInds[j]])
 	}
 	return s
 }
@@ -348,6 +367,10 @@ func main() {
 				stat.Database, stat.Name, readErr.Error())
 			continue
 		}
+		// Remove low cardinality columns
+		stat = stat.discardSmallCardinalityCols(minDistinct)
+		log.Printf("%s.%s now has %d columns after discarding small cols",
+			stat.Database, stat.Name, len(stat.colStats))
 		// Count number of columns meeting the criteria
 		if stat.metYagoCriteria() && stat.metFastTextCriteria() {
 			log.Printf("Selected %s.%s", stat.Database, stat.Name)
