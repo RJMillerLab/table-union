@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -20,20 +20,17 @@ import (
 )
 
 var (
-	databases = [][]string{
-		[]string{"/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db", "canada"},
-		[]string{"/home/ekzhu/OPENDATA/2017-03-05/catalog.data.gov.jsonl.db", "us"},
-		[]string{"/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db", "uk"},
-		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
-		// []string{"/home/ekzhu/OPENDATA/2017-06-05/datahub.io.jsonl.db", "datahub"},
+	databases = map[string]string{
+		"canada": "/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db",
+		"uk":     "/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db",
+		// []string{"/home/ekzhu/OPENDATA/2017-03-05/catalog.data.gov.jsonl.db", "us"},
 	}
-	numRawTableToSelect                   = 100
-	numBenchmarkTablePerRaw               = 25
+	numRawTableToSelect                   = 1
 	fastTextMinNumCol                     = 5
 	fasttextMinPct                        = 0.8
 	yagoMinNumCol                         = fastTextMinNumCol
 	yagoMinPct                            = fasttextMinPct
-	numProjPerC                           = 2
+	minDistinct                           = 4
 	maxSrcTableNumRow                     = 25000
 	statTablename                         = "dataset_profile"
 	maxNumDistinctBeforeGiveUp            = 100
@@ -65,47 +62,22 @@ func (colStat columnStat) isYagoCol() bool {
 	return pct >= yagoMinPct
 }
 
-func (stat tableStat) equals(stat2 tableStat) bool {
-	if stat.Database != stat2.Database || stat.Name != stat2.Name ||
-		len(stat.columns) != len(stat.columns) {
-		return false
-	}
-	columns := make(map[string]bool)
-	for _, c := range stat.columns {
-		columns[c] = true
-	}
-	for _, c := range stat2.columns {
-		if _, ok := columns[c]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
-func (stat tableStat) randomProjectTextCols(c int) tableStat {
-	if c > stat.numTextCol() {
-		panic(fmt.Errorf("c (%d) > num text cols (%d)", c, stat.numTextCol()))
-	}
-	var colInds []int
-	textColInds := make([]int, 0)
+func (stat tableStat) discardSmallCardinalityCols(minDistinct int) tableStat {
+	colInds := make([]int, 0)
 	for i := range stat.colStats {
-		if stat.colStats[i].isText {
-			textColInds = append(textColInds, i)
+		if stat.colStats[i].distinctCount >= minDistinct {
+			colInds = append(colInds, i)
 		}
 	}
-	for _, i := range rand.Perm(len(textColInds)) {
-		colInds = append(colInds, textColInds[i])
-	}
-	colInds = colInds[:c]
 	s := tableStat{
 		TableStat: stat.TableStat,
-		colStats:  make([]columnStat, c),
-		columns:   make([]string, c),
+		colStats:  make([]columnStat, len(colInds)),
+		columns:   make([]string, len(colInds)),
 	}
-	s.NumCol = c
+	s.NumCol = len(colInds)
 	for i, colInd := range colInds {
-		s.columns[i] = stat.columns[colInd]
 		s.colStats[i] = stat.colStats[colInd]
+		s.columns[i] = stat.columns[colInd]
 	}
 	return s
 }
@@ -142,11 +114,14 @@ func (stat tableStat) metYagoCriteria() bool {
 
 func main() {
 	var output string
+	var statDatabaseFilename string
 	var fastTextDatabaseFilename string
 	var yagoDatabaseFilename string
 	var ignoreCoverage bool
+	flag.StringVar(&statDatabaseFilename, "stat", "",
+		"The SQLite3 database for the table stats, which will be computed if not exists")
 	flag.StringVar(&output, "output", "",
-		"The output is a SQLite database storing the benchmark tables.")
+		"The output is a file listing the selected base tables.")
 	flag.StringVar(&fastTextDatabaseFilename, "fasttext",
 		"/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"The FastText database")
@@ -156,31 +131,17 @@ func main() {
 	flag.BoolVar(&ignoreCoverage, "ignore-coverage", false,
 		"Do not use YAGO and FastText coverage as selection criteria")
 	flag.Parse()
-	od, err := opendata.NewExplorer(output)
+
+	od, err := opendata.NewExplorer(statDatabaseFilename)
 	if err != nil {
 		panic(err)
 	}
 	defer od.Close()
-	// Cleaning cached tables
-	log.Print("Cleaning previously generated tables...")
-	cached, err := od.CachedTables()
-	var countCached int
-	for _, name := range cached {
-		if name == statTablename {
-			continue
-		}
-		countCached++
-		fmt.Printf("\rDropping %d out of %d", countCached, len(cached)-1)
-		if err := od.DropCachedTable(name); err != nil {
-			panic(err)
-		}
-	}
-	fmt.Println()
 
 	// Attaching databases
-	for _, database := range databases {
-		log.Printf("Attach database %s as %s", database[0], database[1])
-		if err := od.Attach(database[0], database[1]); err != nil {
+	for database, filename := range databases {
+		log.Printf("Attach database %s as %s", filename, database)
+		if err := od.Attach(filename, database); err != nil {
 			panic(err)
 		}
 	}
@@ -348,6 +309,10 @@ func main() {
 				stat.Database, stat.Name, readErr.Error())
 			continue
 		}
+		// Remove low cardinality columns
+		stat = stat.discardSmallCardinalityCols(minDistinct)
+		log.Printf("%s.%s now has %d columns after discarding small cols",
+			stat.Database, stat.Name, len(stat.colStats))
 		// Count number of columns meeting the criteria
 		if stat.metYagoCriteria() && stat.metFastTextCriteria() {
 			log.Printf("Selected %s.%s", stat.Database, stat.Name)
@@ -359,65 +324,15 @@ func main() {
 		}
 	}
 
-	// Create random projections of the selected tables
-	// The projections for the selected tables, multiple projections for each value of c
-	projections := make([](map[int]([]tableStat)), len(selected))
-	for i, stat := range selected {
-		log.Printf("Projecting %s.%s, num text col = %d",
-			stat.Database, stat.Name, stat.numTextCol())
-		projections[i] = make(map[int]([]tableStat))
-		numTextCol := stat.numTextCol()
-		for c := 1; c < numTextCol; c++ {
-			projections[i][c] = make([]tableStat, 0)
-			for j := 0; j < numProjPerC; j++ {
-				var p tableStat
-				for {
-					p = stat.randomProjectTextCols(c)
-					// Check if this projection is duplicate with a previously generated one
-					var duplicate bool
-					for _, p2 := range projections[i][c] {
-						if p.equals(p2) {
-							duplicate = true
-							log.Printf("found duplicate %v vs. %v; %v, %d text col", p.columns, p2.columns, stat.columns, numTextCol)
-							break
-						}
-					}
-					if !duplicate {
-						break
-					}
-				}
-				projections[i][c] = append(projections[i][c], p)
-			}
-		}
-		projections[i][numTextCol] = []tableStat{stat}
+	log.Printf("Write selected tables to %s", output)
+	file, err := os.Create(output)
+	if err != nil {
+		panic(err)
 	}
-
-	// Generating tablets
-	log.Print("Generating benchmark tables from selected source tables...")
-	for _, projections := range projections {
-		for c, ps := range projections {
-			for j, stat := range ps {
-				limit := stat.NumRow / numBenchmarkTablePerRaw
-				if limit == 0 {
-					panic("Getting limit = 0")
-				}
-				originalTablename := fmt.Sprintf("%s____%s____c%d_%d",
-					stat.Database, stat.Name, c, j)
-				if err := od.LoadTableProject(stat.Database, stat.Name, originalTablename,
-					stat.columns); err != nil {
-					panic(err)
-				}
-				for i := 0; i < numBenchmarkTablePerRaw; i++ {
-					offset := limit * i
-					tablename := fmt.Sprintf("%s____%s____c%d_%d____%d",
-						stat.Database, stat.Name, c, j, i)
-					if err := od.LoadTableLimit("", originalTablename, tablename, offset, limit); err != nil {
-						panic(err)
-					}
-				}
-			}
-		}
+	for _, table := range selected {
+		file.WriteString(fmt.Sprintf("%s %s\n", databases[table.Database], table.Name))
 	}
+	file.Close()
 
 	// Done
 	log.Print("Done")
