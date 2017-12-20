@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
 	"regexp"
 	"sort"
 	"strings"
@@ -27,14 +26,12 @@ var (
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
 		// []string{"/home/ekzhu/OPENDATA/2017-06-05/datahub.io.jsonl.db", "datahub"},
 	}
-	numRawTableToSelect                   = 10
-	numBenchmarkTablePerRaw               = 5
+	numRawTableToSelect                   = 1
 	fastTextMinNumCol                     = 5
 	fasttextMinPct                        = 0.8
 	yagoMinNumCol                         = fastTextMinNumCol
 	yagoMinPct                            = fasttextMinPct
 	minDistinct                           = 4
-	numProjPerC                           = 2
 	maxSrcTableNumRow                     = 25000
 	statTablename                         = "dataset_profile"
 	maxNumDistinctBeforeGiveUp            = 100
@@ -66,23 +63,6 @@ func (colStat columnStat) isYagoCol() bool {
 	return pct >= yagoMinPct
 }
 
-func (stat tableStat) equals(stat2 tableStat) bool {
-	if stat.Database != stat2.Database || stat.Name != stat2.Name ||
-		len(stat.columns) != len(stat.columns) {
-		return false
-	}
-	columns := make(map[string]bool)
-	for _, c := range stat.columns {
-		columns[c] = true
-	}
-	for _, c := range stat2.columns {
-		if _, ok := columns[c]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
 func (stat tableStat) discardSmallCardinalityCols(minDistinct int) tableStat {
 	colInds := make([]int, 0)
 	for i := range stat.colStats {
@@ -99,32 +79,6 @@ func (stat tableStat) discardSmallCardinalityCols(minDistinct int) tableStat {
 	for i, colInd := range colInds {
 		s.colStats[i] = stat.colStats[colInd]
 		s.columns[i] = stat.columns[colInd]
-	}
-	return s
-}
-
-func (stat tableStat) randomProjectTextCols(c int) tableStat {
-	if c > stat.numTextCol() {
-		panic(fmt.Errorf("c (%d) > num text cols (%d)", c, stat.numTextCol()))
-	}
-	textColInds := make([]int, 0)
-	for i := range stat.colStats {
-		if stat.colStats[i].isText {
-			textColInds = append(textColInds, i)
-		}
-	}
-	s := tableStat{
-		TableStat: stat.TableStat,
-		colStats:  make([]columnStat, 0),
-		columns:   make([]string, 0),
-	}
-	s.NumCol = c
-	for i, j := range rand.Perm(len(textColInds)) {
-		if i == c {
-			break
-		}
-		s.columns = append(s.columns, stat.columns[textColInds[j]])
-		s.colStats = append(s.colStats, stat.colStats[textColInds[j]])
 	}
 	return s
 }
@@ -382,63 +336,12 @@ func main() {
 		}
 	}
 
-	// Create random projections of the selected tables
-	// The projections for the selected tables, multiple projections for each value of c
-	projections := make([](map[int]([]tableStat)), len(selected))
-	for i, stat := range selected {
-		log.Printf("Projecting %s.%s, num text col = %d",
-			stat.Database, stat.Name, stat.numTextCol())
-		projections[i] = make(map[int]([]tableStat))
-		numTextCol := stat.numTextCol()
-		for c := 1; c < numTextCol; c++ {
-			projections[i][c] = make([]tableStat, 0)
-			for j := 0; j < numProjPerC; j++ {
-				var p tableStat
-				for {
-					p = stat.randomProjectTextCols(c)
-					// Check if this projection is duplicate with a previously generated one
-					var duplicate bool
-					for _, p2 := range projections[i][c] {
-						if p.equals(p2) {
-							duplicate = true
-							log.Printf("found duplicate %v vs. %v; %v, %d text col", p.columns, p2.columns, stat.columns, numTextCol)
-							break
-						}
-					}
-					if !duplicate {
-						break
-					}
-				}
-				projections[i][c] = append(projections[i][c], p)
-			}
-		}
-		projections[i][numTextCol] = []tableStat{stat}
-	}
-
 	// Generating tablets
-	log.Print("Generating benchmark tables from selected source tables...")
-	for _, projections := range projections {
-		for c, ps := range projections {
-			for j, stat := range ps {
-				limit := stat.NumRow / numBenchmarkTablePerRaw
-				if limit == 0 {
-					panic("Getting limit = 0")
-				}
-				originalTablename := fmt.Sprintf("%s____%s____c%d_%d",
-					stat.Database, stat.Name, c, j)
-				if err := od.LoadTableProject(stat.Database, stat.Name, originalTablename,
-					stat.columns); err != nil {
-					panic(err)
-				}
-				for i := 0; i < numBenchmarkTablePerRaw; i++ {
-					offset := limit * i
-					tablename := fmt.Sprintf("%s____%s____c%d_%d____%d",
-						stat.Database, stat.Name, c, j, i)
-					if err := od.LoadTableLimit("", originalTablename, tablename, offset, limit); err != nil {
-						panic(err)
-					}
-				}
-			}
+	log.Print("Copying base tables from selected source tables...")
+	for _, table := range selected {
+		err := od.LoadTable(table.Database, table.Name, table.Name)
+		if err != nil {
+			panic(err)
 		}
 	}
 

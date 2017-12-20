@@ -71,16 +71,30 @@ if __name__ == "__main__":
 
     # Create benchmark tables by selections
     for table in tables:
-        limit = int(nrows[table] / NUM_BENCHMARK_TABLE_PER_BASE)
-        offsets = [i*limit for i in range(NUM_BENCHMARK_TABLE_PER_BASE)]
         # Do selection on all projections of this table
         for c in projections[table]:
             for i, columns in enumerate(projections[table][c]):
+
+                # First create the deduplicated projected table
+                proj_table_name = "{}____c{}_{}".format(table, c, i)
                 fmt = ", ".join(['''"{}"'''.format(c) for c in columns])
+                sql = '''CREATE TABLE "{}" AS SELECT DISTINCT {} FROM BASE."{}";'''.format(proj_table_name, fmt, table)
+                conn.execute(sql)
+
+                # Count the number of rows in the projected table
+                # and set the limit and offsets
+                nrow = conn.execute('''SELECT count(rowid) FROM "{}";'''.format(proj_table_name)).fetchone()[0]
+                limit = int(nrow / NUM_BENCHMARK_TABLE_PER_BASE)
+                offsets = [i*limit for i in range(NUM_BENCHMARK_TABLE_PER_BASE)]
+
+                # Create the selections of the projected table
                 for j, offset in enumerate(offsets):
                     name = "{}____c{}_{}____{}".format(table, c, i, j)
-                    sql = '''CREATE TABLE "{}" AS SELECT {} FROM base."{}" LIMIT {} OFFSET {};'''.format(name, fmt, table, limit, offset)
+                    sql = '''CREATE TABLE "{}" AS SELECT * FROM "{}" LIMIT {} OFFSET {};'''.format(name, proj_table_name, limit, offset)
                     conn.execute(sql)
+
+                # Drop the projected table after selections have created
+                conn.execute('''DROP TABLE "{}";'''.format(proj_table_name))
     conn.commit()
 
     # Finish
