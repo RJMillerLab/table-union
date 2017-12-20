@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -19,12 +20,10 @@ import (
 )
 
 var (
-	databases = [][]string{
-		[]string{"/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db", "canada"},
+	databases = map[string]string{
+		"canada": "/home/ekzhu/OPENDATA/2017-06-05/open.canada.ca_data_en.jsonl.db",
+		"uk":     "/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db",
 		// []string{"/home/ekzhu/OPENDATA/2017-03-05/catalog.data.gov.jsonl.db", "us"},
-		[]string{"/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db", "uk"},
-		// []string{"/home/ekzhu/OPENDATA/2017-06-05/data.opencolorado.org.jsonl.db", "colorado"},
-		// []string{"/home/ekzhu/OPENDATA/2017-06-05/datahub.io.jsonl.db", "datahub"},
 	}
 	numRawTableToSelect                   = 1
 	fastTextMinNumCol                     = 5
@@ -115,11 +114,14 @@ func (stat tableStat) metYagoCriteria() bool {
 
 func main() {
 	var output string
+	var statDatabaseFilename string
 	var fastTextDatabaseFilename string
 	var yagoDatabaseFilename string
 	var ignoreCoverage bool
+	flag.StringVar(&statDatabaseFilename, "stat", "",
+		"The SQLite3 database for the table stats, which will be computed if not exists")
 	flag.StringVar(&output, "output", "",
-		"The output is a SQLite database storing the benchmark tables.")
+		"The output is a file listing the selected base tables.")
 	flag.StringVar(&fastTextDatabaseFilename, "fasttext",
 		"/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"The FastText database")
@@ -129,31 +131,17 @@ func main() {
 	flag.BoolVar(&ignoreCoverage, "ignore-coverage", false,
 		"Do not use YAGO and FastText coverage as selection criteria")
 	flag.Parse()
-	od, err := opendata.NewExplorer(output)
+
+	od, err := opendata.NewExplorer(statDatabaseFilename)
 	if err != nil {
 		panic(err)
 	}
 	defer od.Close()
-	// Cleaning cached tables
-	log.Print("Cleaning previously generated tables...")
-	cached, err := od.CachedTables()
-	var countCached int
-	for _, name := range cached {
-		if name == statTablename {
-			continue
-		}
-		countCached++
-		fmt.Printf("\rDropping %d out of %d", countCached, len(cached)-1)
-		if err := od.DropCachedTable(name); err != nil {
-			panic(err)
-		}
-	}
-	fmt.Println()
 
 	// Attaching databases
-	for _, database := range databases {
-		log.Printf("Attach database %s as %s", database[0], database[1])
-		if err := od.Attach(database[0], database[1]); err != nil {
+	for database, filename := range databases {
+		log.Printf("Attach database %s as %s", filename, database)
+		if err := od.Attach(filename, database); err != nil {
 			panic(err)
 		}
 	}
@@ -336,14 +324,15 @@ func main() {
 		}
 	}
 
-	// Generating tablets
-	log.Print("Copying base tables from selected source tables...")
-	for _, table := range selected {
-		err := od.LoadTable(table.Database, table.Name, table.Name)
-		if err != nil {
-			panic(err)
-		}
+	log.Printf("Write selected tables to %s", output)
+	file, err := os.Create(output)
+	if err != nil {
+		panic(err)
 	}
+	for _, table := range selected {
+		file.WriteString(fmt.Sprintf("%s %s\n", databases[table.Database], table.Name))
+	}
+	file.Close()
 
 	// Done
 	log.Print("Done")
