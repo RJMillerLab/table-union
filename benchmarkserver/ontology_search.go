@@ -38,6 +38,8 @@ func (index *JaccardUnionIndex) OntBuild() error {
 	}
 	index.lsh.Index()
 	log.Printf("ont build count %d", count)
+	//index.lsh.PrintBuckets("/home/fnargesian/TABLE_UNION_OUTPUT/sem_buckets.csv")
+	//log.Printf("printed.")
 	return nil
 }
 
@@ -65,6 +67,8 @@ func (index *JaccardUnionIndex) NoOntBuild() error {
 		}
 	}
 	index.lsh.Index()
+	//index.lsh.PrintBuckets("/home/fnargesian/TABLE_UNION_OUTPUT/nosem_buckets.csv")
+	//log.Printf("printed.")
 	log.Printf("no ont build count %d", count)
 	return nil
 }

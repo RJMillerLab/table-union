@@ -57,6 +57,8 @@ func (index *JaccardUnionIndex) Build() error {
 	}
 	index.lsh.Index()
 	log.Printf("index time for jaccard: %f", getNow()-start)
+	//index.lsh.PrintBuckets("/home/fnargesian/TABLE_UNION_OUTPUT/minhash_buckets.csv")
+	//log.Printf("printed.")
 	return nil
 }
 

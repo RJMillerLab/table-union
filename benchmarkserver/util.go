@@ -2,6 +2,7 @@ package benchmarkserver
 
 import (
 	"bufio"
+	"encoding/csv"
 	"fmt"
 	"log"
 	"math"
@@ -17,6 +18,7 @@ import (
 	"github.com/RJMillerLab/table-union/opendata"
 	"github.com/deckarep/golang-set"
 	"github.com/ekzhu/counter"
+	"github.com/ekzhu/datatable"
 )
 
 var (
@@ -235,18 +237,29 @@ func getTextDomains(file, domainDir string) (indices []int) {
 }
 
 func getHeaders(file, domainDir string) (headers []string) {
-	typesFile := path.Join(domainDir, file, "index")
-	f, err := os.Open(typesFile)
-	defer f.Close()
+	/*
+		typesFile := path.Join(domainDir, file, "index")
+		f, err := os.Open(typesFile)
+		defer f.Close()
+		if err != nil {
+			panic(err)
+		}
+
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			headers = append(headers, scanner.Text())
+		}
+		return
+	*/
+	f, err := os.Open(path.Join(queryDir, file))
 	if err != nil {
 		panic(err)
 	}
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		headers = append(headers, scanner.Text())
-	}
-	return
+	defer f.Close()
+	reader := csv.NewReader(f)
+	queryTable, err := datatable.FromCSV(reader)
+	queryHeaders := queryTable.GetRow(0)
+	return queryHeaders
 }
 
 func getTextHeaders(file, domainDir string) []string {

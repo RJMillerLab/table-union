@@ -22,7 +22,6 @@ type tablePair struct {
 	candidateTable string
 }
 
-//func initCAlignment(N int, tableCDF map[int]opendata.CDF, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF, domainDir string) alignment {
 func initCAlignment(N int, tableCDF map[int]opendata.CDF, attCDFs map[string]opendata.CDF, domainDir string, perturbationDelta float64) alignment {
 	return alignment{
 		completedTables:   counter.NewCounter(),
@@ -94,6 +93,7 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 				reduceBatch <- e
 			}
 		}
+		wg.Done()
 	}()
 	go func() {
 		if len(noOntVecs) == 0 {
@@ -175,7 +175,8 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 				continue
 			}
 			//reduceQueue.Push(pair, pair.Percentile)
-			reduceQueue.Push(pair, pair.Percentile.ValueMinus, pair.Percentile.ValuePlus)
+			//reduceQueue.Push(pair, pair.Percentile.ValueMinus, pair.Percentile.ValuePlus)
+			reduceQueue.Push(pair, pair.Percentile.Value, pair.Percentile.Value)
 			if reduceQueue.Size() == batchSize {
 				// checking if we have processed too many batches
 				if numBatches > 3 {
@@ -251,7 +252,6 @@ func (a alignment) processPairsCombined(reduceQueue *pqueuespan.TopKQueue, out c
 		go func() {
 			for tp := range tablesToAlign {
 				candTableID := tp
-				//cAlignment := alignTables(queryTableID, candTableID, a.domainDir, a.setCDF, a.semCDF, a.semsetCDF, a.nlCDF, a.tableCDF)
 				cAlignment := alignTables(queryTableID, candTableID, a.domainDir, a.attCDFs, a.tableCDF, a.perturbationDelta)
 				result := SearchResult{
 					CandidateTableID:         candTableID,
@@ -260,8 +260,10 @@ func (a alignment) processPairsCombined(reduceQueue *pqueuespan.TopKQueue, out c
 					Duration:                 float64(time.Now().Sub(a.startTime)) / float64(1000000),
 					CUnionabilityScores:      cAlignment.scores,
 					CUnionabilityPercentiles: cAlignment.percentiles,
-					MaxC:  cAlignment.maxC,
-					BestC: cAlignment.bestC,
+					MaxC:                     cAlignment.maxC,
+					BestC:                    cAlignment.bestC,
+					SketchedQueryColsNum:     cAlignment.sketchedQueryColsNum,
+					SketchedCandidateColsNum: cAlignment.sketchedQueryColsNum,
 				}
 				alignedTables <- result
 			}
@@ -274,10 +276,10 @@ func (a alignment) processPairsCombined(reduceQueue *pqueuespan.TopKQueue, out c
 		for result := range alignedTables {
 			// this scoring can change
 			//cAlignmentQueue.Push(result, result.CUnionabilityPercentiles[result.BestC-1])
-			//lb, ub := perturbPercentile(a.tableCDF[result.BestC], result.CUnionabilityPercentiles[result.BestC-1], delta)
-			//pair.PercentilePlus = ub
-			//pair.PercentileMinus = lb
-			cAlignmentQueue.Push(result, result.CUnionabilityPercentiles[result.BestC-1].ValueMinus, result.CUnionabilityPercentiles[result.BestC-1].ValuePlus)
+			//cAlignmentQueue.Push(result, result.CUnionabilityPercentiles[result.BestC-1].ValueMinus, result.CUnionabilityPercentiles[result.BestC-1].ValuePlus)
+			cAlignmentQueue.Push(result, result.CUnionabilityPercentiles[result.BestC-1].Value, result.CUnionabilityPercentiles[result.BestC-1].Value)
+			//cAlignmentQueue.Push(result, result.CUnionabilityPercentiles[result.BestC-1].ValuePlus, result.CUnionabilityPercentiles[result.BestC-1].ValuePlus)
+			//cAlignmentQueue.Push(result, result.CUnionabilityPercentiles[result.BestC-1].ValueMinus, result.CUnionabilityPercentiles[result.BestC-1].ValueMinus)
 		}
 		results, _, _ := cAlignmentQueue.Descending()
 		for i := range results {

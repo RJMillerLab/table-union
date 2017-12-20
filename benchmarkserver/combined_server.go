@@ -101,7 +101,9 @@ func (s *CombinedServer) queryHandler(c *gin.Context) {
 			Duration:                 result.Duration,
 			CUnionabilityScores:      result.CUnionabilityScores,
 			CUnionabilityPercentiles: result.CUnionabilityPercentiles,
-			BestC: result.BestC,
+			BestC:                    result.BestC,
+			SketchedQueryColsNum:     result.SketchedQueryColsNum,
+			SketchedCandidateColsNum: result.SketchedCandidateColsNum,
 		}
 
 		searchResults = append(searchResults, QueryResult{

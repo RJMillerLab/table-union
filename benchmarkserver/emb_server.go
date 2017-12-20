@@ -47,6 +47,9 @@ type Union struct {
 	CUnionabilityScores      []float64
 	CUnionabilityPercentiles []opendata.Percentile
 	BestC                    int
+	TextToAllHeaders         map[int]int
+	SketchedQueryColsNum     int
+	SketchedCandidateColsNum int
 }
 
 func NewServer(ui *UnionIndex) *Server {

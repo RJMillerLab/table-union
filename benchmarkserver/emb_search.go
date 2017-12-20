@@ -36,6 +36,8 @@ type SearchResult struct {
 	CUnionabilityPercentiles []opendata.Percentile
 	MaxC                     int
 	BestC                    int
+	SketchedQueryColsNum     int
+	SketchedCandidateColsNum int
 }
 
 type UnionIndex struct {
@@ -105,6 +107,8 @@ func (index *UnionIndex) Build() error {
 	}
 	index.lsh.Index()
 	log.Printf("index time for embedding: %f", getNow()-start)
+	//index.lsh.PrintBuckets("/home/fnargesian/TABLE_UNION_OUTPUT/simhash_buckets.csv")
+	//log.Printf("printed")
 	return nil
 }
 

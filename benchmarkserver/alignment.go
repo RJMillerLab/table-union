@@ -2,7 +2,7 @@ package benchmarkserver
 
 import (
 	"log"
-	"strconv"
+	"math"
 	"time"
 
 	"github.com/RJMillerLab/table-union/opendata"
@@ -61,16 +61,17 @@ type Pair struct {
 }
 
 type CUnionableVector struct {
-	queryTable     string
-	candidateTable string
-	scores         []float64
-	percentiles    []opendata.Percentile
-	alignment      []Pair
-	maxC           int
-	bestC          int
+	queryTable               string
+	candidateTable           string
+	scores                   []float64
+	percentiles              []opendata.Percentile
+	alignment                []Pair
+	maxC                     int
+	bestC                    int
+	sketchedQueryColsNum     int
+	sketchedCandidateColsNum int
 }
 
-//func alignTables(queryTable, candidateTable, domainDir string, setCDF, semCDF, semsetCDF, nlCDF opendata.CDF, tableCDF map[int]opendata.CDF) CUnionableVector {
 func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[string]opendata.CDF, tableCDF map[int]opendata.CDF, perturbationDelta float64) CUnionableVector {
 	log.Printf("processing candidate table %s.", candidateTable)
 	var result CUnionableVector
@@ -78,30 +79,42 @@ func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[strin
 	cUnionabilityPercentiles := make([]opendata.Percentile, 0)
 	queryTextDomains := getTextDomains(queryTable, domainDir)
 	candTextDomains := getTextDomains(candidateTable, domainDir)
-	partialAlign := counter.NewCounter()
-	reverseAlign := counter.NewCounter()
-	maxC := len(candTextDomains)
+	partialAlign := make(map[string](*counter.Counter))
+	reverseAlign := make(map[string](*counter.Counter))
+	partialAlign[candidateTable] = counter.NewCounter()
+	reverseAlign[queryTable] = counter.NewCounter()
+	sketchedCandColumns := make(map[int]bool)
+	sketchedQueryColumns := make(map[int]bool)
+	maxC := int(math.Min(float64(len(candTextDomains)), float64(len(queryTextDomains))))
 	alignment := make([]Pair, 0)
 	batch := pqueuespan.NewTopKQueue(len(queryTextDomains) * len(candTextDomains))
 	for _, qindex := range queryTextDomains {
 		for _, cindex := range candTextDomains {
 			p := getAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, attCDFs, perturbationDelta)
+			//p := getOneMeasureAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, attCDFs, perturbationDelta, "set")
+			//p := getOneMeasureAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, attCDFs, perturbationDelta, "nl")
+			if p.Sim == -1.0 {
+				log.Printf("-1 for %d and %d", qindex, cindex)
+			} else {
+				sketchedCandColumns[cindex] = true
+				sketchedQueryColumns[qindex] = true
+			}
 			if p.Percentile.Value != 0.0 {
 				//batch.Push(p, p.Percentile)
-				batch.Push(p, p.Percentile.ValueMinus, p.Percentile.ValuePlus)
+				//batch.Push(p, p.Percentile.ValueMinus, p.Percentile.ValuePlus)
+				batch.Push(p, p.Percentile.Value, p.Percentile.Value)
 			}
 		}
 	}
-
 	pairs, _, _ := batch.Descending()
 	for i := range pairs {
 		pair := pairs[i].(Pair)
-		if partialAlign.Has(strconv.Itoa(pair.CandColIndex)) || reverseAlign.Has(strconv.Itoa(pair.QueryColIndex)) {
+		if partialAlign[candidateTable].Has(pair.CandColIndex) || reverseAlign[queryTable].Has(pair.QueryColIndex) {
 			// because we are using priority queue
 			continue
 		}
-		partialAlign.Update(strconv.Itoa(pair.CandColIndex))
-		reverseAlign.Update(strconv.Itoa(pair.QueryColIndex))
+		partialAlign[candidateTable].Update(pair.CandColIndex)
+		reverseAlign[queryTable].Update(pair.QueryColIndex)
 		alignment = append(alignment, pair)
 		if len(cUnionabilityScores) == 0 {
 			cUnionabilityScores = append(cUnionabilityScores, pair.Percentile.Value)
@@ -111,11 +124,11 @@ func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[strin
 		cUnionabilityPercentiles = append(cUnionabilityPercentiles, opendata.GetPerturbedPercentile(tableCDF[len(cUnionabilityPercentiles)+1], cUnionabilityScores[len(cUnionabilityScores)-1], perturbationDelta))
 		//cUnionabilityPercentiles = append(cUnionabilityPercentiles, getPercentile(tableCDF[len(cUnionabilityPercentiles)+1], cUnionabilityScores[len(cUnionabilityScores)-1]))
 		// When we get c unique column alignments for a candidate table
-		if partialAlign.Unique() == maxC {
+		if partialAlign[candidateTable].Unique() == maxC {
 			break
 		}
 	}
-	maxC = len(cUnionabilityPercentiles)
+	//maxC = len(cUnionabilityPercentiles)
 	// if no alignment found for k = number of query columns
 	for i := len(cUnionabilityScores); i < maxC; i += 1 {
 		cUnionabilityScores = append(cUnionabilityScores, 0.0)
@@ -128,19 +141,52 @@ func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[strin
 	//inds := make([]int, len(s))
 	// ascending sort
 	//floats.Argsort(s, inds)
-	s, bestC := opendata.SortPercentiles(cUnionabilityPercentiles)
+	//log.Printf("queryTable: %s, candTable: %s,len(cUnionabilityPercentiles): %d", queryTable, candidateTable, len(cUnionabilityPercentiles))
+	if len(cUnionabilityPercentiles) == 0 {
+		log.Printf("queryTable: %s, candTable: %s,len(cUnionabilityPercentiles): %d, len(cUnionabilityScores): %d", queryTable, candidateTable, len(cUnionabilityPercentiles), len(cUnionabilityScores))
+	}
+	_, bestC := opendata.SortPercentiles(cUnionabilityPercentiles)
 	result = CUnionableVector{
 		queryTable:     queryTable,
 		candidateTable: candidateTable,
 		scores:         cUnionabilityScores,
-		//percentiles:    cUnionabilityPercentiles,
-		percentiles: s,
-		alignment:   alignment,
-		maxC:        maxC,
+		percentiles:    cUnionabilityPercentiles,
+		//percentiles: s,
+		alignment: alignment,
+		maxC:      maxC,
 		//bestC:       inds[len(inds)-1] + 1,
-		bestC: bestC + 1,
+		bestC:                    bestC + 1,
+		sketchedQueryColsNum:     len(sketchedQueryColumns),
+		sketchedCandidateColsNum: len(sketchedCandColumns),
 	}
 	return result
+}
+
+func getOneMeasureAttUnionabilityPair(queryTable, candidateTable string, qindex, cindex int, attCDFs map[string]opendata.CDF, perturbationDelta float64, measure string) Pair {
+	uScore, uPercentile, uMeasures := opendata.GetOneMeasureAttUnionabilityPercentile(queryTable, candidateTable, qindex, cindex, attCDFs, perturbationDelta, measure)
+	p := Pair{
+		CandTableID:   candidateTable,
+		CandColIndex:  cindex,
+		QueryColIndex: qindex,
+		Sim:           uScore,
+		Percentile:    uPercentile,
+		Measure:       measure,
+	}
+	for _, m := range uMeasures {
+		if m == "set" {
+			p.Hypergeometric = uScore
+		}
+		if m == "sem" {
+			p.OntologyHypergeometric = uScore
+		}
+		if m == "semset" {
+			p.SemSet = uScore
+		}
+		if m == "nl" {
+			p.Cosine = uScore
+		}
+	}
+	return p
 }
 
 func getAttUnionabilityPair(queryTable, candidateTable string, qindex, cindex int, attCDFs map[string]opendata.CDF, perturbationDelta float64) Pair {

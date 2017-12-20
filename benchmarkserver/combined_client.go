@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	queryDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v5/csvfiles/"
+	queryDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v6/csvfiles/"
 	//queryDir = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
 )
 
@@ -114,19 +114,19 @@ func (c *CombinedClient) Query(queryCSVFilename string, n int) []QueryResult {
 				nlMeans = append(nlMeans, nlMean)
 				nlCovars = append(nlCovars, nlCovar)
 				nlCards = append(nlCards, len(col))
-				queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
-				textToAllHeaders[len(queryTextHeaders)-1] = i
 			}
 			if len(setVec) != 0 && err3 == nil {
 				setVecs = append(setVecs, setVec)
 				setCards = append(setCards, getCardinality(col))
 			}
-			if err2 == nil {
+			if len(ontVec) != 0 && err2 == nil {
 				ontVecs = append(ontVecs, ontVec)
 				noOntVecs = append(noOntVecs, noOntVec)
 				ontCards = append(ontCards, ontCard)
 				noOntCards = append(noOntCards, noOntCard)
 			}
+			queryTextHeaders = append(queryTextHeaders, queryHeaders[i])
+			textToAllHeaders[len(queryTextHeaders)-1] = i
 		}
 	}
 	// the query is empty
@@ -143,6 +143,7 @@ func (c *CombinedClient) Query(queryCSVFilename string, n int) []QueryResult {
 	}
 	log.Printf("query: %s", queryCSVFilename)
 	for _, result := range resp.Result {
+		log.Printf("query: %s", queryCSVFilename)
 		log.Printf("candidate: %s", result.TableUnion.CandTableID)
 		result.TableUnion.QueryHeader = queryHeaders
 		result.TableUnion.QueryTextHeader = queryTextHeaders
@@ -150,10 +151,10 @@ func (c *CombinedClient) Query(queryCSVFilename string, n int) []QueryResult {
 		log.Printf("table unionability scores: %v", result.TableUnion.CUnionabilityScores)
 		log.Printf("table unionability percentile: %v", result.TableUnion.CUnionabilityPercentiles)
 		log.Printf("maxC: %d - bestC: %d bestPerc: %f", len(result.TableUnion.CUnionabilityPercentiles), result.TableUnion.BestC, result.TableUnion.CUnionabilityPercentiles[result.TableUnion.BestC-1])
-		for i, pair := range result.TableUnion.Alignment {
+		for _, pair := range result.TableUnion.Alignment {
 			log.Printf("%s -> %s : score %f - perc: %f - measure: %s", queryHeaders[pair.QueryColIndex], result.TableUnion.CandHeader[pair.CandColIndex], pair.Sim, pair.Percentile, pair.Measure)
-			pair.QueryColIndex = textToAllHeaders[pair.QueryColIndex]
-			result.TableUnion.Alignment[i] = pair
+			//pair.QueryColIndex = textToAllHeaders[pair.QueryColIndex]
+			//result.TableUnion.Alignment[i] = pair
 		}
 		log.Printf("--------------------------")
 		results = append(results, result)
