@@ -202,6 +202,59 @@ func getAllAttUnionability(queryTable, candidateTable string, queryIndex, candIn
 	return uSet, uSem, uSemSet, uNL
 }
 
+func GetOneMeasureAttUnionabilityPercentile(queryTable, candidateTable string, queryIndex, candIndex int, attCDFs map[string]CDF, perturbationDelta float64, measure string) (float64, Percentile, []string) {
+	var attCDF CDF
+	if measure == "set" {
+		attCDF = attCDFs["set"]
+	}
+	if measure == "sem" {
+		attCDF = attCDFs["sem"]
+	}
+	if measure == "semset" {
+		attCDF = attCDFs["semset"]
+	}
+	if measure == "nl" {
+		attCDF = attCDFs["nl"]
+	}
+	uMeasure := make([]string, 0)
+	var u float64
+	var perc Percentile
+	if measure == "set" {
+		u = setUnionability(queryTable, candidateTable, queryIndex, candIndex)
+		if u == -1.0 {
+			return -1.0, Percentile{0.0, 0.0, 0.0, 0.0}, []string{}
+		}
+		perc = GetPerturbedPercentile(attCDF, u, perturbationDelta)
+		uMeasure = append(uMeasure, "set")
+	}
+	if measure == "nl" {
+		u = nlUnionability(queryTable, candidateTable, queryIndex, candIndex)
+		if u == -1.0 {
+			return -1.0, Percentile{0.0, 0.0, 0.0, 0.0}, []string{}
+		}
+		perc = GetPerturbedPercentile(attCDF, u, perturbationDelta)
+		uMeasure = append(uMeasure, "nl")
+	}
+	if measure == "sem" || measure == "semset" {
+		uSem, uSemSet := semSetUnionability(queryTable, candidateTable, queryIndex, candIndex)
+		if measure == "sem" {
+			if uSem == -1.0 {
+				return -1.0, Percentile{0.0, 0.0, 0.0, 0.0}, []string{}
+			}
+			perc = GetPerturbedPercentile(attCDF, uSem, perturbationDelta)
+			uMeasure = append(uMeasure, "sem")
+		}
+		if measure == "semset" {
+			if uSemSet == -1.0 {
+				return -1.0, Percentile{0.0, 0.0, 0.0, 0.0}, []string{}
+			}
+			perc = GetPerturbedPercentile(attCDF, u, perturbationDelta)
+			uMeasure = append(uMeasure, "semset")
+		}
+	}
+	return u, perc, uMeasure
+}
+
 func GetAttUnionabilityPercentile(queryTable, candidateTable string, queryIndex, candIndex int, attCDFs map[string]CDF, perturbationDelta float64) (float64, Percentile, []string) {
 	setCDF := attCDFs["set"]
 	semCDF := attCDFs["sem"]
@@ -213,12 +266,18 @@ func GetAttUnionabilityPercentile(queryTable, candidateTable string, queryIndex,
 	uSet := setUnionability(queryTable, candidateTable, queryIndex, candIndex)
 	//uSetPerc := getPercentile(setCDF, uSet)
 	uSetPerc := GetPerturbedPercentile(setCDF, uSet, perturbationDelta)
+	//log.Printf("queryIndex: %d  candIndex: %d uSet: %f  uSetPerc: %v", queryIndex, candIndex, uSet, uSetPerc)
 	uScore = uSet
 	uPercentile = uSetPerc
 	uMeasure = append(uMeasure, "set")
+	uSem, uSemSet := semSetUnionability(queryTable, candidateTable, queryIndex, candIndex)
 	uNL := nlUnionability(queryTable, candidateTable, queryIndex, candIndex)
+	if uSet == -1.0 && uSem == -1.0 && uSemSet == -1.0 && uNL == -1.0 {
+		return -1.0, Percentile{0.0, 0.0, 0.0, 0.0}, []string{}
+	}
 	//uNLPerc := getPercentile(nlCDF, uNL)
 	uNLPerc := GetPerturbedPercentile(nlCDF, uNL, perturbationDelta)
+	//log.Printf("queryIndex: %d  candIndex: %d uNL: %f  uNLPerc: %v", queryIndex, candIndex, uNL, uNLPerc)
 	//if uNLPerc > uPercentile.Value {
 	cmp := ComparePercentiles(uNLPerc, uPercentile)
 	if cmp == 1 {
@@ -229,11 +288,12 @@ func GetAttUnionabilityPercentile(queryTable, candidateTable string, queryIndex,
 	} else if cmp == 0 {
 		uMeasure = append(uMeasure, "nl")
 	}
-	uSem, uSemSet := semSetUnionability(queryTable, candidateTable, queryIndex, candIndex)
 	uSemPerc := GetPerturbedPercentile(semCDF, uSem, perturbationDelta)
+	//log.Printf("queryIndex: %d  candIndex: %d uSem: %f  uSemPerc: %v", queryIndex, candIndex, uSem, uSemPerc)
 	//uSemPerc := getPercentile(semCDF, uSem)
 	//uSemSetPerc := getPercentile(semsetCDF, uSemSet)
 	uSemSetPerc := GetPerturbedPercentile(semsetCDF, uSemSet, perturbationDelta)
+	//log.Printf("queryIndex: %d  candIndex: %d uSemSet: %f  uSemSetPerc: %v", queryIndex, candIndex, uSemSet, uSemSetPerc)
 	cmp = ComparePercentiles(uSemSetPerc, uPercentile)
 	if cmp == 1 {
 		//if uSemSetPerc > uPercentile.Value {
@@ -341,14 +401,17 @@ func semSetUnionability(queryTable, candidateTable string, queryIndex, candIndex
 		return -1.0, -1.0
 	}
 	ontJaccard := estimateJaccard(coVec, qoVec)
-	noA, nA := getOntDomainCardinality(candidateTable, candIndex)
-	noB, nB := getOntDomainCardinality(queryTable, queryIndex)
-	if noA == -1.0 || nA == -1.0 || noB == -1.0 || nB == -1.0 {
-		return -1.0, -1.0
-	}
-	noOntProb := sameDomainProb(jaccard, noA, noB)
-	ontProb := sameDomainProb(ontJaccard, nA, nB)
-	return ontProb, noOntProb + ontProb - ontProb*noOntProb
+	//noA, nA := getOntDomainCardinality(candidateTable, candIndex)
+	//noB, nB := getOntDomainCardinality(queryTable, queryIndex)
+	//if noA == -1.0 || nA == -1.0 || noB == -1.0 || nB == -1.0 {
+	//	return -1.0, -1.0
+	//}
+	//noOntProb := sameDomainProb(jaccard, noA, noB)
+	//ontProb := sameDomainProb(ontJaccard, nA, nB)
+	uSem := ontJaccard
+	uSemSet := jaccard + ontJaccard - ontJaccard*jaccard
+	return uSem, uSemSet
+	//return ontProb, noOntProb + ontProb - ontProb*noOntProb
 }
 
 func nlUnionability(queryTable, candidateTable string, queryIndex, candIndex int) float64 {
@@ -383,7 +446,8 @@ func nlUnionability(queryTable, candidateTable string, queryIndex, candIndex int
 	//qCard := getDomainSize(queryTable, domainDir, queryIndex)
 	cosine := embedding.Cosine(qMean, cMean)
 	//ht2, f := getT2Statistics(mean, queryMean, covar, queryCovar, card, queryCardinality)
-	return cosine
+	uNL := cosine
+	return uNL
 }
 
 func setUnionability(queryTable, candidateTable string, queryIndex, candIndex int) float64 {
@@ -406,12 +470,13 @@ func setUnionability(queryTable, candidateTable string, queryIndex, candIndex in
 	}
 	// inserting the pair into its corresponding priority queue
 	jaccard := estimateJaccard(cVec, qVec)
-	nB := getDomainCardinality(candidateTable, candIndex)
-	nA := getDomainCardinality(queryTable, queryIndex)
-	if nB == -1.0 || nA == -1.0 {
-		return -1.0
-	}
-	uSet := sameDomainProb(jaccard, nA, nB)
+	//nB := getDomainCardinality(candidateTable, candIndex)
+	//nA := getDomainCardinality(queryTable, queryIndex)
+	//if nB == -1.0 || nA == -1.0 {
+	//	return -1.0
+	//}
+	//uSet := sameDomainProb(jaccard, nA, nB)
+	uSet := jaccard
 	return uSet
 }
 
@@ -575,6 +640,12 @@ func getOntDomainCardinality(tableID string, index int) (int, int) {
 	return card, ocard
 }
 
+func CountTextAtts(queryTable string, candidateTable string) int {
+	queryTextDomains := getTextDomains(queryTable)
+	candTextDomains := getTextDomains(candidateTable)
+	return len(queryTextDomains) * len(candTextDomains)
+}
+
 func DoSaveAttScores(allScores chan []AttributeUnion, progress chan ProgressCounter) {
 	db, err := sql.Open("sqlite3", AttStatsDB)
 	if err != nil {
@@ -640,6 +711,16 @@ func DoSaveTableScores(unions chan TableUnion, progress chan ProgressCounter) {
 	//}()
 }
 
+type attPairPerc struct {
+	queryTable      string
+	candidateTable  string
+	queryColumn     int
+	candidateColumn int
+	score           float64
+	measure         string
+	percentile      float64
+}
+
 func SavePercentileAttUnionability() {
 	setCDF, semCDF, semsetCDF, nlCDF := LoadAttCDF()
 	cdfs := make(map[string]CDF)
@@ -670,105 +751,167 @@ func SavePercentileAttUnionability() {
 	if err != nil {
 		panic(err)
 	}
+	wg := &sync.WaitGroup{}
+	wg.Add(52)
+	wwg := &sync.WaitGroup{}
+	wwg.Add(3)
 	var count int
-	for rows.Next() {
-		var queryTable string
-		var candidateTable string
-		var queryColumn int
-		var candidateColumn int
-		var score float64
-		var measure string
-		err := rows.Scan(&queryTable, &candidateTable, &queryColumn, &candidateColumn, &score, &measure)
-		if err != nil {
-			panic(err)
+	pairs := make(chan attPairPerc, 100)
+	savePairs := make(chan attPairPerc, 5000)
+	go func() {
+		for rows.Next() {
+			var queryTable string
+			var candidateTable string
+			var queryColumn int
+			var candidateColumn int
+			var score float64
+			var measure string
+			err := rows.Scan(&queryTable, &candidateTable, &queryColumn, &candidateColumn, &score, &measure)
+			if err != nil {
+				panic(err)
+			}
+			pairs <- attPairPerc{
+				queryTable:      queryTable,
+				candidateTable:  candidateTable,
+				queryColumn:     queryColumn,
+				candidateColumn: candidateColumn,
+				score:           score,
+				measure:         measure,
+			}
 		}
-		//percentile := getPercentile(cdfs[measure], score)
-		percentile := getPercentileEquiDepth(cdfs[measure], score)
-		_, err = stmt.Exec(queryTable, candidateTable, queryColumn, candidateColumn, score, percentile, measure)
-		if err != nil {
-			panic(err)
+		rows.Close()
+		close(pairs)
+		wwg.Done()
+	}()
+	go func() {
+		for i := 0; i < 52; i++ {
+			go func() {
+				for p := range pairs {
+					//percentile := getPercentile(cdfs[measure], score)
+					percentile := getPercentileEquiDepth(cdfs[p.measure], p.score)
+					p.percentile = percentile
+					savePairs <- p
+				}
+				wg.Done()
+			}()
 		}
-		count += 1
-		if count%500 == 0 {
-			log.Printf("Processed count %d attribute pairs.", count)
+	}()
+	go func() {
+		wg.Wait()
+		close(savePairs)
+		wwg.Done()
+	}()
+	go func() {
+		for p := range savePairs {
+			_, err = stmt.Exec(p.queryTable, p.candidateTable, p.queryColumn, p.candidateColumn, p.score, p.percentile, p.measure)
+			if err != nil {
+				panic(err)
+			}
+			count += 1
+			if count%500 == 0 {
+				log.Printf("Processed count %d attribute pairs.", count)
+			}
 		}
-	}
-	rows.Close()
+		wwg.Done()
+	}()
+	wwg.Wait()
 	db1.Close()
 	db2.Close()
 }
 
 func ComputeTableUnionabilityVariousC() {
 	tableUnions := make(chan tableCUnion)
-	db, err := sql.Open("sqlite3", TableStatsDB)
+	db, err := sql.Open("sqlite3", AttStatsDB)
 	if err != nil {
 		panic(err)
 	}
-	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT query_table, candidate_table FROM %s LIMIT 50000;`, AllAttPercentileTable))
+	rows2, err := db.Query(fmt.Sprintf(`SELECT DISTINCT query_table, candidate_table FROM %s;`, AllAttPercentileTable))
 	if err != nil {
 		panic(err)
 	}
 	//
-	tablePairs := make([]string, 0)
-	for rows.Next() {
-		var queryTable string
-		var candidateTable string
-		err := rows.Scan(&queryTable, &candidateTable)
-		if err != nil {
-			panic(err)
-		}
-		tablePairs = append(tablePairs, queryTable+" "+candidateTable)
-	}
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	//tablePairs := make([]string, 0)
+	tablePairs := make(chan string)
+	wwg := &sync.WaitGroup{}
+	wwg.Add(3)
 	go func() {
-		var count int
-		for _, pair := range tablePairs {
-			rows, err = db.Query(fmt.Sprintf(`SELECT DISTINCT query_column, candidate_column, MAX(percentile) AS maxPercentile FROM %s WHERE query_table='%s' AND candidate_table='%s' GROUP BY query_column, candidate_column ORDER BY maxPercentile;`, AllAttPercentileTable, strings.Split(pair, " ")[0], strings.Split(pair, " ")[1]))
+		for rows2.Next() {
+			var queryTable string
+			var candidateTable string
+			err := rows2.Scan(&queryTable, &candidateTable)
 			if err != nil {
 				panic(err)
 			}
-			cUnionabilityScores := make(map[int]float64)
-			unionabilityDiffs := make(map[int]float64)
-			c := 1
-			for rows.Next() {
-				var maxPercentile float64
-				var queryColumn int
-				var candidateColumn int
-				err := rows.Scan(&queryColumn, &candidateColumn, &maxPercentile)
+			//tablePairs = append(tablePairs, queryTable+" "+candidateTable)
+			tablePairs <- queryTable + " " + candidateTable
+		}
+		close(tablePairs)
+		wwg.Done()
+	}()
+	wg := &sync.WaitGroup{}
+	wg.Add(35)
+	for i := 0; i < 35; i++ {
+		go func() {
+			//for _, pair := range tablePairs {
+			for pair := range tablePairs {
+				rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT query_column, candidate_column, MAX(percentile) AS maxPercentile FROM %s WHERE query_table='%s' AND candidate_table='%s' AND percentile > 0.0 GROUP BY query_column, candidate_column ORDER BY maxPercentile desc;`, AllAttPercentileTable, strings.Split(pair, " ")[0], strings.Split(pair, " ")[1]))
 				if err != nil {
 					panic(err)
 				}
-				if c == 1 {
-					cUnionabilityScores[c] = maxPercentile
-					unionabilityDiffs[c] = 1.0 - maxPercentile
-				} else {
-					cUnionabilityScores[c] = cUnionabilityScores[c-1] * maxPercentile
-					unionabilityDiffs[c] = cUnionabilityScores[c-1] - cUnionabilityScores[c]
+				cUnionabilityScores := make(map[int]float64)
+				unionabilityDiffs := make(map[int]float64)
+				queryAligned := make(map[int]bool)
+				candAligned := make(map[int]bool)
+				c := 1
+				for rows.Next() {
+					var maxPercentile float64
+					var queryColumn int
+					var candidateColumn int
+					err := rows.Scan(&queryColumn, &candidateColumn, &maxPercentile)
+					if err != nil {
+						panic(err)
+					}
+					if c == 1 {
+						cUnionabilityScores[c] = maxPercentile
+						unionabilityDiffs[c] = 1.0 - maxPercentile
+						queryAligned[int(queryColumn)] = true
+						candAligned[int(candidateColumn)] = true
+						c += 1
+					} else if _, ok := queryAligned[int(queryColumn)]; !ok {
+						if _, ok := candAligned[int(candidateColumn)]; !ok {
+							cUnionabilityScores[c] = cUnionabilityScores[c-1] * maxPercentile
+							unionabilityDiffs[c] = cUnionabilityScores[c-1] - cUnionabilityScores[c]
+							queryAligned[int(queryColumn)] = true
+							candAligned[int(candidateColumn)] = true
+							c += 1
+						}
+					}
 				}
-				c += 1
+				cus := tableCUnion{
+					queryTable:     strings.Split(pair, " ")[0],
+					candidateTable: strings.Split(pair, " ")[1],
+					cScores:        cUnionabilityScores,
+					diffScores:     unionabilityDiffs,
+				}
+				tableUnions <- cus
 			}
-			cus := tableCUnion{
-				queryTable:     strings.Split(pair, " ")[0],
-				candidateTable: strings.Split(pair, " ")[1],
-				cScores:        cUnionabilityScores,
-				diffScores:     unionabilityDiffs,
-			}
-			tableUnions <- cus
-			count += 1
-			if count%500 == 0 {
-				log.Printf("Processed %d tables.", count)
-			}
-		}
+			wg.Done()
+		}()
+		//wg.Done()
+		//db.Close()
+		//close(tableUnions)
+	}
+	go func() {
+		wg.Wait()
 		db.Close()
 		close(tableUnions)
-		wg.Done()
+		wwg.Done()
 	}()
 	go func() {
 		saveTableUnionabilityVariousC(tableUnions)
-		wg.Done()
+		wwg.Done()
 	}()
-	wg.Wait()
+	wwg.Wait()
 }
 
 func saveTableUnionabilityVariousC(unions chan tableCUnion) {
@@ -796,6 +939,9 @@ func saveTableUnionabilityVariousC(unions chan tableCUnion) {
 			}
 		}
 		count += 1
+		if count%500 == 0 {
+			log.Printf("Processed %d table pairs.", count)
+		}
 	}
 	db.Close()
 }
@@ -812,13 +958,13 @@ func ComputeAttUnionabilityCDF(numBins int) {
 
 func ComputeAllAttUnionabilityCDF(numBins int) {
 	setCdf := computeAttCDFEquiDepth(numBins, AttStatsDB, AllAttStatsTable, "set")
-	saveCDF(setCdf, AttStatsDB, SetCDFTable+"_eqdepth")
+	saveCDF(setCdf, AttStatsDB, SetCDFTable)
 	semCdf := computeAttCDFEquiDepth(numBins, AttStatsDB, AllAttStatsTable, "sem")
-	saveCDF(semCdf, AttStatsDB, SemCDFTable+"_eqdepth")
+	saveCDF(semCdf, AttStatsDB, SemCDFTable)
 	semSetCdf := computeAttCDFEquiDepth(numBins, AttStatsDB, AllAttStatsTable, "semset")
-	saveCDF(semSetCdf, AttStatsDB, SemSetCDFTable+"_eqdepth")
+	saveCDF(semSetCdf, AttStatsDB, SemSetCDFTable)
 	nlCdf := computeAttCDFEquiDepth(numBins, AttStatsDB, AllAttStatsTable, "nl")
-	saveCDF(nlCdf, AttStatsDB, NlCDFTable+"_eqdepth")
+	saveCDF(nlCdf, AttStatsDB, NlCDFTable)
 	/*
 		setCdf := computeAttCDFEquiWidth(numBins, AttStatsDB, AllAttStatsTable, "set")
 		saveCDF(setCdf, AttStatsDB, SetCDFTable)
@@ -1065,6 +1211,7 @@ func computeAttCDFEquiDepth(numBins int, dbName, tableName, measure string) []Bi
 	// setting the lower bound and upper bound of the first and last bins
 	hist[len(hist)-1].UpperBound = 1.0
 	db.Close()
+	log.Printf("Finished computing cdf: %s", measure)
 	return hist
 }
 
@@ -1267,6 +1414,7 @@ func saveCDF(bins []Bin, dbName, tableName string) {
 		}
 	}
 	db.Close()
+	log.Printf("Finished saving: %s %s", dbName, tableName)
 }
 
 func LoadAttCDF() (CDF, CDF, CDF, CDF) {
@@ -1292,7 +1440,7 @@ func readMultCDFFromDB(dbName, tableName string) map[int]CDF {
 	if err != nil {
 		panic(err)
 	}
-	rows, err := db.Query(fmt.Sprintf(`SELECT DISTINCT c FROM %s;`, tableName))
+	rows, err := db.Query(fmt.Sprintf(`SELECT MAX(c) FROM %s;`, tableName))
 	if err != nil {
 		panic(err)
 	}
@@ -1434,11 +1582,11 @@ func GetPerturbedPercentile(cdf CDF, score, delta float64) Percentile {
 	return p
 }
 
-// this method can be modified to sort percentiles based on perturbation
 func SortPercentiles(ps []Percentile) ([]Percentile, int) {
 	vs := make([]float64, 0)
 	sps := make([]Percentile, 0)
 	for _, p := range ps {
+		//vs = append(vs, p.ValueMinus)
 		vs = append(vs, p.Value)
 	}
 	inds := make([]int, len(vs))
@@ -1447,5 +1595,29 @@ func SortPercentiles(ps []Percentile) ([]Percentile, int) {
 	for _, i := range inds {
 		sps = append(sps, ps[i])
 	}
+	//return sps, inds[0]
 	return sps, inds[len(inds)-1]
+}
+
+func PickC(ps []Percentile) ([]Percentile, int) {
+	vs := make([]float64, 0)
+	for _, p := range ps {
+		//vs = append(vs, p.ValueMinus)
+		vs = append(vs, p.Value)
+	}
+	inds := make([]int, len(vs))
+	// ascending sort
+	floats.Argsort(vs, inds)
+	diffs := make([]float64, 0)
+	for j, _ := range vs {
+		if j > 0 {
+			diffs = append(diffs, vs[j]-vs[j-1])
+		}
+	}
+	if len(ps) == 1 {
+		return ps, 0
+	}
+	dinds := make([]int, len(diffs))
+	floats.Argsort(diffs, dinds)
+	return ps, dinds[0]
 }

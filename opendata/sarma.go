@@ -41,7 +41,7 @@ func InitSarma() {
 
 func InitAnnotator() {
 	entityToClass = loadEntityClasses()
-	//prepareDB()
+	prepareDB()
 }
 
 func AnnotateDomainsFromEntityFiles(files <-chan string, fanout int, ext string) <-chan *domainAnnotation {

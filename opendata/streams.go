@@ -418,6 +418,21 @@ func DoClassifyDomainsFromFiles(fanout int, files <-chan string) <-chan int {
 	return out
 }
 
+func getColumnNames(file string) (names []string) {
+	indexFile := path.Join(OutputDir, "domains", file, "index")
+	f, err := os.Open(indexFile)
+	defer f.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		names = append(names, scanner.Text())
+	}
+	return
+}
+
 func getNonNumericDomains(file string) (indices []int) {
 	typesFile := path.Join(OutputDir, "domains", file, "types")
 	f, err := os.Open(typesFile)

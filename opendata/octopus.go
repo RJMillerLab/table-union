@@ -23,6 +23,13 @@ type OctopusScore struct {
 	score     float64
 }
 
+type OctopusAlignment struct {
+	query     string
+	candidate string
+	alignment map[int]int
+	score     float64
+}
+
 func ComputeIDF(filenames <-chan string) map[string]float64 {
 	numDocuments := 0
 	idf := make(map[string]float64)
@@ -92,6 +99,60 @@ func computeTableTFIDF(filename string, idf map[string]float64) (map[string]floa
 	return tfidf, l2
 }
 
+func ComputeColumnTextAlignment(t1name, t2name string, tfidfs1, tfidfs2 []map[string]float64, l2s1, l2s2 []float64) OctopusAlignment {
+	cdists := make([]float64, 0)
+	colpairs := make([]string, 0)
+	for i, _ := range tfidfs1 {
+		for j, _ := range tfidfs2 {
+			if l2s1[i] != 0 && l2s2[j] != 0 {
+				colpairs = append(colpairs, strconv.Itoa(i)+" "+strconv.Itoa(j))
+				cdists = append(cdists, 1.0-computeCosine(tfidfs1[i], tfidfs2[j], l2s1[i], l2s2[j]))
+			}
+		}
+	}
+	cUP := make([]float64, len(cdists))
+	copy(cUP, cdists)
+	s := cUP
+	inds := make([]int, len(s))
+	// ascending sort
+	floats.Argsort(s, inds)
+	m := int(math.Min(float64(len(l2s1)), float64(len(l2s2))))
+	var matchNum int
+	covered := make(map[string]bool)
+	alignment := make(map[int]int)
+	var score float64
+	for jx := 0; jx < len(inds); jx++ {
+		ix := inds[jx]
+		parts := strings.Split(colpairs[ix], " ")
+		if _, ok := covered[t1name+parts[0]]; !ok {
+			if _, ok := covered[t2name+parts[1]]; !ok {
+				score += (1.0 - cdists[ix])
+				if (1.0 - cdists[ix]) <= 0 {
+					continue
+				}
+				matchNum += 1
+				covered[t1name+parts[0]] = true
+				covered[t2name+parts[1]] = true
+				i, _ := strconv.Atoi(parts[0])
+				j, _ := strconv.Atoi(parts[1])
+				alignment[i] = j
+			}
+		}
+
+		if matchNum == m {
+			break
+		}
+	}
+	log.Printf("score: %f, len(alignment): %d", score, len(alignment))
+	sp := OctopusAlignment{
+		query:     t1name,
+		candidate: t2name,
+		score:     score,
+		alignment: alignment,
+	}
+	return sp
+}
+
 func ComputeColumnTextClusterScore(t1name, t2name string, tfidfs1, tfidfs2 []map[string]float64, l2s1, l2s2 []float64) OctopusScore {
 	seen := make(map[string]bool)
 	cdists := make([]float64, 0)
@@ -132,16 +193,65 @@ func ComputeColumnTextClusterScore(t1name, t2name string, tfidfs1, tfidfs2 []map
 				covered[t2name+string(j)] = true
 			}
 		}
+		if matchNum == m {
+			break
+		}
+	}
+	sp := OctopusScore{
+		query:     t1name,
+		candidate: t2name,
+		score:     score,
+	}
+	return sp
+}
+
+func ComputeSizeAlignment(t1name, t2name string, lens1, lens2 []float64) OctopusAlignment {
+	cdists := make([]float64, 0)
+	colpairs := make([]string, 0)
+	for i, _ := range lens1 {
+		for j, _ := range lens2 {
+			if lens1[i] != 0 && lens2[j] != 0 {
+				colpairs = append(colpairs, strconv.Itoa(i)+" "+strconv.Itoa(j))
+				cdists = append(cdists, math.Abs(lens1[i]-lens2[j]))
+			}
+		}
+	}
+	cUP := make([]float64, len(cdists))
+	copy(cUP, cdists)
+	s := cUP
+	inds := make([]int, len(s))
+	// ascending sort
+	floats.Argsort(s, inds)
+	m := int(math.Min(float64(len(lens1)), float64(len(lens2))))
+	var matchNum int
+	covered := make(map[string]bool)
+	alignment := make(map[int]int)
+	var score float64
+	for jx := 0; jx < len(inds); jx++ {
+		ix := inds[jx]
+		parts := strings.Split(colpairs[ix], " ")
+		if _, ok := covered[t1name+parts[0]]; !ok {
+			if _, ok := covered[t2name+parts[1]]; !ok {
+				score -= cdists[ix]
+				matchNum += 1
+				covered[t1name+parts[0]] = true
+				covered[t2name+parts[1]] = true
+				i, _ := strconv.Atoi(parts[0])
+				j, _ := strconv.Atoi(parts[1])
+				alignment[i] = j
+			}
+		}
 
 		if matchNum == m {
 			break
 		}
 	}
-
-	sp := OctopusScore{
+	log.Printf("score: %f len(alignment): %d", score, len(alignment))
+	sp := OctopusAlignment{
 		query:     t1name,
 		candidate: t2name,
 		score:     score,
+		alignment: alignment,
 	}
 	return sp
 }
@@ -269,12 +379,61 @@ func DoSaveOctopusScores(scores <-chan OctopusScore) <-chan ProgressCounter {
 	progress := make(chan ProgressCounter)
 	go func() {
 		for score := range scores {
+			if score.score <= 0.0 {
+				progress <- ProgressCounter{1}
+				continue
+			}
 			//log.Printf("saving the score of %s and %s: %f", score.query, score.candidate, score.score)
 			_, err = stmt.Exec(score.query, score.candidate, score.score)
 			if err != nil {
 				panic(err)
 			}
 			progress <- ProgressCounter{1}
+		}
+		wg.Done()
+	}()
+	go func() {
+		wg.Wait()
+		db.Close()
+		close(progress)
+	}()
+	return progress
+}
+
+func DoSaveOctopusAlignments(alignments <-chan OctopusAlignment) <-chan ProgressCounter {
+	log.Printf("saving octopus scores")
+	db, err := sql.Open("sqlite3", OctopusDB)
+	if err != nil {
+		panic(err)
+	}
+	// Create table
+	_, err = db.Exec(fmt.Sprintf(`drop table if exists %s; create table if not exists %s (query_table text, candidate_table text, query_column_id int, query_column_name text, candidate_column_id int, candidate_column_name text, score real);`, OctopusTable, OctopusTable))
+	if err != nil {
+		panic(err)
+	}
+	stmt, err := db.Prepare(fmt.Sprintf(`insert into %s(query_table, candidate_table, query_column_id, query_column_name, candidate_column_id, candidate_column_name, score) values(?, ?, ?, ?, ?, ?, ?);`, OctopusTable))
+	if err != nil {
+		panic(err)
+	}
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	progress := make(chan ProgressCounter)
+	go func() {
+		for a := range alignments {
+			qColNames := getColumnNames(a.query)
+			cColNames := getColumnNames(a.candidate)
+			if a.score <= 0.0 {
+				progress <- ProgressCounter{1}
+				continue
+			}
+			for c1, c2 := range a.alignment {
+				_, err = stmt.Exec(a.query, a.candidate, c1, qColNames[c1], c2, cColNames[c2], a.score)
+				if err != nil {
+					panic(err)
+				}
+			}
+			progress <- ProgressCounter{1}
+
 		}
 		wg.Done()
 	}()

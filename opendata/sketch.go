@@ -85,7 +85,7 @@ func DoOntologyMinhashFromDB(fanout int, files <-chan string) <-chan *DomainSket
 				fullpath := path.Join(OutputDir, "domains", domain.tableName)
 				fullpath = path.Join(fullpath, fmt.Sprintf("%d.%s", domain.columnIndex, "ont-minhash-l1"))
 				if _, err := os.Stat(fullpath); !os.IsNotExist(err) {
-					return
+					continue
 				}
 				//
 				minhashDomainClasses(domain.tableName, domain.columnIndex, out)
