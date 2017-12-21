@@ -19,7 +19,7 @@ func main() {
 	go func() {
 		for query := range queryFilenames {
 			candFilenames := StreamFilenames()
-			for i := 0; i < 25; i++ {
+			for i := 0; i < 60; i++ {
 				wg.Add(1)
 				go func() {
 					for candidate := range candFilenames {

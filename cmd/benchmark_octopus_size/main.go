@@ -18,7 +18,8 @@ func main() {
 	log.Printf("start of octopus size experiments")
 	CheckEnv()
 	start := GetNow()
-	results := make(chan OctopusScore)
+	//results := make(chan OctopusScore)
+	results := make(chan OctopusAlignment)
 	queryFilenames := StreamQueryFilenames()
 	pairs := make(chan pair)
 	go func() {
@@ -46,11 +47,12 @@ func main() {
 	}()
 	wg := sync.WaitGroup{}
 	go func() {
-		for i := 0; i < 30; i++ {
+		for i := 0; i < 50; i++ {
 			wg.Add(1)
 			go func() {
 				for p := range pairs {
-					sp := ComputeSizeClusterScore(p.t1name, p.t2name, p.colens1, p.colens2)
+					//sp := ComputeSizeClusterScore(p.t1name, p.t2name, p.colens1, p.colens2)
+					sp := ComputeSizeAlignment(p.t1name, p.t2name, p.colens1, p.colens2)
 					results <- sp
 				}
 				wg.Done()
@@ -59,7 +61,8 @@ func main() {
 		wg.Wait()
 		close(results)
 	}()
-	progress := DoSaveOctopusScores(results)
+	progress := DoSaveOctopusAlignments(results)
+	//progress := DoSaveOctopusScores(results)
 	total := ProgressCounter{}
 	for n := range progress {
 		total.Values += n.Values

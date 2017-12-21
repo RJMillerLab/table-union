@@ -20,7 +20,8 @@ func main() {
 	log.Printf("start of octopus column text expeirments")
 	CheckEnv()
 	start := GetNow()
-	results := make(chan OctopusScore)
+	//results := make(chan OctopusScore)
+	results := make(chan OctopusAlignment)
 	allFilenames := StreamFilenames()
 	idf := ComputeIDF(allFilenames)
 	queryFilenames := StreamQueryFilenames()
@@ -56,7 +57,8 @@ func main() {
 			wg.Add(1)
 			go func() {
 				for p := range pairs {
-					sp := ComputeColumnTextClusterScore(p.t1name, p.t2name, p.tfidfs1, p.tfidfs2, p.l2s1, p.l2s2)
+					//sp := ComputeColumnTextClusterScore(p.t1name, p.t2name, p.tfidfs1, p.tfidfs2, p.l2s1, p.l2s2)
+					sp := ComputeColumnTextAlignment(p.t1name, p.t2name, p.tfidfs1, p.tfidfs2, p.l2s1, p.l2s2)
 					results <- sp
 				}
 				wg.Done()
@@ -65,7 +67,8 @@ func main() {
 		wg.Wait()
 		close(results)
 	}()
-	progress := DoSaveOctopusScores(results)
+	//progress := DoSaveOctopusScores(results)
+	progress := DoSaveOctopusAlignments(results)
 	total := ProgressCounter{}
 	for n := range progress {
 		total.Values += n.Values
