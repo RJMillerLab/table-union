@@ -62,6 +62,10 @@ var SemCDFTable = os.Getenv("SEM_CDF_TABLE")
 var SemSetCDFTable = os.Getenv("SEMSET_CDF_TABLE")
 var NlCDFTable = os.Getenv("NL_CDF_TABLE")
 var AllAttPercentileTable = os.Getenv("ALL_ATT_PERCENTILE_TABLE")
+var AttStitchingDB = os.Getenv("ATT_STITCHING_DB")
+var AttStitchingTable = os.Getenv("ATT_STITCHING_TABLE")
+var TableStitchingDB = os.Getenv("TABLE_STITCHING_DB")
+var TableStitchingTable = os.Getenv("TABLE_STITCHING_TABLE")
 
 func CheckEnv() {
 }

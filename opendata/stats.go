@@ -258,7 +258,7 @@ func GetOneMeasureAttUnionabilityPercentile(queryTable, candidateTable string, q
 func GetAttUnionabilityPercentile(queryTable, candidateTable string, queryIndex, candIndex int, attCDFs map[string]CDF, perturbationDelta float64) (float64, Percentile, []string) {
 	setCDF := attCDFs["set"]
 	semCDF := attCDFs["sem"]
-	semsetCDF := attCDFs["semset"]
+	//semsetCDF := attCDFs["semset"]
 	nlCDF := attCDFs["nl"]
 	var uScore float64
 	var uPercentile Percentile
@@ -268,9 +268,9 @@ func GetAttUnionabilityPercentile(queryTable, candidateTable string, queryIndex,
 	uScore = uNL
 	uPercentile = uNLPerc
 	uMeasure = append(uMeasure, "nl")
-	uSem, uSemSet := semSetUnionability(queryTable, candidateTable, queryIndex, candIndex)
+	uSem, _ := semSetUnionability(queryTable, candidateTable, queryIndex, candIndex)
 	uSet := setUnionability(queryTable, candidateTable, queryIndex, candIndex)
-	if uSet == -1.0 && uSem == -1.0 && uSemSet == -1.0 && uNL == -1.0 {
+	if uSet == -1.0 && uSem == -1.0 && uNL == -1.0 {
 		return -1.0, Percentile{0.0, 0.0, 0.0, 0.0}, []string{}
 	}
 	uSetPerc := GetPerturbedPercentile(setCDF, uSet, perturbationDelta)
@@ -284,16 +284,18 @@ func GetAttUnionabilityPercentile(queryTable, candidateTable string, queryIndex,
 		uMeasure = append(uMeasure, "set")
 	}
 	uSemPerc := GetPerturbedPercentile(semCDF, uSem, perturbationDelta)
-	uSemSetPerc := GetPerturbedPercentile(semsetCDF, uSemSet, perturbationDelta)
-	cmp = ComparePercentiles(uSemSetPerc, uPercentile)
-	if cmp == 1 {
-		uScore = uSemSet
-		uPercentile = uSemSetPerc
-		uMeasure = make([]string, 0)
-		uMeasure = append(uMeasure, "semset")
-	} else if cmp == 0 {
-		uMeasure = append(uMeasure, "semset")
-	}
+	/*
+		uSemSetPerc := GetPerturbedPercentile(semsetCDF, uSemSet, perturbationDelta)
+		cmp = ComparePercentiles(uSemSetPerc, uPercentile)
+		if cmp == 1 {
+			uScore = uSemSet
+			uPercentile = uSemSetPerc
+			uMeasure = make([]string, 0)
+			uMeasure = append(uMeasure, "semset")
+		} else if cmp == 0 {
+			uMeasure = append(uMeasure, "semset")
+		}
+	*/
 	cmp = ComparePercentiles(uSemPerc, uPercentile)
 	if cmp == 1 {
 		uScore = uSem
@@ -355,23 +357,25 @@ func GetAttUnionability(queryTable, candidateTable string, queryIndex, candIndex
 }
 
 func semSetUnionability(queryTable, candidateTable string, queryIndex, candIndex int) (float64, float64) {
-	minhashFilename := getUnannotatedMinhashFilename(candidateTable, candIndex)
-	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
-		return -1.0, -1.0
-	}
-	cuaVec, err := ReadMinhashSignature(minhashFilename, numHash)
-	if err != nil {
-		return -1.0, -1.0
-	}
-	minhashFilename = getUnannotatedMinhashFilename(queryTable, queryIndex)
-	if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
-		return -1.0, -1.0
-	}
-	quaVec, err := ReadMinhashSignature(minhashFilename, numHash)
-	if err != nil {
-		return -1.0, -1.0
-	}
-	jaccard := estimateJaccard(quaVec, cuaVec)
+	/*
+		minhashFilename := getUnannotatedMinhashFilename(candidateTable, candIndex)
+		if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
+			return -1.0, -1.0
+		}
+		cuaVec, err := ReadMinhashSignature(minhashFilename, numHash)
+		if err != nil {
+			return -1.0, -1.0
+		}
+		minhashFilename = getUnannotatedMinhashFilename(queryTable, queryIndex)
+		if _, err := os.Stat(minhashFilename); os.IsNotExist(err) {
+			return -1.0, -1.0
+		}
+		quaVec, err := ReadMinhashSignature(minhashFilename, numHash)
+		if err != nil {
+			return -1.0, -1.0
+		}
+		jaccard := estimateJaccard(quaVec, cuaVec)
+	*/
 	// computing ontology jaccard
 	ontMinhashFilename := getOntMinhashFilename(candidateTable, candIndex)
 	if _, err := os.Stat(ontMinhashFilename); os.IsNotExist(err) {
@@ -398,7 +402,8 @@ func semSetUnionability(queryTable, candidateTable string, queryIndex, candIndex
 	//noOntProb := sameDomainProb(jaccard, noA, noB)
 	//ontProb := sameDomainProb(ontJaccard, nA, nB)
 	uSem := ontJaccard
-	uSemSet := jaccard + ontJaccard - ontJaccard*jaccard
+	//uSemSet := jaccard + ontJaccard - ontJaccard*jaccard
+	uSemSet := 0.0
 	return uSem, uSemSet
 	//return ontProb, noOntProb + ontProb - ontProb*noOntProb
 }
