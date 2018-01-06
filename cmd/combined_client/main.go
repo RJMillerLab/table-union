@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/RJMillerLab/table-union/benchmarkserver"
 	"github.com/RJMillerLab/table-union/experiment"
@@ -29,20 +30,22 @@ func main() {
 	var fanout int
 	var opendataDir string
 	var experimentType string
-	//flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/domains",	"The top-level director for all domain and embedding files")
-	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/domains", "The top-level director for all domain and embedding files")
+	flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v7/domains", "The top-level director for all domain and embedding files")
+	//flag.StringVar(&domainDir, "domain-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/domains", "The top-level director for all domain and embedding files")
 	flag.IntVar(&numHash, "h", 256, "LSH Parameter: number of hash functions")
-	flag.StringVar(&queryDir, "query-dir", "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only", "The directory of query files")
-	//flag.StringVar(&queryDir, "query-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/csvfiles",	"The directory of query files")
+	//flag.StringVar(&queryDir, "query-dir", "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only", "The directory of query files")
+	flag.StringVar(&queryDir, "query-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v7/csvfiles", "The directory of query files")
 	flag.Float64Var(&threshold, "t", 0.7, "Search Parameter: k-unionability threshold")
-	flag.IntVar(&n, "n", 25, "Search Parameter: top (n,k) unionable tables")
-	flag.StringVar(&host, "host", "http://localhost:4075", "Server host")
-	flag.StringVar(&port, "port", "4075", "Server port")
-	flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4/combined.sqlite", "experiments DB")
-	flag.StringVar(&opendataDir, "opendate-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v4", "The directory of open data tables.")
+	flag.IntVar(&n, "n", 60, "Search Parameter: top (n,k) unionable tables")
+	flag.StringVar(&host, "host", "http://localhost:4064", "Server host")
+	flag.StringVar(&port, "port", "4064", "Server port")
+	flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v7/investigate.sqlite", "experiments DB")
+	//flag.StringVar(&experimentsDB, "experiments-db", "/home/fnargesian/TABLE_UNION_OUTPUT/scalability.sqlite", "experiments DB")
+	flag.StringVar(&opendataDir, "opendata-dir", "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v7", "The directory of open data tables.")
+	//flag.StringVar(&opendataDir, "opendata-dir", "/home/fnargesian/TABLE_UNION_OUTPUT", "The directory of open data tables.")
 	flag.StringVar(&fastTextSqliteDB, "fasttext-db", "/home/ekzhu/FB_WORD_VEC/fasttext.db",
 		"Sqlite database file for fastText vecs")
-	flag.IntVar(&fanout, "fanout", 10, "Number threads querying the server in parallel.")
+	flag.IntVar(&fanout, "fanout", 15, "Number threads querying the server in parallel.")
 	flag.StringVar(&experimentType, "type", "fixedn", "The type of experiments: fixed k or fixed n.")
 	flag.Parse()
 	// Create client
@@ -57,7 +60,8 @@ func main() {
 	}
 	queries := opendata.StreamQueryFilenames()
 	//
-	alignments := make(chan benchmarkserver.Union, 100)
+	log.Printf("start time: %v", time.Now())
+	alignments := make(chan benchmarkserver.Union, 10)
 	wg := &sync.WaitGroup{}
 	wg.Add(fanout)
 	for i := 0; i < fanout; i++ {
@@ -80,16 +84,16 @@ func main() {
 		wg.Wait()
 		close(alignments)
 	}()
-	progress := experiment.DoSaveAlignments(alignments, "scores", experimentsDB, 1)
 
 	total := experiment.ProgressCounter{}
-	for n := range progress {
+	//for n := range progress {
+	for n := range experiment.DoSaveAlignments(alignments, "setnlsem_scores", experimentsDB, 1) {
 		total.Values += n.Values
-		if total.Values%1 == 0 {
+		if total.Values%100 == 0 {
 			log.Printf("Calculated and saved %d unionable tables", total.Values)
 		}
 	}
+	log.Printf("finish time: %v", time.Now())
 	log.Printf("Calculated and saved %d unionable tables", total.Values)
 	log.Println("Done experiments.")
-
 }

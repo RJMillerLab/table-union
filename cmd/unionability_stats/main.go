@@ -15,7 +15,7 @@ func main() {
 	CheckEnv()
 	//ComputeTableUnionabilityVariousC()
 	//ComputeAttUnionabilityCDF(100)
-	//ComputeAllAttUnionabilityCDF(500)
+	//ComputeAllAttUnionabilityCDF(5000)
 	ComputeTableUnionabilityCDF(500)
 	//SavePercentileAttUnionability()
 	/*
@@ -28,7 +28,7 @@ func main() {
 		allAttUnions := make(chan []AttributeUnion, 500)
 		allTableUnions := make(chan TableUnion, 500)
 		tablePairs := make(chan pair, 500)
-		seen := make(map[string]bool)
+		//seen := make(map[string]bool)
 		queryTables := make([]string, 0)
 		candTables := make([]string, 0)
 		for query := range queryFilenames {
@@ -43,38 +43,27 @@ func main() {
 		}
 		log.Printf("len(queryTables): %d", len(queryTables))
 		log.Printf("len(candTables): %d", len(candTables))
-		s := rand.New(rand.NewSource(time.Now().UnixNano()))
-		r := rand.New(rand.NewSource(time.Now().UnixNano()))
-		i := 0
 		swg := &sync.WaitGroup{}
 		swg.Add(5)
 		go func() {
-			for i < 1000000 {
-				u := r.Intn(len(queryTables))
-				v := s.Intn(len(candTables))
-				query := queryTables[u]
-				cand := candTables[v]
-				if _, ok := seen[cand+" "+query]; !ok {
-					if _, ok := seen[cand+" "+query]; !ok {
-						seen[cand+" "+query] = true
-						seen[query+" "+cand] = true
+			for _, query := range queryTables {
+				for _, cand := range candTables {
+					if query < cand {
 						p := pair{
 							t1name: query,
 							t2name: cand,
 						}
 						tablePairs <- p
-						i += 1
 					}
 				}
 			}
-			log.Printf("i: %d", i)
 			close(tablePairs)
 			swg.Done()
 		}()
 		log.Printf("started computing att unionability.")
 		go func() {
 			wg := &sync.WaitGroup{}
-			for i := 0; i < 45; i++ {
+			for i := 0; i < 95; i++ {
 				wg.Add(1)
 				go func() {
 					for p := range tablePairs {
@@ -109,7 +98,7 @@ func main() {
 				total.Values += n.Values
 				now := GetNow()
 				if total.Values%100 == 0 {
-					fmt.Printf("Processed %d attributes in %.2f seconds\n", total.Values, now-astart)
+					log.Printf("Processed %d attributes in %.2f seconds\n", total.Values, now-astart)
 				}
 			}
 			swg.Done()
@@ -120,7 +109,7 @@ func main() {
 				total.Values += n.Values
 				now := GetNow()
 				if total.Values%100 == 0 {
-					fmt.Printf("Processed %d tables in %.2f seconds\n", total.Values, now-tstart)
+					log.Printf("Processed %d tables in %.2f seconds\n", total.Values, now-tstart)
 				}
 			}
 			swg.Done()
