@@ -248,7 +248,7 @@ func GetOneMeasureAttUnionabilityPercentile(queryTable, candidateTable string, q
 			if uSemSet == -1.0 {
 				return -1.0, Percentile{0.0, 0.0, 0.0, 0.0}, []string{}
 			}
-			perc = GetPerturbedPercentile(attCDF, u, perturbationDelta)
+			perc = GetPerturbedPercentile(attCDF, uSemSet, perturbationDelta)
 			uMeasure = append(uMeasure, "semset")
 		}
 	}
@@ -263,40 +263,30 @@ func GetAttUnionabilityPercentile(queryTable, candidateTable string, queryIndex,
 	var uScore float64
 	var uPercentile Percentile
 	uMeasure := make([]string, 0)
-	uSet := setUnionability(queryTable, candidateTable, queryIndex, candIndex)
-	//uSetPerc := getPercentile(setCDF, uSet)
-	uSetPerc := GetPerturbedPercentile(setCDF, uSet, perturbationDelta)
-	//log.Printf("queryIndex: %d  candIndex: %d uSet: %f  uSetPerc: %v", queryIndex, candIndex, uSet, uSetPerc)
-	uScore = uSet
-	uPercentile = uSetPerc
-	uMeasure = append(uMeasure, "set")
-	uSem, uSemSet := semSetUnionability(queryTable, candidateTable, queryIndex, candIndex)
 	uNL := nlUnionability(queryTable, candidateTable, queryIndex, candIndex)
+	uNLPerc := GetPerturbedPercentile(nlCDF, uNL, perturbationDelta)
+	uScore = uNL
+	uPercentile = uNLPerc
+	uMeasure = append(uMeasure, "nl")
+	uSem, uSemSet := semSetUnionability(queryTable, candidateTable, queryIndex, candIndex)
+	uSet := setUnionability(queryTable, candidateTable, queryIndex, candIndex)
 	if uSet == -1.0 && uSem == -1.0 && uSemSet == -1.0 && uNL == -1.0 {
 		return -1.0, Percentile{0.0, 0.0, 0.0, 0.0}, []string{}
 	}
-	//uNLPerc := getPercentile(nlCDF, uNL)
-	uNLPerc := GetPerturbedPercentile(nlCDF, uNL, perturbationDelta)
-	//log.Printf("queryIndex: %d  candIndex: %d uNL: %f  uNLPerc: %v", queryIndex, candIndex, uNL, uNLPerc)
-	//if uNLPerc > uPercentile.Value {
-	cmp := ComparePercentiles(uNLPerc, uPercentile)
+	uSetPerc := GetPerturbedPercentile(setCDF, uSet, perturbationDelta)
+	cmp := ComparePercentiles(uSetPerc, uPercentile)
 	if cmp == 1 {
-		uScore = uNL
-		uPercentile = uNLPerc
+		uScore = uSet
+		uPercentile = uSetPerc
 		uMeasure = make([]string, 0)
-		uMeasure = append(uMeasure, "nl")
+		uMeasure = append(uMeasure, "set")
 	} else if cmp == 0 {
-		uMeasure = append(uMeasure, "nl")
+		uMeasure = append(uMeasure, "set")
 	}
 	uSemPerc := GetPerturbedPercentile(semCDF, uSem, perturbationDelta)
-	//log.Printf("queryIndex: %d  candIndex: %d uSem: %f  uSemPerc: %v", queryIndex, candIndex, uSem, uSemPerc)
-	//uSemPerc := getPercentile(semCDF, uSem)
-	//uSemSetPerc := getPercentile(semsetCDF, uSemSet)
 	uSemSetPerc := GetPerturbedPercentile(semsetCDF, uSemSet, perturbationDelta)
-	//log.Printf("queryIndex: %d  candIndex: %d uSemSet: %f  uSemSetPerc: %v", queryIndex, candIndex, uSemSet, uSemSetPerc)
 	cmp = ComparePercentiles(uSemSetPerc, uPercentile)
 	if cmp == 1 {
-		//if uSemSetPerc > uPercentile.Value {
 		uScore = uSemSet
 		uPercentile = uSemSetPerc
 		uMeasure = make([]string, 0)
@@ -306,7 +296,6 @@ func GetAttUnionabilityPercentile(queryTable, candidateTable string, queryIndex,
 	}
 	cmp = ComparePercentiles(uSemPerc, uPercentile)
 	if cmp == 1 {
-		//if uSemPerc > uPercentile.Value {
 		uScore = uSem
 		uPercentile = uSemPerc
 		uMeasure = make([]string, 0)
@@ -752,12 +741,12 @@ func SavePercentileAttUnionability() {
 		panic(err)
 	}
 	wg := &sync.WaitGroup{}
-	wg.Add(52)
+	wg.Add(60)
 	wwg := &sync.WaitGroup{}
 	wwg.Add(3)
 	var count int
-	pairs := make(chan attPairPerc, 100)
-	savePairs := make(chan attPairPerc, 5000)
+	pairs := make(chan attPairPerc, 1000)
+	savePairs := make(chan attPairPerc, 10000)
 	go func() {
 		for rows.Next() {
 			var queryTable string
@@ -784,7 +773,7 @@ func SavePercentileAttUnionability() {
 		wwg.Done()
 	}()
 	go func() {
-		for i := 0; i < 52; i++ {
+		for i := 0; i < 60; i++ {
 			go func() {
 				for p := range pairs {
 					//percentile := getPercentile(cdfs[measure], score)
@@ -1099,6 +1088,7 @@ func computeCUnionabilityCDFEquiDepth(numBins int, dbName, tableName string) map
 			}
 		}
 		binSize := int(math.Floor(float64(total) / float64(numBins)))
+		log.Printf("binSize: %d", binSize)
 		rows, err = db.Query(fmt.Sprintf(`SELECT score, count(*) as count FROM %s WHERE c=%d GROUP BY score ORDER BY score ASC;`, tableName, c))
 		if err != nil {
 			panic(err)
@@ -1139,9 +1129,20 @@ func computeCUnionabilityCDFEquiDepth(numBins int, dbName, tableName string) map
 				}
 			}
 		}
-		hist[len(hist)-1].UpperBound = 1.0
+		//hist[len(hist)-1].UpperBound = 1.0
 		hist[len(hist)-1].Percentile = float64(hist[len(hist)-1].AccumulativeCount) / float64(total)
 		hist[len(hist)-1].AccumulativeCount = hist[len(hist)-1].AccumulativeCount + b.Count
+		if hist[len(hist)-1].UpperBound != 1.0 {
+			b = Bin{
+				LowerBound:        hist[len(hist)-1].UpperBound,
+				UpperBound:        1.0,
+				Count:             total - hist[len(hist)-1].AccumulativeCount,
+				AccumulativeCount: total,
+				Percentile:        1.0,
+				Total:             total,
+			}
+			hist = append(hist, b)
+		}
 		cHists[c] = hist
 	}
 	log.Printf("Number of c hists %d.", len(cHists))
@@ -1209,7 +1210,18 @@ func computeAttCDFEquiDepth(numBins int, dbName, tableName, measure string) []Bi
 		}
 	}
 	// setting the lower bound and upper bound of the first and last bins
-	hist[len(hist)-1].UpperBound = 1.0
+	//hist[len(hist)-1].UpperBound = 1.0
+	if hist[len(hist)-1].UpperBound != 1.0 {
+		b = Bin{
+			LowerBound:        hist[len(hist)-1].UpperBound,
+			UpperBound:        1.0,
+			Count:             total - hist[len(hist)-1].AccumulativeCount,
+			AccumulativeCount: total,
+			Percentile:        1.0,
+			Total:             total,
+		}
+		hist = append(hist, b)
+	}
 	db.Close()
 	log.Printf("Finished computing cdf: %s", measure)
 	return hist
@@ -1570,9 +1582,12 @@ func getPercentileEquiDepth(cdf CDF, score float64) float64 {
 }
 
 func GetPerturbedPercentile(cdf CDF, score, delta float64) Percentile {
-	v := getPercentile(cdf, score)
-	lb := getPercentile(cdf, math.Max(score-delta, 0.0))
-	ub := getPercentile(cdf, math.Min(score+delta, 1.0))
+	v := getPercentileEquiDepth(cdf, score)
+	lb := getPercentileEquiDepth(cdf, math.Max(score-delta, 0.0))
+	ub := getPercentileEquiDepth(cdf, math.Min(score+delta, 1.0))
+	//v := getPercentile(cdf, score)
+	//lb := getPercentile(cdf, math.Max(score-delta, 0.0))
+	//ub := getPercentile(cdf, math.Min(score+delta, 1.0))
 	p := Percentile{
 		Value:        v,
 		ValuePlus:    ub,
@@ -1587,7 +1602,8 @@ func SortPercentiles(ps []Percentile) ([]Percentile, int) {
 	sps := make([]Percentile, 0)
 	for _, p := range ps {
 		//vs = append(vs, p.ValueMinus)
-		vs = append(vs, p.Value)
+		//vs = append(vs, p.Value)
+		vs = append(vs, p.ValuePlus)
 	}
 	inds := make([]int, len(vs))
 	// ascending sort
@@ -1595,8 +1611,17 @@ func SortPercentiles(ps []Percentile) ([]Percentile, int) {
 	for _, i := range inds {
 		sps = append(sps, ps[i])
 	}
+	// find the largest c with max c-alignment
+	bestC := inds[len(inds)-1]
+	for i := 0; i < len(ps); i++ {
+		//		if ps[i].Value == ps[inds[len(inds)-1]].Value {
+		if ps[i].ValuePlus == ps[inds[len(inds)-1]].ValuePlus {
+			bestC = i
+		}
+	}
+	return sps, bestC
 	//return sps, inds[0]
-	return sps, inds[len(inds)-1]
+	//return sps, inds[len(inds)-1]
 }
 
 func PickC(ps []Percentile) ([]Percentile, int) {

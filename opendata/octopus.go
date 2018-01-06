@@ -422,7 +422,9 @@ func DoSaveOctopusAlignments(alignments <-chan OctopusAlignment) <-chan Progress
 		for a := range alignments {
 			qColNames := getColumnNames(a.query)
 			cColNames := getColumnNames(a.candidate)
-			if a.score <= 0.0 {
+			// this condition is not required for size cluster
+			//if a.score <= 0.0 {
+			if math.IsNaN(a.score) || math.IsInf(a.score, 0) {
 				progress <- ProgressCounter{1}
 				continue
 			}
