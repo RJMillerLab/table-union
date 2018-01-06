@@ -7,6 +7,9 @@ import os
 MIN_DISTINCT = 4
 NUM_PROJ_PER_C = 2
 NUM_BENCHMARK_TABLE_PER_BASE = 5
+MIN_NUM_ROW_PER_BENCHMARK_TABLE = 100
+# The numebr of horizontal paritions for a table with nrows will be determined by taking:
+# min(NUM_BENCHMARK_TABLE_PER_BASE, max(nrow/MIN_NUM_ROW_PER_BENCHMARK_TABLE, 1))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Given a SQLite3 database of base tables,"
@@ -84,7 +87,8 @@ if __name__ == "__main__":
                 # Count the number of rows in the projected table
                 # and set the limit and offsets
                 nrow = conn.execute('''SELECT count(rowid) FROM "{}";'''.format(proj_table_name)).fetchone()[0]
-                limit = int(nrow / NUM_BENCHMARK_TABLE_PER_BASE)
+                n = min(NUM_BENCHMARK_TABLE_PER_BASE, max(nrow/MIN_NUM_ROW_PER_BENCHMARK_TABLE, 1))
+                limit = int(nrow / n)
                 offsets = [i*limit for i in range(NUM_BENCHMARK_TABLE_PER_BASE)]
 
                 # Create the selections of the projected table

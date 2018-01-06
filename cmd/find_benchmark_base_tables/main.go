@@ -25,7 +25,7 @@ var (
 		"uk":     "/home/ekzhu/OPENDATA/2017-06-05/data.gov.uk.jsonl.db",
 		// []string{"/home/ekzhu/OPENDATA/2017-03-05/catalog.data.gov.jsonl.db", "us"},
 	}
-	numRawTableToSelect                   = 1
+	numRawTableToSelect                   = 25
 	fastTextMinNumCol                     = 5
 	fasttextMinPct                        = 0.8
 	yagoMinNumCol                         = fastTextMinNumCol
