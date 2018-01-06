@@ -22,7 +22,7 @@ import (
 
 var (
 	ByteOrder = binary.BigEndian
-	batchSize = 1000
+	batchSize = 500 //1000
 )
 
 type SearchResult struct {
@@ -38,6 +38,7 @@ type SearchResult struct {
 	BestC                    int
 	SketchedQueryColsNum     int
 	SketchedCandidateColsNum int
+	C                        int
 }
 
 type UnionIndex struct {
@@ -84,10 +85,10 @@ func (index *UnionIndex) BuildScalability(size int) error {
 }
 
 func (index *UnionIndex) Build() error {
-	start := getNow()
 	domainfilenames := opendata.StreamFilenames()
 	embfilenames := opendata.StreamEmbVectors(10, domainfilenames)
 	//embfilenames := StreamAllODEmbVectors(10, domainfilenames)
+	start := getNow()
 	count := 0
 	for file := range embfilenames {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
@@ -109,6 +110,7 @@ func (index *UnionIndex) Build() error {
 	log.Printf("index time for embedding: %f", getNow()-start)
 	//index.lsh.PrintBuckets("/home/fnargesian/TABLE_UNION_OUTPUT/simhash_buckets.csv")
 	//log.Printf("printed")
+	log.Printf("index time for embedding: %f", getNow()-start)
 	return nil
 }
 
@@ -274,7 +276,7 @@ func getColumnPairPlus(candTableID, domainDir string, candColIndex, queryColInde
 		Sim:              cosine,
 		QueryCardinality: queryCardinality,
 		CandCardinality:  card,
-		Measure:          "nl",
+		Measure:          []string{"nl"},
 	}
 	return p
 }

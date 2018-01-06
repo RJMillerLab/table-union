@@ -34,10 +34,10 @@ func NewJaccardUnionIndex(domainDir string, lsh *minhashlsh.MinhashLSH, numHash 
 }
 
 func (index *JaccardUnionIndex) Build() error {
-	start := getNow()
 	domainfilenames := opendata.StreamFilenames()
 	minhashFilenames := opendata.StreamMinhashVectors(10, "minhash", domainfilenames)
 	count := 0
+	start := getNow()
 	for file := range minhashFilenames {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			log.Printf("Simhash file does not exist: %s", file)
@@ -59,6 +59,7 @@ func (index *JaccardUnionIndex) Build() error {
 	log.Printf("index time for jaccard: %f", getNow()-start)
 	//index.lsh.PrintBuckets("/home/fnargesian/TABLE_UNION_OUTPUT/minhash_buckets.csv")
 	//log.Printf("printed.")
+	log.Printf("index time for jaccard: %f", getNow()-start)
 	return nil
 }
 
@@ -166,7 +167,7 @@ func getColumnPairJaccardPlus(candTableID, domainDir string, candColIndex, query
 		Hypergeometric: sig,
 		Sim:            sig,
 		//Sim: jaccard,
-		Measure: "set",
+		Measure: []string{"set"},
 	}
 	return p
 }

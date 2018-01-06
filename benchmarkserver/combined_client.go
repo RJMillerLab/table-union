@@ -17,8 +17,13 @@ import (
 )
 
 var (
-	queryDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v6/csvfiles/"
+	opendataDirUS = "/home/ekzhu/OPENDATA"
+	queryDir      = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v6/csvfiles/"
+	domainDir     = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v6/domains"
+	opendataDir   = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v6/csvfiles"
 	//queryDir = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
+	//domainDir     = "/home/fnargesian/TABLE_UNION_OUTPUT/domains"
+	//opendataDir   = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
 )
 
 type CombinedClient struct {
@@ -57,10 +62,8 @@ func (c *CombinedClient) mkReq(queryRequest CombinedQueryRequest) QueryResponse 
 		panic(err)
 		if nErr, ok := err.(*net.OpError); ok {
 			if nErr.Err == syscall.EPIPE {
-				log.Printf("broken pipe! retrying!")
 				resp, err = c.cli.Do(req)
 				if err != nil {
-					log.Printf("retring failed!")
 					return queryResponse
 				}
 			}
@@ -148,15 +151,15 @@ func (c *CombinedClient) Query(queryCSVFilename string, n int) []QueryResult {
 		result.TableUnion.QueryHeader = queryHeaders
 		result.TableUnion.QueryTextHeader = queryTextHeaders
 		// Retrive header index
-		log.Printf("table unionability scores: %v", result.TableUnion.CUnionabilityScores)
-		log.Printf("table unionability percentile: %v", result.TableUnion.CUnionabilityPercentiles)
-		log.Printf("maxC: %d - bestC: %d bestPerc: %f", len(result.TableUnion.CUnionabilityPercentiles), result.TableUnion.BestC, result.TableUnion.CUnionabilityPercentiles[result.TableUnion.BestC-1])
-		for _, pair := range result.TableUnion.Alignment {
-			log.Printf("%s -> %s : score %f - perc: %f - measure: %s", queryHeaders[pair.QueryColIndex], result.TableUnion.CandHeader[pair.CandColIndex], pair.Sim, pair.Percentile, pair.Measure)
-			//pair.QueryColIndex = textToAllHeaders[pair.QueryColIndex]
-			//result.TableUnion.Alignment[i] = pair
-		}
-		log.Printf("--------------------------")
+		/*
+			log.Printf("table unionability scores: %v", result.TableUnion.CUnionabilityScores)
+			log.Printf("table unionability percentile: %v", result.TableUnion.CUnionabilityPercentiles)
+			log.Printf("maxC: %d - bestC: %d - C: %d bestPerc: %f", len(result.TableUnion.CUnionabilityPercentiles), result.TableUnion.BestC, result.TableUnion.C, result.TableUnion.CUnionabilityPercentiles[result.TableUnion.BestC-1])
+			for _, pair := range result.TableUnion.Alignment {
+				log.Printf("%s -> %s : score %f - perc: %f - measure: %s", queryHeaders[pair.QueryColIndex], result.TableUnion.CandHeader[pair.CandColIndex], pair.Sim, pair.Percentile, pair.Measure)
+			}
+			log.Printf("--------------------------")
+		*/
 		results = append(results, result)
 	}
 	return results

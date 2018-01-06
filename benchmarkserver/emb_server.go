@@ -50,6 +50,7 @@ type Union struct {
 	TextToAllHeaders         map[int]int
 	SketchedQueryColsNum     int
 	SketchedCandidateColsNum int
+	C                        int
 }
 
 func NewServer(ui *UnionIndex) *Server {

@@ -57,7 +57,8 @@ type Pair struct {
 	T2                     float64
 	Sim                    float64
 	Percentile             opendata.Percentile //between 0 and 1
-	Measure                string
+	//Measure                string
+	Measure []string
 }
 
 type CUnionableVector struct {
@@ -92,17 +93,19 @@ func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[strin
 		for _, cindex := range candTextDomains {
 			p := getAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, attCDFs, perturbationDelta)
 			//p := getOneMeasureAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, attCDFs, perturbationDelta, "set")
+			//p := getOneMeasureAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, attCDFs, perturbationDelta, "sem")
+			//p := getOneMeasureAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, attCDFs, perturbationDelta, "semset")
 			//p := getOneMeasureAttUnionabilityPair(queryTable, candidateTable, qindex, cindex, attCDFs, perturbationDelta, "nl")
 			if p.Sim == -1.0 {
-				log.Printf("-1 for %d and %d", qindex, cindex)
+				//log.Printf("-1 for %d and %d", qindex, cindex)
 			} else {
 				sketchedCandColumns[cindex] = true
 				sketchedQueryColumns[qindex] = true
 			}
 			if p.Percentile.Value != 0.0 {
 				//batch.Push(p, p.Percentile)
-				//batch.Push(p, p.Percentile.ValueMinus, p.Percentile.ValuePlus)
-				batch.Push(p, p.Percentile.Value, p.Percentile.Value)
+				batch.Push(p, p.Percentile.ValueMinus, p.Percentile.ValuePlus)
+				//batch.Push(p, p.Percentile.Value, p.Percentile.Value)
 			}
 		}
 	}
@@ -141,11 +144,8 @@ func alignTables(queryTable, candidateTable, domainDir string, attCDFs map[strin
 	//inds := make([]int, len(s))
 	// ascending sort
 	//floats.Argsort(s, inds)
-	//log.Printf("queryTable: %s, candTable: %s,len(cUnionabilityPercentiles): %d", queryTable, candidateTable, len(cUnionabilityPercentiles))
-	if len(cUnionabilityPercentiles) == 0 {
-		log.Printf("queryTable: %s, candTable: %s,len(cUnionabilityPercentiles): %d, len(cUnionabilityScores): %d", queryTable, candidateTable, len(cUnionabilityPercentiles), len(cUnionabilityScores))
-	}
 	_, bestC := opendata.SortPercentiles(cUnionabilityPercentiles)
+	//_, bestC := opendata.PickC(cUnionabilityPercentiles)
 	result = CUnionableVector{
 		queryTable:     queryTable,
 		candidateTable: candidateTable,
@@ -170,7 +170,8 @@ func getOneMeasureAttUnionabilityPair(queryTable, candidateTable string, qindex,
 		QueryColIndex: qindex,
 		Sim:           uScore,
 		Percentile:    uPercentile,
-		Measure:       measure,
+		//Measure:       measure,
+		Measure: []string{measure},
 	}
 	for _, m := range uMeasures {
 		if m == "set" {
@@ -197,7 +198,8 @@ func getAttUnionabilityPair(queryTable, candidateTable string, qindex, cindex in
 		QueryColIndex: qindex,
 		Sim:           uScore,
 		Percentile:    uPercentile,
-		Measure:       uMeasures[0],
+		//Measure:       uMeasures[0],
+		Measure: uMeasures,
 	}
 	for _, m := range uMeasures {
 		if m == "set" {

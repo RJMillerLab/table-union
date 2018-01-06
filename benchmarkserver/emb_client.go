@@ -21,14 +21,6 @@ import (
 	fasttext "github.com/ekzhu/go-fasttext"
 )
 
-var (
-	domainDir   = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v6/domains"
-	opendataDir = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v6/csvfiles"
-	//domainDir     = "/home/fnargesian/TABLE_UNION_OUTPUT/domains"
-	//opendataDir   = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
-	opendataDirUS = "/home/ekzhu/OPENDATA"
-)
-
 type Client struct {
 	ft       *fasttext.FastText
 	host     string
