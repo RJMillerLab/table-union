@@ -134,6 +134,7 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 		if len(ontVecs) == 0 {
 			return
 		}
+		/*
 		for pair := range server.semi.lsh.QueryPlus(ontSigs, done2) {
 			tableID, columnIndex := fromColumnID(pair.CandidateKey)
 			e := getColumnPairOntJaccardPlus(tableID, server.semi.domainDir, columnIndex, pair.QueryIndex, server.semi.numHash, ontVecs[pair.QueryIndex], noOntVecs[pair.QueryIndex], ontCards[pair.QueryIndex], noOntCards[pair.QueryIndex])
@@ -189,6 +190,7 @@ func (server *CombinedServer) CombinedOrderAll(nlMeans, nlCovars [][]float64, se
 			}
 			//}
 		}
+		*/
 	}()
 	wwg := &sync.WaitGroup{}
 	wwg.Add(1)

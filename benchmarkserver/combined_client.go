@@ -18,9 +18,9 @@ import (
 
 var (
 	opendataDirUS = "/home/ekzhu/OPENDATA"
-	queryDir      = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v6/csvfiles/"
-	domainDir     = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v6/domains"
-	opendataDir   = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v6/csvfiles"
+	queryDir      = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v7/csvfiles/"
+	domainDir     = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v7/domains"
+	opendataDir   = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v7/csvfiles"
 	//queryDir = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
 	//domainDir     = "/home/fnargesian/TABLE_UNION_OUTPUT/domains"
 	//opendataDir   = "/home/ekzhu/OPENDATA/resource-2016-12-15-csv-only"
