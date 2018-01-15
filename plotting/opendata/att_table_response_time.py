@@ -30,7 +30,6 @@ parser.add_argument("-outputb", "--outputb", default="plots/attable_response_tim
 args = parser.parse_args(sys.argv[1:])
 
 ns = np.array([i*10 for i in range(1,7)])
-ns = np.array(ns)
 all_rs10 = []
 all_rs90 = []
 
@@ -47,29 +46,29 @@ for i in range(len(dbs)):
 fs = 12
 colors = ["royalblue", "g", "r", "c", "m", "y", "k"]
 hatches = ["//", "\\\\", ".", "+", "xx"]
-width = 1.0
-fig, ax = plt.subplots(figsize=(6, 0.618*6))
+width = 1.75
+fig, ax = plt.subplots(figsize=(6, 0.58*6))
 #ax.set_yscale("log", basey=10)
 ax.yaxis.set_major_formatter(ScalarFormatter())
 ax.tick_params(axis='both', which='major', labelsize=fs)
 for i, ts in enumerate(all_rs90):
     #ts = list(np.log2(np.array(ts)))
     print(ts)
-    ax.bar(ns+i*width, ts, width, label=methods[i], color=colors[i], hatch=hatches[i])
+    ax.bar(ns+i*width, np.array(ts)/1000.0, width, label=methods[i], color=colors[i], hatch=hatches[i])
 ax.set_xticks(ns + width*len(methods)/2.0)
 ax.set_xticklabels(ns)
 ax.set_xlabel("k", fontsize=fs)
-ax.set_ylabel("Response Time (ms)", fontsize=fs)
-ax.set_xlim([5,68])
-ax.set_ylim([0,170000])
+ax.set_ylabel("90th Pct Response Time (s)", fontsize=fs)
+ax.set_xlim([8,69])
+ax.set_ylim([0,170])
 ax.yaxis.grid(linestyle="dotted")
 #ax.set_yticks([0,4,8,12,16,20])
-ax.set_yticks([0,20000,40000,60000,80000,140000])
+#ax.set_yticks([0,20000,40000,60000,80000,140000])
 ax.legend(loc='best', ncol=len(methods), fontsize=fs, fancybox=True, framealpha=0.1, columnspacing=1.70)
 plt.tight_layout()
 plt.savefig(args.outputc)
 print("Done printing 90 percentile.")
-fig, ax = plt.subplots(figsize=(6, 0.618*6))
+fig, ax = plt.subplots(figsize=(6, 0.58*6))
 #ax.set_yscale("log", basey=10)
 ax.yaxis.set_major_formatter(ScalarFormatter())
 ax.tick_params(axis='both', which='major', labelsize=fs)
@@ -77,14 +76,14 @@ for i, ts in enumerate(all_rs10):
     print(methods[i])
     print(ts)
     #ts = list(np.log2(np.array(ts)))
-    ax.bar(ns+i*width, ts, width, label=methods[i], color=colors[i], hatch=hatches[i])
+    ax.bar(ns+i*width, np.array(ts)/1000.0, width, label=methods[i], color=colors[i], hatch=hatches[i])
 ax.set_xticks(ns + width*len(methods)/2.0)
 ax.set_xticklabels(ns)
 ax.set_xlabel("k", fontsize=fs)
-ax.set_yticks([0,200,400,600,800])
-ax.set_ylabel("Response Time (ms)", fontsize=fs)
-ax.set_xlim([5,68])
-ax.set_ylim([0,900])
+#ax.set_yticks([0,200,400,600,800])
+ax.set_ylabel("10th Pct Response Time (s)", fontsize=fs)
+ax.set_xlim([8,69])
+ax.set_ylim([0,0.9])
 ax.yaxis.grid(linestyle="dotted")
 ax.legend(loc='best', ncol=len(methods), fontsize=fs, fancybox=True, framealpha=0.1, columnspacing=2.25)
 plt.tight_layout()
