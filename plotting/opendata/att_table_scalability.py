@@ -53,8 +53,8 @@ fs = 12
 linestyles = ["-+", "-x", "--", "-"]
 cs = ['royalblue','c', 'y', 'b']
 hatches = ['//', '\\', '/', 'o']
-width = 2.0#1.0
-fig, ax = plt.subplots(figsize=(6, 0.618*6))
+width = 1.75#1.0
+fig, ax = plt.subplots(figsize=(3, 3.6))
 #ax.set_yscale("log", basey=2)
 ax.yaxis.set_major_formatter(ScalarFormatter())
 index_labels = ["200K", "400K", "600K", "800K", "1M"]
@@ -63,18 +63,19 @@ labels = ["90-Percentile", "10-Percentile"]
 for i, ts in enumerate(all_rs):
     if i == 1:
         continue
-    ax.bar(ns+i*width, ts, width, label=labels[i], color=cs[i], hatch=hatches[i])
+    ax.bar(ns+i*width, np.array(ts)/1000.0, width, label=labels[i], color=cs[i])
 ax.set_axisbelow(True)
 #
 ax.yaxis.grid(linestyle="dotted")
 #ax.set_xticks(ns + width*len(labels)/2.0)
+ax.set_xlim(3, 28)
 ax.set_xticks(ns)
 ax.set_xticklabels(index_labels)
 for tick in ax.get_xticklabels():
     tick.set_rotation(45)
-ax.set_xlabel('Corpus Size', fontsize=fs)
-ax.set_ylabel('Response Time (ms)', fontsize=fs)
-ax.set_ylim(0,6300)
+ax.set_xlabel('Corpus Size (Number of Tables)', fontsize=fs)
+ax.set_ylabel('90th Pct Response Time (s)', fontsize=fs)
+ax.set_ylim(0,6.3)
 #ax.legend(loc='best', ncol=len(labels), fontsize=10, fancybox=True, framealpha=0.1)
 plt.tight_layout()
 plt.savefig(args.outputa)
