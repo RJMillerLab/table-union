@@ -29,15 +29,12 @@ parser.add_argument("-outputc", "--outputc", default="plots/attable_response_tim
 parser.add_argument("-outputb", "--outputb", default="plots/attable_response_time_10p.pdf")
 args = parser.parse_args(sys.argv[1:])
 
-#ns = [5]
-#ns.extend(np.array([i*10 for i in range(1,7)]))
 ns = np.array([i*10 for i in range(1,7)])
 ns = np.array(ns)
 all_rs10 = []
 all_rs90 = []
 
 dbs = ["scalability.sqlite", "scalability.sqlite", "scalability.sqlite", "scalability.sqlite"]#, "scalability.sqlite"]
-#dbs = ["tablesearch_results.sqlite", "tablesearch_results.sqlite", "tablesearch_results.sqlite", "tablesearch_results.sqlite", "tablesearch_results.sqlite"]
 tables = ["setnlsem_scores", "nl_scores", "set_scores", "sem_scores"]#, "semset_scores"]
 benchmark = "/home/fnargesian/TABLE_UNION_OUTPUT/benchmark-v7"
 methods = ["$U_{Ensemble}$", "$U_{NL}$", "$U_{Set}$", "$U_{Sem}$"]#, "$U_{SemSet}$"]
